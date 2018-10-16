@@ -342,6 +342,9 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			break
 		}
 	}
+	if len(retryPackets)==0{
+		return nil
+	}
 	var writer *ExtentWriter
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = nil
