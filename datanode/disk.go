@@ -102,10 +102,14 @@ func NewDisk(path string, restSize uint64, maxErrs int) (d *Disk) {
 }
 
 func (d *Disk) PartitionCount() int {
+	d.RLock()
+	defer d.RUnlock()
 	return len(d.partitionMap)
 }
 
 func (d *Disk) computeUsage() (err error) {
+	d.RLock()
+	defer d.RUnlock()
 	fs := syscall.Statfs_t{}
 	err = syscall.Statfs(d.Path, &fs)
 	if err != nil {
@@ -219,15 +223,15 @@ func (d *Disk) updateSpaceInfo() (err error) {
 
 func (d *Disk) AttachDataPartition(dp DataPartition) {
 	d.Lock()
-	defer d.Unlock()
 	d.partitionMap[dp.ID()] = dp
+	d.Unlock()
 	d.computeUsage()
 }
 
 func (d *Disk) DetachDataPartition(dp DataPartition) {
 	d.Lock()
-	defer d.Unlock()
 	delete(d.partitionMap, dp.ID())
+	d.Unlock()
 	d.computeUsage()
 }
 
