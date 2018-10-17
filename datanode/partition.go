@@ -328,8 +328,10 @@ func (dp *dataPartition) LaunchRepair() {
 	dp.fileRepair()
 }
 
+
+
 func (dp *dataPartition) updateReplicaHosts() (err error) {
-	if time.Now().Unix()-dp.updateReplicationTime <= int64(5*time.Minute) {
+	if time.Now().Unix()-dp.updateReplicationTime <=UpdateReplicationHostsTime {
 		return
 	}
 	dp.isLeader = false
