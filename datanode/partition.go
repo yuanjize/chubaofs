@@ -340,12 +340,13 @@ func (dp *dataPartition) updateReplicaHosts() (err error) {
 		return
 	}
 	if !dp.compareReplicaHosts(dp.replicaHosts, replicas) {
-		log.LogInfof("action[updateReplicaHosts] partition[%v] replicaHosts changed from [%v] to [%v].",
-			dp.partitionId, dp.replicaHosts, replicas)
+		log.LogInfof(fmt.Sprintf("action[updateReplicaHosts] partition[%v] replicaHosts changed from [%v] to [%v].",
+			dp.partitionId, dp.replicaHosts, replicas))
 	}
 	dp.isLeader = isLeader
 	dp.replicaHosts = replicas
 	dp.updateReplicationTime = time.Now().Unix()
+	log.LogInfof(fmt.Sprintf("ActionUpdateReplicationHosts partiton[%v]",dp.partitionId))
 	return
 }
 
