@@ -41,6 +41,13 @@ type ClusterView struct {
 	DataNodes          []DataNodeView
 }
 
+type VolStatView struct {
+	Name string
+	Total uint64 `json:"TotalGB"`
+	Used uint64 `json:"UsedGB"`
+	Increased uint64 `json:"IncreasedGB"`
+}
+
 type DataNodeView struct {
 	Addr   string
 	Status bool

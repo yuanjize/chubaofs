@@ -40,6 +40,8 @@ type Cluster struct {
 	idAlloc       *IDAllocator
 	t             *Topology
 	compactStatus bool
+	dataNodeSpace *DataNodeSpaceStat
+	metaNodeSpace *MetaNodeSpaceStat
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition) (c *Cluster) {
@@ -52,6 +54,8 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.partition = partition
 	c.idAlloc = newIDAllocator(c.fsm.store, c.partition)
 	c.t = NewTopology()
+	c.dataNodeSpace = new(DataNodeSpaceStat)
+	c.metaNodeSpace = new(MetaNodeSpaceStat)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -72,52 +76,12 @@ func (c *Cluster) startCheckAvailSpace() {
 			if c.partition.IsLeader() {
 				c.checkAvailSpace()
 			}
-			time.Sleep(time.Second * DefaultCheckHeartbeatIntervalSeconds)
+			time.Sleep(time.Minute * DefaultCheckHeartbeatIntervalSeconds )
 		}
 	}()
 
 }
 
-func (c *Cluster) checkAvailSpace() {
-	c.checkDataNodeAvailSpace()
-	c.checkVolAvailSpace()
-}
-
-func (c *Cluster) checkVolAvailSpace() {
-	vols := c.copyVols()
-	for _, vol := range vols {
-		used, total := vol.statSpace()
-		if total <= 0 {
-			continue
-		}
-		useRate := float64(used) / float64(total)
-		if useRate > SpaceAvailRate {
-			Warn(c.Name, fmt.Sprintf("clusterId[%v] vol[%v] space utilization reached [%v],usedSpace[%v],totalSpace[%v] please allocate dataPartition",
-				c.Name, vol.Name, useRate, used, total))
-		}
-	}
-}
-
-func (c *Cluster) checkDataNodeAvailSpace() {
-	var (
-		total uint64
-		used  uint64
-	)
-	c.dataNodes.Range(func(addr, node interface{}) bool {
-		dataNode := node.(*DataNode)
-		total = total + dataNode.Total
-		used = used + dataNode.Used
-		return true
-	})
-	if total <= 0 {
-		return
-	}
-	useRate := float64(used) / float64(total)
-	if useRate > SpaceAvailRate {
-		Warn(c.Name, fmt.Sprintf("clusterId[%v] space utilization reached [%v],usedSpace[%v],totalSpace[%v] please add dataNode",
-			c.Name, useRate, used, total))
-	}
-}
 
 func (c *Cluster) startCheckVols() {
 	go func() {

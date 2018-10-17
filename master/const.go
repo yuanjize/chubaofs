@@ -48,7 +48,7 @@ const (
 	RuntimeStackBufSize                     = 4096
 	NodesAliveRate                  float32 = 0.5
 	MinReadWriteDataPartitions              = 200
-	SpaceAvailRate                          = 0.95
+	SpaceAvailRate                          = 0.90
 )
 
 const (
