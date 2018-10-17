@@ -237,6 +237,7 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 		err = errors.Annotatef(err, "delete dataPartition failed,partitionId[%v]", request.PartitionId)
 		log.LogErrorf("action[handleDeleteDataPartition] err[%v].", err)
 	}
+	log.LogInfof(fmt.Sprintf("action[handleDeleteDataPartition] %v error(%v)", request.PartitionId, string(data)))
 }
 
 // Handle OpLoadDataPartition packet.

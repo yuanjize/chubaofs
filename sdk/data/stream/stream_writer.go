@@ -342,7 +342,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			break
 		}
 	}
-	if len(retryPackets)==0{
+	if len(retryPackets) == 0 {
 		return nil
 	}
 	var writer *ExtentWriter
