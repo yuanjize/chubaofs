@@ -104,17 +104,25 @@ func (m *Master) handleFunctions() {
 	return
 }
 
+func (m *Master) newReverseProxy() *httputil.ReverseProxy {
+	return &httputil.ReverseProxy{Director: func(request *http.Request) {
+		request.URL.Scheme = "http"
+		request.URL.Host = m.leaderInfo.addr
+	}}
+}
+
 func (m *Master) handlerWithInterceptor() http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			leaderId, _ := m.partition.LeaderTerm()
-			if leaderId == 0 {
+
+			if m.partition.IsLeader() {
+				m.ServeHTTP(w, r)
+				return
+			}
+			if m.leaderInfo.addr == "" {
 				log.LogErrorf("action[handlerWithInterceptor] no leader,request[%v]", r.URL)
 				http.Error(w, m.leaderInfo.addr, http.StatusBadRequest)
 				return
-			}
-			if m.partition.IsLeader() {
-				m.ServeHTTP(w, r)
 			} else {
 				m.proxy(w, r)
 			}
@@ -122,12 +130,7 @@ func (m *Master) handlerWithInterceptor() http.Handler {
 }
 
 func (m *Master) proxy(w http.ResponseWriter, r *http.Request) {
-	director := func(request *http.Request) {
-		request.URL.Scheme = "http"
-		request.URL.Host = m.leaderInfo.addr
-	}
-	reverseProxy := &httputil.ReverseProxy{Director: director}
-	reverseProxy.ServeHTTP(w, r)
+	m.reverseProxy.ServeHTTP(w, r)
 }
 
 func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
