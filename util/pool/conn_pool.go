@@ -84,8 +84,10 @@ func (p *Pool) getconnect() (c *ConnectObject) {
 	}
 }
 
+
 func (p *Pool) AutoRelease() {
-	for {
+	connectLen:=len(p.pool)
+	for i:=0;i<connectLen;i++{
 		select {
 		case c := <-p.pool:
 			if time.Now().UnixNano()-int64(c.idle) > p.timeout {

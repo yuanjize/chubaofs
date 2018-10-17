@@ -114,7 +114,8 @@ type dataPartition struct {
 	tinyStore       *storage.TinyStore
 	stopC           chan bool
 
-	runtimeMetrics *DataPartitionMetrics
+	runtimeMetrics        *DataPartitionMetrics
+	updateReplicationTime int64
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
@@ -327,18 +328,25 @@ func (dp *dataPartition) LaunchRepair() {
 	dp.fileRepair()
 }
 
+
+
 func (dp *dataPartition) updateReplicaHosts() (err error) {
+	if time.Now().Unix()-dp.updateReplicationTime <=UpdateReplicationHostsTime {
+		return
+	}
 	dp.isLeader = false
 	isLeader, replicas, err := dp.fetchReplicaHosts()
 	if err != nil {
 		return
 	}
 	if !dp.compareReplicaHosts(dp.replicaHosts, replicas) {
-		log.LogInfof("action[updateReplicaHosts] partition[%v] replicaHosts changed from [%v] to [%v].",
-			dp.partitionId, dp.replicaHosts, replicas)
+		log.LogInfof(fmt.Sprintf("action[updateReplicaHosts] partition[%v] replicaHosts changed from [%v] to [%v].",
+			dp.partitionId, dp.replicaHosts, replicas))
 	}
 	dp.isLeader = isLeader
 	dp.replicaHosts = replicas
+	dp.updateReplicationTime = time.Now().Unix()
+	log.LogInfof(fmt.Sprintf("ActionUpdateReplicationHosts partiton[%v]",dp.partitionId))
 	return
 }
 
