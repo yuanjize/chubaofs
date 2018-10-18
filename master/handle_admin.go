@@ -451,7 +451,7 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, rstMsg)
 	return
 errDeal:
-	logMsg := getReturnMessage("dataNodeOffline", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	logMsg := getReturnMessage("diskOffLine", r.RemoteAddr, err.Error(), http.StatusBadRequest)
 	HandleError(logMsg, err, http.StatusBadRequest, w)
 	return
 }
