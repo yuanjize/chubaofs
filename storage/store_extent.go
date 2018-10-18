@@ -57,7 +57,7 @@ var (
 	GetStableExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return now.Unix()-info.ModTime.Unix() > 30*60 && !info.Deleted && info.Size > 0
+			return now.Unix()-info.ModTime.Unix() > 5*60 && !info.Deleted && info.Size > 0
 		}
 	}
 	GetEmptyExtentFilter = func() ExtentFilter {
