@@ -462,14 +462,10 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode) {
 	Warn(c.Name, msg)
 }
 
-func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string) {
+func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string, badPartitionIds []uint64) {
 	msg := fmt.Sprintf("action[diskOffLine], Node[%v] OffLine,disk[%v]", dataNode.Addr, badDiskPath)
 	log.LogWarn(msg)
 	safeVols := c.getAllNormalVols()
-	badPartitionIds := dataNode.getBadDiskPartitions(badDiskPath)
-	if len(badPartitionIds) == 0 {
-		return
-	}
 	for _, vol := range safeVols {
 		for _, dp := range vol.dataPartitions.dataPartitions {
 			for _, bad := range badPartitionIds {
@@ -481,6 +477,7 @@ func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string) {
 	}
 	msg = fmt.Sprintf("action[diskOffLine],clusterID[%v] Node[%v] OffLine success",
 		c.Name, dataNode.Addr)
+	log.LogWarnf(msg)
 	Warn(c.Name, msg)
 }
 
