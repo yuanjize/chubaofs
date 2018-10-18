@@ -56,7 +56,6 @@ func NewSpaceManager(rack string) SpaceManager {
 	space.stopC = make(chan bool, 0)
 
 	go space.statUpdateScheduler()
-	go space.fileRepairScheduler()
 	go space.flushDeleteScheduler()
 
 	return space
@@ -190,22 +189,6 @@ func (space *spaceManager) getMinPartitionCntDisk() (d *Disk) {
 	return
 }
 
-func (space *spaceManager) fileRepairScheduler() {
-	go func() {
-		timer := time.NewTimer(5 * time.Minute)
-		for {
-			select {
-			case <-timer.C:
-				space.fileRepair()
-				timer = time.NewTimer(2 * time.Minute)
-			case <-space.stopC:
-				timer.Stop()
-				return
-			}
-		}
-	}()
-}
-
 func (space *spaceManager) flushDeleteScheduler() {
 	go func() {
 		ticker := time.NewTicker(2 * time.Minute)
@@ -234,17 +217,6 @@ func (space *spaceManager) statUpdateScheduler() {
 			}
 		}
 	}()
-}
-
-func (space *spaceManager) fileRepair() {
-	partitions := make([]DataPartition, 0)
-	space.RangePartitions(func(dp DataPartition) bool {
-		partitions = append(partitions, dp)
-		return true
-	})
-	for _, partition := range partitions {
-		partition.LaunchRepair()
-	}
 }
 
 func (space *spaceManager) flushDelete() {

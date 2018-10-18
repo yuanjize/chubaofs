@@ -261,6 +261,7 @@ func (dp *dataPartition) statusUpdateScheduler() {
 		select {
 		case <-ticker.C:
 			dp.statusUpdate()
+			dp.LaunchRepair()
 		case <-dp.stopC:
 			ticker.Stop()
 			return
@@ -328,10 +329,8 @@ func (dp *dataPartition) LaunchRepair() {
 	dp.fileRepair()
 }
 
-
-
 func (dp *dataPartition) updateReplicaHosts() (err error) {
-	if time.Now().Unix()-dp.updateReplicationTime <=UpdateReplicationHostsTime {
+	if time.Now().Unix()-dp.updateReplicationTime <= UpdateReplicationHostsTime {
 		return
 	}
 	dp.isLeader = false
@@ -346,7 +345,7 @@ func (dp *dataPartition) updateReplicaHosts() (err error) {
 	dp.isLeader = isLeader
 	dp.replicaHosts = replicas
 	dp.updateReplicationTime = time.Now().Unix()
-	log.LogInfof(fmt.Sprintf("ActionUpdateReplicationHosts partiton[%v]",dp.partitionId))
+	log.LogInfof(fmt.Sprintf("ActionUpdateReplicationHosts partiton[%v]", dp.partitionId))
 	return
 }
 
