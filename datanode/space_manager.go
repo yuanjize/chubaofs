@@ -327,6 +327,7 @@ func (s *DataNode) fillHeartBeatResponse(response *proto.DataNodeHeartBeatRespon
 			PartitionStatus: partition.Status(),
 			Total:           uint64(partition.Size()),
 			Used:            uint64(partition.Used()),
+			DiskPath:        partition.Disk().Path,
 		}
 		response.PartitionInfo = append(response.PartitionInfo, vr)
 		return true
