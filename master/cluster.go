@@ -462,6 +462,28 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode) {
 	Warn(c.Name, msg)
 }
 
+func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string) {
+	msg := fmt.Sprintf("action[diskOffLine], Node[%v] OffLine,disk[%v]", dataNode.Addr, badDiskPath)
+	log.LogWarn(msg)
+	safeVols := c.getAllNormalVols()
+	badPartitionIds := dataNode.getBadDiskPartitions(badDiskPath)
+	if len(badPartitionIds) == 0 {
+		return
+	}
+	for _, vol := range safeVols {
+		for _, dp := range vol.dataPartitions.dataPartitions {
+			for _, bad := range badPartitionIds {
+				if bad == dp.PartitionID {
+					c.dataPartitionOffline(dataNode.Addr, vol.Name, dp, DiskOfflineInfo)
+				}
+			}
+		}
+	}
+	msg = fmt.Sprintf("action[diskOffLine],clusterID[%v] Node[%v] OffLine success",
+		c.Name, dataNode.Addr)
+	Warn(c.Name, msg)
+}
+
 func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 	c.dataNodes.Delete(dataNode.Addr)
 	go dataNode.clean()
@@ -523,7 +545,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {

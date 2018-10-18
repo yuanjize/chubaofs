@@ -16,6 +16,7 @@ package master
 
 const (
 	ParaNodeAddr          = "addr"
+	ParaDiskPath          = "disk"
 	ParaName              = "name"
 	ParaId                = "id"
 	ParaCount             = "count"
@@ -34,6 +35,7 @@ const (
 	GetAvailMetaNodeHostsErr       = "GetAvailMetaNodeHostsErr "
 	GetDataReplicaFileCountInfo    = "GetDataReplicaFileCountInfo "
 	DataNodeOfflineInfo            = "dataNodeOfflineInfo"
+	DiskOfflineInfo				   = "DiskOfflineInfo"
 	HandleDataPartitionOfflineErr  = "HandleDataPartitionOffLineErr "
 )
 

@@ -51,6 +51,7 @@ const (
 	// Node APIs
 	AddDataNode               = "/dataNode/add"
 	DataNodeOffline           = "/dataNode/offline"
+	DiskOffLine               = "/disk/offline"
 	GetDataNode               = "/dataNode/get"
 	AddMetaNode               = "/metaNode/add"
 	MetaNodeOffline           = "/metaNode/offline"
@@ -83,6 +84,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(AddDataNode, m.handlerWithInterceptor())
 	http.Handle(AddMetaNode, m.handlerWithInterceptor())
 	http.Handle(DataNodeOffline, m.handlerWithInterceptor())
+	http.Handle(DiskOffLine, m.handlerWithInterceptor())
 	http.Handle(MetaNodeOffline, m.handlerWithInterceptor())
 	http.Handle(GetDataNode, m.handlerWithInterceptor())
 	http.Handle(GetMetaNode, m.handlerWithInterceptor())
@@ -155,6 +157,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.getDataNode(w, r)
 	case DataNodeOffline:
 		m.dataNodeOffline(w, r)
+	case DiskOffLine:
+		m.diskOffline(w, r)
 	case DataNodeResponse:
 		m.dataNodeTaskResponse(w, r)
 	case AddMetaNode:
