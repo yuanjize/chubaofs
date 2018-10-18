@@ -83,8 +83,8 @@ func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec
 
 	for _, addr := range partition.PersistenceHosts {
 		if partition.missDataPartition(addr) == true && partition.needWarnMissDataPartition(addr, dataPartitionWarnInterval) {
-			msg := fmt.Sprintf("action[checkMissErr], partitionID:%v  on Node:%v  "+
-				"miss time  > :%v  but server not exsit So Migrate", partition.PartitionID, addr, dataPartitionMissSec)
+			msg := fmt.Sprintf("action[checkMissErr], clusterID[%v] partitionID:%v  on Node:%v  "+
+				"miss time  > :%v  but server not exsit So Migrate", clusterID, partition.PartitionID, addr, dataPartitionMissSec)
 			Warn(clusterID, msg)
 		}
 	}

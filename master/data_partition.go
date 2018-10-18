@@ -104,10 +104,22 @@ func (partition *DataPartition) canOffLine(offlineAddr string) (err error) {
 	msg := fmt.Sprintf("action[canOffLine],partitionID:%v  RocksDBHost:%v  offLine:%v ",
 		partition.PartitionID, partition.PersistenceHosts, offlineAddr)
 	liveReplicas := partition.getLiveReplicas(DefaultDataPartitionTimeOutSec)
-	if len(liveReplicas) < 2 {
+	otherLiveReplicas := partition.removeOfflineAddr(liveReplicas, offlineAddr)
+	if len(otherLiveReplicas) < int(partition.ReplicaNum/2) {
 		msg = fmt.Sprintf(msg+" err:%v  liveReplicas:%v ", CannotOffLineErr, len(liveReplicas))
 		log.LogError(msg)
 		err = fmt.Errorf(msg)
+	}
+	return
+}
+
+func (partition *DataPartition) removeOfflineAddr(liveReplicas []*DataReplica, offlineAddr string) (otherLiveReplicas []*DataReplica) {
+	otherLiveReplicas = make([]*DataReplica, 0)
+	for i := 0; i < len(liveReplicas); i++ {
+		replica := partition.Replicas[i]
+		if replica.Addr != offlineAddr {
+			otherLiveReplicas = append(otherLiveReplicas, replica)
+		}
 	}
 
 	return
