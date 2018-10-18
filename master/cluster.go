@@ -42,6 +42,7 @@ type Cluster struct {
 	compactStatus bool
 	dataNodeSpace *DataNodeSpaceStat
 	metaNodeSpace *MetaNodeSpaceStat
+	volSpaceStat  sync.Map
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition) (c *Cluster) {
@@ -76,12 +77,11 @@ func (c *Cluster) startCheckAvailSpace() {
 			if c.partition.IsLeader() {
 				c.checkAvailSpace()
 			}
-			time.Sleep(time.Minute * DefaultCheckHeartbeatIntervalSeconds )
+			time.Sleep(time.Minute * DefaultCheckHeartbeatIntervalSeconds)
 		}
 	}()
 
 }
-
 
 func (c *Cluster) startCheckVols() {
 	go func() {
@@ -523,7 +523,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
