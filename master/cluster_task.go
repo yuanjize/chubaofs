@@ -506,7 +506,6 @@ func (c *Cluster) dealDataNodeHeartbeatResp(nodeAddr string, resp *proto.DataNod
 	dataNode.setNodeAlive()
 	c.t.putDataNode(dataNode)
 	c.UpdateDataNode(dataNode, resp.PartitionInfo)
-	dataNode.dataPartitionInfos = nil
 	logMsg = fmt.Sprintf("action[dealDataNodeHeartbeatResp],dataNode:%v ReportTime:%v  success", dataNode.Addr, time.Now().Unix())
 	log.LogInfof(logMsg)
 
