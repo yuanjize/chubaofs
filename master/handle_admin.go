@@ -36,7 +36,9 @@ type ClusterView struct {
 	MaxDataPartitionID uint64
 	MaxMetaNodeID      uint64
 	MaxMetaPartitionID uint64
-	Vols               []string
+	DataNodeStat       *DataNodeSpaceStat
+	MetaNodeStat       *MetaNodeSpaceStat
+	VolStat            []*VolSpaceStat
 	MetaNodes          []MetaNodeView
 	DataNodes          []DataNodeView
 }
@@ -113,14 +115,24 @@ func (m *Master) getCluster(w http.ResponseWriter, r *http.Request) {
 		MaxDataPartitionID: m.cluster.idAlloc.dataPartitionID,
 		MaxMetaNodeID:      m.cluster.idAlloc.metaNodeID,
 		MaxMetaPartitionID: m.cluster.idAlloc.metaPartitionID,
-		Vols:               make([]string, 0),
 		MetaNodes:          make([]MetaNodeView, 0),
 		DataNodes:          make([]DataNodeView, 0),
+		VolStat:			make([]*VolSpaceStat,0),
 	}
 
-	cv.Vols = m.cluster.getAllVols()
+	vols:= m.cluster.getAllVols()
 	cv.MetaNodes = m.cluster.getAllMetaNodes()
 	cv.DataNodes = m.cluster.getAllDataNodes()
+	cv.DataNodeStat=m.cluster.dataNodeSpace
+	cv.MetaNodeStat=m.cluster.metaNodeSpace
+	for _,name:=range vols{
+		stat,ok:=m.cluster.volSpaceStat.Load(name)
+		if !ok {
+			cv.VolStat=append(cv.VolStat,newVolSpaceStat(name,0,0,"0.0001"))
+			continue
+		}
+		cv.VolStat=append(cv.VolStat,stat.(*VolSpaceStat))
+	}
 	if body, err = json.Marshal(cv); err != nil {
 		goto errDeal
 	}
