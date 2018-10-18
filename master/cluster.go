@@ -77,7 +77,7 @@ func (c *Cluster) startCheckAvailSpace() {
 			if c.partition.IsLeader() {
 				c.checkAvailSpace()
 			}
-			time.Sleep(time.Minute * DefaultCheckHeartbeatIntervalSeconds)
+			time.Sleep(time.Minute)
 		}
 	}()
 
