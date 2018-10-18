@@ -21,18 +21,18 @@ type MetaNodeSpaceStat struct {
 }
 
 type VolSpaceStat struct {
-	Name string
-	TotalGB uint64
-	UsedGB uint64
+	Name      string
+	TotalGB   uint64
+	UsedGB    uint64
 	UsedRatio string
 }
 
-func newVolSpaceStat(name string,total,used uint64,ratio string) *VolSpaceStat {
+func newVolSpaceStat(name string, total, used uint64, ratio string) *VolSpaceStat {
 	return &VolSpaceStat{
-		Name:name,
-		TotalGB:total,
-		UsedGB:used,
-		UsedRatio:ratio,
+		Name:      name,
+		TotalGB:   total,
+		UsedGB:    used,
+		UsedRatio: ratio,
 	}
 }
 
@@ -106,6 +106,6 @@ func (c *Cluster) checkVolAvailSpace() {
 			Warn(c.Name, fmt.Sprintf("clusterId[%v] vol[%v] space utilization reached [%v],usedSpace[%v],totalSpace[%v] please allocate dataPartition",
 				c.Name, vol.Name, useRate, used, total))
 		}
-		c.volSpaceStat.Store(vol.Name,newVolSpaceStat(vol.Name,total,used,strconv.FormatFloat(useRate, 'f', 3, 32)))
+		c.volSpaceStat.Store(vol.Name, newVolSpaceStat(vol.Name, total/util.GB, used/util.GB, strconv.FormatFloat(useRate, 'f', 3, 32)))
 	}
 }
