@@ -72,8 +72,8 @@ const (
 )
 
 const (
-	ConnIsNullErr = "ConnIsNullErr"
-	UpdateReplicationHostsTime=300
+	ConnIsNullErr              = "ConnIsNullErr"
+	UpdateReplicationHostsTime = 300
 )
 
 const (

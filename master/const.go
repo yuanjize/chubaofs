@@ -35,7 +35,7 @@ const (
 	GetAvailMetaNodeHostsErr       = "GetAvailMetaNodeHostsErr "
 	GetDataReplicaFileCountInfo    = "GetDataReplicaFileCountInfo "
 	DataNodeOfflineInfo            = "dataNodeOfflineInfo"
-	DiskOfflineInfo				   = "DiskOfflineInfo"
+	DiskOfflineInfo                = "DiskOfflineInfo"
 	HandleDataPartitionOfflineErr  = "HandleDataPartitionOffLineErr "
 )
 
