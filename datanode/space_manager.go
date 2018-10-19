@@ -16,12 +16,9 @@ package datanode
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
-
 	"os"
-
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util/log"
 )
@@ -45,12 +42,15 @@ type spaceManager struct {
 	partitionMu sync.RWMutex
 	stats       *Stats
 	stopC       chan bool
+	chooseIndex int
+	diskList    []string
 }
 
 func NewSpaceManager(rack string) SpaceManager {
 	var space *spaceManager
 	space = &spaceManager{}
 	space.disks = make(map[string]*Disk)
+	space.diskList = make([]string, 0)
 	space.partitions = make(map[uint32]DataPartition)
 	space.stats = NewStats(rack)
 	space.stopC = make(chan bool, 0)
@@ -139,6 +139,7 @@ func (space *spaceManager) GetDisk(path string) (d *Disk, err error) {
 func (space *spaceManager) putDisk(d *Disk) {
 	space.diskMu.Lock()
 	space.disks[d.Path] = d
+	space.diskList = append(space.diskList, d.Path)
 	space.diskMu.Unlock()
 
 }
@@ -172,19 +173,14 @@ func (space *spaceManager) updateMetrics() {
 func (space *spaceManager) getMinPartitionCntDisk() (d *Disk) {
 	space.diskMu.Lock()
 	defer space.diskMu.Unlock()
-	var minPartitionCnt uint64
-	minPartitionCnt = math.MaxUint64
 	var path string
-	for index, disk := range space.disks {
-		if uint64(disk.PartitionCount()) < minPartitionCnt {
-			minPartitionCnt = uint64(disk.PartitionCount())
-			path = index
-		}
+	if space.chooseIndex >= len(space.disks) {
+		space.chooseIndex = 0
 	}
-	if path == "" {
-		return nil
-	}
+
+	path = space.diskList[space.chooseIndex]
 	d = space.disks[path]
+	space.chooseIndex++
 
 	return
 }
@@ -249,10 +245,21 @@ func (space *spaceManager) CreatePartition(volId string, partitionId uint32, sto
 	if space.GetPartition(partitionId) != nil {
 		return
 	}
-	disk := space.getMinPartitionCntDisk()
-	if disk == nil || disk.Available < uint64(storeSize) {
+	var (
+		disk *Disk
+	)
+	for i := 0; i < len(space.disks); i++ {
+		disk = space.getMinPartitionCntDisk()
+		if disk.Available < uint64(storeSize) {
+			disk = nil
+			continue
+		}
+		break
+	}
+	if disk == nil {
 		return nil, ErrNoDiskForCreatePartition
 	}
+
 	if dp, err = CreateDataPartition(volId, partitionId, disk, storeSize, storeType); err != nil {
 		return
 	}
