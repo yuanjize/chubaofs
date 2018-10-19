@@ -194,6 +194,9 @@ then generator a task to OpRecoverCreateDataPartition to a new Node*/
 func (partition *DataPartition) addLackReplication() (t *proto.AdminTask, lackAddr string, err error) {
 	partition.Lock()
 	defer partition.Unlock()
+	if time.Now().Unix()-partition.createTime>300{
+		return
+	}
 	for _, addr := range partition.PersistenceHosts {
 		if _, ok := partition.IsInReplicas(addr); !ok {
 			log.LogError(fmt.Sprintf("action[addLackReplication],partitionID:%v lack replication:%v",
