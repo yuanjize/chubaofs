@@ -36,12 +36,12 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total         uint64
-	used          uint64
-	FileInCoreMap map[string]*FileInCore
-	MissNodes     map[string]int64
-	VolName       string
-	createTime    int64
+	total            uint64
+	used             uint64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	VolName          string
+	modifyTime       int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -55,7 +55,7 @@ func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string
 	partition.MissNodes = make(map[string]int64)
 	partition.Status = proto.ReadOnly
 	partition.VolName = volName
-	partition.createTime=time.Now().Unix()
+	partition.modifyTime =time.Now().Unix()
 	return
 }
 
@@ -171,6 +171,7 @@ func (partition *DataPartition) offLineInMem(addr string) {
 	}
 	partition.FileInCoreMap = make(map[string]*FileInCore, 0)
 	partition.DeleteReplicaByIndex(delIndex)
+	partition.modifyTime = time.Now().Unix()
 
 	return
 }
