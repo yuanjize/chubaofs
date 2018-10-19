@@ -174,7 +174,7 @@ func (space *spaceManager) getMinPartitionCntDisk() (d *Disk) {
 	space.diskMu.Lock()
 	defer space.diskMu.Unlock()
 	var path string
-	if space.chooseIndex >= len(space.disks) {
+	if space.chooseIndex >= len(space.diskList) {
 		space.chooseIndex = 0
 	}
 
