@@ -49,7 +49,7 @@ const (
 	DefaultMetaNodeReservedMem      uint64  = 1 << 32
 	RuntimeStackBufSize                     = 4096
 	NodesAliveRate                  float32 = 0.5
-	MinReadWriteDataPartitions              = 200
+	MinReadWriteDataPartitions              = 2
 	SpaceAvailRate                          = 0.90
 )
 
