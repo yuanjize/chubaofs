@@ -43,6 +43,7 @@ type Cluster struct {
 	dataNodeSpace *DataNodeSpaceStat
 	metaNodeSpace *MetaNodeSpaceStat
 	volSpaceStat  sync.Map
+	BadDataPartitionIds *sync.Map
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition) (c *Cluster) {
@@ -57,6 +58,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.t = NewTopology()
 	c.dataNodeSpace = new(DataNodeSpaceStat)
 	c.metaNodeSpace = new(MetaNodeSpaceStat)
+	c.BadDataPartitionIds = new(sync.Map)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -64,6 +66,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckMetaPartitions()
 	c.startCheckAvailSpace()
 	c.startCheckVols()
+	c.startCheckBadDiskRecovery()
 	return
 }
 
@@ -459,25 +462,6 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode) {
 	c.delDataNodeFromCache(dataNode)
 	msg = fmt.Sprintf("action[dataNodeOffLine],clusterID[%v] Node[%v] OffLine success",
 		c.Name, dataNode.Addr)
-	Warn(c.Name, msg)
-}
-
-func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string, badPartitionIds []uint64) {
-	msg := fmt.Sprintf("action[diskOffLine], Node[%v] OffLine,disk[%v]", dataNode.Addr, badDiskPath)
-	log.LogWarn(msg)
-	safeVols := c.getAllNormalVols()
-	for _, vol := range safeVols {
-		for _, dp := range vol.dataPartitions.dataPartitions {
-			for _, bad := range badPartitionIds {
-				if bad == dp.PartitionID {
-					c.dataPartitionOffline(dataNode.Addr, vol.Name, dp, DiskOfflineInfo)
-				}
-			}
-		}
-	}
-	msg = fmt.Sprintf("action[diskOffLine],clusterID[%v] Node[%v] OffLine success",
-		c.Name, dataNode.Addr)
-	log.LogWarnf(msg)
 	Warn(c.Name, msg)
 }
 
