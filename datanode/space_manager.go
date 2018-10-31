@@ -16,11 +16,11 @@ package datanode
 
 import (
 	"fmt"
-	"sync"
-	"time"
-	"os"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util/log"
+	"os"
+	"sync"
+	"time"
 )
 
 type SpaceManager interface {

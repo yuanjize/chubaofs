@@ -137,6 +137,7 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 			Size:      uint32(extentInfo.Size),
 			MarkDel:   extentInfo.Deleted,
 			NeedleCnt: 1,
+			Modified:  extentInfo.ModTime.Unix(),
 		}
 		files = append(files, file)
 	}
