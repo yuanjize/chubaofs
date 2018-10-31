@@ -512,7 +512,7 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 		wg.Add(1)
 		recoverIndex++
 		go dp.doStreamExtentFixRepair(&wg, fixExtent)
-		if recoverIndex==4{
+		if recoverIndex%4==0{
 			wg.Wait()
 		}
 	}
