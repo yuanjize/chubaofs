@@ -486,6 +486,8 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 			continue
 		}
 		if store.IsExistExtent(uint64(addExtent.FileId)) {
+			fixFileSizeTask := &storage.FileInfo{Source: addExtent.Source, FileId: addExtent.FileId, Size: addExtent.Size}
+			metas.NeedFixFileSizeTasks = append(metas.NeedFixFileSizeTasks, fixFileSizeTask)
 			continue
 		}
 		err := store.Create(uint64(addExtent.FileId), addExtent.Inode, false)
