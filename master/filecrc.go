@@ -72,12 +72,13 @@ func (fc *FileInCore) generateFileCrcTask(partitionID uint64, liveVols []*DataRe
 	}
 
 	fms, needRepair := fc.needCrcRepair(liveVols, volType)
-	if len(fms) < len(liveVols) {
+
+	if len(fms) < len(liveVols) && (time.Now().Unix()-fc.LastModify) > CheckMissFileReplicaTime {
 		liveAddrs := make([]string, 0)
 		for _, replica := range liveVols {
 			liveAddrs = append(liveAddrs, replica.Addr)
 		}
-		Warn(clusterID, fmt.Sprintf("pid[%v],file[%v],fms[%v],liveAddr[%v]", partitionID, fc.Name, fc.getFileMetaAddrs(), liveAddrs))
+		Warn(clusterID, fmt.Sprintf("partitionid[%v],file[%v],fms[%v],liveAddr[%v]", partitionID, fc.Name, fc.getFileMetaAddrs(), liveAddrs))
 	}
 	if !needRepair {
 		return
