@@ -73,7 +73,7 @@ const (
 
 const (
 	ConnIsNullErr              = "ConnIsNullErr"
-	UpdateReplicationHostsTime = 300
+	UpdateReplicationHostsTime = 60
 	SimultaneouslyRecoverFiles=7
 )
 
