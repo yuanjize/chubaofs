@@ -81,6 +81,19 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		if currFixOffset >= remoteExtentInfo.Size {
 			break
 		}
+		localExtentInfo, err = store.GetWatermark(uint64(remoteExtentInfo.FileId), false)
+		if err != nil {
+			err = errors.Annotatef(err, "streamRepairExtent GetWatermark error")
+			log.LogError("action[streamRepairExtent] err(%v).", err)
+			return err
+		}
+		if localExtentInfo.Size > currFixOffset {
+			err = errors.Annotatef(err, "streamRepairExtent unavali fix localSize(%v) "+
+				"remoteSize(%v) want fixOffset(%v) data error", localExtentInfo.Size, remoteExtentInfo.Size, currFixOffset)
+			log.LogError("action[streamRepairExtent] err(%v).", err)
+			return err
+		}
+
 		reply := NewPacket()
 		// Read 64k stream repair packet
 		if err = reply.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
