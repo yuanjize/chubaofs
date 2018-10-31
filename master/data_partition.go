@@ -42,6 +42,7 @@ type DataPartition struct {
 	MissNodes        map[string]int64
 	VolName          string
 	modifyTime       int64
+	createTime       int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -56,6 +57,7 @@ func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string
 	partition.Status = proto.ReadOnly
 	partition.VolName = volName
 	partition.modifyTime =time.Now().Unix()
+	partition.createTime =time.Now().Unix()
 	return
 }
 

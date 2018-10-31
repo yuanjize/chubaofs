@@ -11,7 +11,7 @@ import (
 func (c *Cluster) startCheckBadDiskRecovery() {
 	go func() {
 		for {
-			if  c.partition.IsLeader() {
+			if c.partition.IsLeader() {
 				if c.vols != nil {
 					c.checkBadDiskRecovery()
 				}
@@ -31,13 +31,17 @@ func (c *Cluster) checkBadDiskRecovery() {
 			if err != nil {
 				continue
 			}
-			if len(partition.Replicas) == 0 {
+			vol, err := c.getVol(partition.VolName)
+			if err != nil {
+				continue
+			}
+			if len(partition.Replicas) == 0 || len(partition.Replicas) < int(vol.dpReplicaNum) {
 				continue
 			}
 			used := partition.Replicas[0].Used
 			for _, replica := range partition.Replicas {
 				if math.Abs(float64(replica.Used)-float64(used)) > minus {
-					minus = math.Abs(float64(replica.Used)-float64(used))
+					minus = math.Abs(float64(replica.Used) - float64(used))
 				}
 			}
 			if minus < util.GB {
