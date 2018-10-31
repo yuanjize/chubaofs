@@ -333,6 +333,7 @@ func (dp *dataPartition) updateReplicaHosts() (err error) {
 	if time.Now().Unix()-dp.updateReplicationTime <= UpdateReplicationHostsTime {
 		return
 	}
+	dp.isLeader = false
 	isLeader, replicas, err := dp.fetchReplicaHosts()
 	if err != nil {
 		return
