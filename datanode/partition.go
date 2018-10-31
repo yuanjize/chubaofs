@@ -497,7 +497,10 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 	}
 
 	tinyFiles := make([]*storage.FileInfo, 0)
-	var wg sync.WaitGroup
+	var (
+		wg sync.WaitGroup
+		recoverIndex int
+	)
 	for _, fixExtent := range metas.NeedFixFileSizeTasks {
 		if fixExtent.FileId <= storage.TinyChunkCount {
 			tinyFiles = append(tinyFiles, fixExtent)
@@ -507,7 +510,11 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 			continue
 		}
 		wg.Add(1)
-		dp.doStreamExtentFixRepair(&wg, fixExtent)
+		recoverIndex++
+		go dp.doStreamExtentFixRepair(&wg, fixExtent)
+		if recoverIndex==4{
+			wg.Wait()
+		}
 	}
 	for chunkId, deleteTinyObject := range metas.NeedDeleteObjectsTasks {
 		if err := dp.DelObjects(uint32(chunkId), deleteTinyObject); err != nil {
