@@ -50,10 +50,11 @@ const (
 	RuntimeStackBufSize                     = 4096
 	NodesAliveRate                  float32 = 0.5
 	SpaceAvailRate                          = 0.90
+	CheckMissFileReplicaTime                = 600
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 
