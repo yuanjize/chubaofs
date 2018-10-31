@@ -15,8 +15,8 @@
 package master
 
 import (
-	"github.com/tiglabs/containerfs/proto"
 	"fmt"
+	"github.com/tiglabs/containerfs/proto"
 )
 
 /*check File: recover File,if File lack or timeOut report or crc bad*/

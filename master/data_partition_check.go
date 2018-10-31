@@ -161,7 +161,7 @@ func (partition *DataPartition) checkReplicationTask(clusterID string) (tasks []
 		msg = fmt.Sprintf("action[%v], partitionID:%v  Lack Replication"+
 			" On :%v  Err:%v  PersistenceHosts:%v  new task to create DataReplica",
 			AddLackReplicationErr, partition.PartitionID, lackAddr, lackErr.Error(), partition.PersistenceHosts)
-		Warn(clusterID,msg)
+		Warn(clusterID, msg)
 	} else {
 		partition.setToNormal()
 	}
@@ -194,7 +194,7 @@ then generator a task to OpRecoverCreateDataPartition to a new Node*/
 func (partition *DataPartition) addLackReplication() (t *proto.AdminTask, lackAddr string, err error) {
 	partition.Lock()
 	defer partition.Unlock()
-	if time.Now().Unix()-partition.createTime <120{
+	if time.Now().Unix()-partition.createTime < 120 {
 		return
 	}
 	for _, addr := range partition.PersistenceHosts {

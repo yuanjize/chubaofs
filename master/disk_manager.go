@@ -1,11 +1,11 @@
 package master
 
 import (
-	"math"
 	"fmt"
-	"time"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
+	"math"
+	"time"
 )
 
 func (c *Cluster) startCheckBadDiskRecovery() {

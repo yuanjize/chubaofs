@@ -454,7 +454,7 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 	}
 	rstMsg = fmt.Sprintf("recive diskOffline node[%v] disk[%v],badPartitionIds[%v]  has offline  success",
 		node.Addr, diskPath, badPartitionIds)
-	m.cluster.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offLineAddr, diskPath),badPartitionIds)
+	m.cluster.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offLineAddr, diskPath), badPartitionIds)
 	m.cluster.diskOffLine(node, diskPath, badPartitionIds)
 	io.WriteString(w, rstMsg)
 	log.LogWarnf(rstMsg)

@@ -500,7 +500,7 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 
 	tinyFiles := make([]*storage.FileInfo, 0)
 	var (
-		wg sync.WaitGroup
+		wg           sync.WaitGroup
 		recoverIndex int
 	)
 	for _, fixExtent := range metas.NeedFixFileSizeTasks {
@@ -514,7 +514,7 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 		wg.Add(1)
 		recoverIndex++
 		go dp.doStreamExtentFixRepair(&wg, fixExtent)
-		if recoverIndex%SimultaneouslyRecoverFiles==0{
+		if recoverIndex%SimultaneouslyRecoverFiles == 0 {
 			wg.Wait()
 		}
 	}

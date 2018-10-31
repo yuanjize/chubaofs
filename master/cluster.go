@@ -26,23 +26,23 @@ import (
 )
 
 type Cluster struct {
-	Name          string
-	vols          map[string]*Vol
-	dataNodes     sync.Map
-	metaNodes     sync.Map
-	createDpLock  sync.Mutex
-	volsLock      sync.RWMutex
-	leaderInfo    *LeaderInfo
-	cfg           *ClusterConfig
-	fsm           *MetadataFsm
-	partition     raftstore.Partition
-	retainLogs    uint64
-	idAlloc       *IDAllocator
-	t             *Topology
-	compactStatus bool
-	dataNodeSpace *DataNodeSpaceStat
-	metaNodeSpace *MetaNodeSpaceStat
-	volSpaceStat  sync.Map
+	Name                string
+	vols                map[string]*Vol
+	dataNodes           sync.Map
+	metaNodes           sync.Map
+	createDpLock        sync.Mutex
+	volsLock            sync.RWMutex
+	leaderInfo          *LeaderInfo
+	cfg                 *ClusterConfig
+	fsm                 *MetadataFsm
+	partition           raftstore.Partition
+	retainLogs          uint64
+	idAlloc             *IDAllocator
+	t                   *Topology
+	compactStatus       bool
+	dataNodeSpace       *DataNodeSpaceStat
+	metaNodeSpace       *MetaNodeSpaceStat
+	volSpaceStat        sync.Map
 	BadDataPartitionIds *sync.Map
 }
 
