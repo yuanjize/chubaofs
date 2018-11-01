@@ -112,7 +112,9 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 			}
 		}
 		tasks := dp.checkReplicationTask(c.Name)
-		c.putDataNodeTasks(tasks)
+		if len(tasks) != 0 {
+			c.putDataNodeTasks(tasks)
+		}
 	}
 	return
 }
