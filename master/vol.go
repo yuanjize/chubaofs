@@ -27,14 +27,15 @@ type Vol struct {
 	dpReplicaNum   uint8
 	mpReplicaNum   uint8
 	threshold      float32
+	Status         uint8
+	Capacity          uint64 //GB
 	MetaPartitions map[uint64]*MetaPartition
 	mpsLock        sync.RWMutex
 	dataPartitions *DataPartitionMap
-	Status         uint8
 	sync.RWMutex
 }
 
-func NewVol(name, volType string, replicaNum uint8) (vol *Vol) {
+func NewVol(name, volType string, replicaNum uint8,capacity uint64) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.dataPartitions = NewDataPartitionMap(name)
 	vol.dpReplicaNum = replicaNum

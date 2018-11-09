@@ -342,12 +342,13 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		msg        string
 		volType    string
 		replicaNum int
+		capacity    int
 	)
 
-	if name, volType, replicaNum, err = parseCreateVolPara(r); err != nil {
+	if name, volType, replicaNum, capacity,err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.createVol(name, volType, uint8(replicaNum)); err != nil {
+	if err = m.cluster.createVol(name, volType, uint8(replicaNum),capacity); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("create vol[%v] successed\n", name)
@@ -765,7 +766,7 @@ func parseDeleteVolPara(r *http.Request) (name string, err error) {
 	return checkVolPara(r)
 }
 
-func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum int, err error) {
+func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum ,capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -778,6 +779,11 @@ func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum int, 
 	}
 	if volType, err = parseDataPartitionType(r); err != nil {
 		return
+	}
+	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+			err = UnMatchPara
+		}
 	}
 	return
 }
