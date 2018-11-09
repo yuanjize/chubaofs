@@ -103,6 +103,7 @@ type VolValue struct {
 	VolType    string
 	ReplicaNum uint8
 	Status     uint8
+	Capacity   uint64
 }
 
 func newVolValue(vol *Vol) (vv *VolValue) {
@@ -110,6 +111,7 @@ func newVolValue(vol *Vol) (vv *VolValue) {
 		VolType:    vol.VolType,
 		ReplicaNum: vol.dpReplicaNum,
 		Status:     vol.Status,
+		Capacity:   vol.Capacity,
 	}
 	return
 }
@@ -439,7 +441,7 @@ func (c *Cluster) applyAddVol(cmd *Metadata) {
 			log.LogError(fmt.Sprintf("action[applyAddVol] failed,err:%v", err))
 			return
 		}
-		vol := NewVol(keys[2], vv.VolType, vv.ReplicaNum)
+		vol := NewVol(keys[2], vv.VolType, vv.ReplicaNum, vv.Capacity)
 		c.putVol(vol)
 	}
 }
@@ -463,6 +465,7 @@ func (c *Cluster) applyUpdateVol(cmd *Metadata) {
 			return
 		}
 		vol.setStatus(vv.Status)
+		vol.setCapacity(vv.Capacity)
 	}
 }
 
@@ -661,7 +664,7 @@ func (c *Cluster) loadVols() (err error) {
 			err = fmt.Errorf("action[loadVols],value:%v,err:%v", encodedValue.Data(), err)
 			return err
 		}
-		vol := NewVol(volName, vv.VolType, vv.ReplicaNum)
+		vol := NewVol(volName, vv.VolType, vv.ReplicaNum, vv.Capacity)
 		vol.Status = vv.Status
 		c.putVol(vol)
 		encodedKey.Free()

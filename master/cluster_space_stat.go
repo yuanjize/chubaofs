@@ -97,7 +97,7 @@ func (c *Cluster) checkMetaNodeAvailSpace() {
 func (c *Cluster) checkVolAvailSpace() {
 	vols := c.copyVols()
 	for _, vol := range vols {
-		used, total := vol.statSpace()
+		used, total := vol.getTotalUsedSpace(), vol.Capacity*util.GB
 		if total <= 0 {
 			continue
 		}

@@ -17,6 +17,7 @@ package master
 import (
 	"fmt"
 	"github.com/tiglabs/containerfs/proto"
+	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"sync"
 )
@@ -28,14 +29,14 @@ type Vol struct {
 	mpReplicaNum   uint8
 	threshold      float32
 	Status         uint8
-	Capacity          uint64 //GB
+	Capacity       uint64 //GB
 	MetaPartitions map[uint64]*MetaPartition
 	mpsLock        sync.RWMutex
 	dataPartitions *DataPartitionMap
 	sync.RWMutex
 }
 
-func NewVol(name, volType string, replicaNum uint8,capacity uint64) (vol *Vol) {
+func NewVol(name, volType string, replicaNum uint8, capacity uint64) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.dataPartitions = NewDataPartitionMap(name)
 	vol.dpReplicaNum = replicaNum
@@ -45,6 +46,7 @@ func NewVol(name, volType string, replicaNum uint8,capacity uint64) (vol *Vol) {
 	} else {
 		vol.mpReplicaNum = replicaNum
 	}
+	vol.Capacity = capacity
 	return
 }
 
@@ -96,6 +98,9 @@ func (vol *Vol) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err
 }
 
 func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
+	if vol.Status == VolReadOnly {
+		return
+	}
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
 	for _, dp := range vol.dataPartitions.dataPartitionMap {
@@ -181,6 +186,52 @@ func (vol *Vol) setStatus(status uint8) {
 	vol.Lock()
 	defer vol.Unlock()
 	vol.Status = status
+}
+
+func (vol *Vol) getStatus() uint8 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.Status
+}
+
+func (vol *Vol) setCapacity(capacity uint64) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.Capacity = capacity
+}
+
+func (vol *Vol) getCapacity() uint64 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.Capacity
+}
+
+func (vol *Vol) checkAvailSpace(c *Cluster) {
+	if vol.getStatus() == VolMarkDelete {
+		return
+	}
+	usedSpace := vol.getTotalUsedSpace()
+	usedSpace = usedSpace / util.GB
+	if usedSpace >= vol.getCapacity() {
+		vol.setStatus(VolReadOnly)
+		vol.setAllDataPartitionsToReadOnly()
+		return
+	} else {
+		vol.setStatus(VolNormal)
+	}
+	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions {
+		for i := 0; i < MinReadWriteDataPartitions; i++ {
+			c.createDataPartition(vol.Name, vol.VolType)
+		}
+	}
+}
+
+func (vol *Vol) setAllDataPartitionsToReadOnly() {
+	vol.dataPartitions.setAllDataPartitionsToReadOnly()
+}
+
+func (vol *Vol) getTotalUsedSpace() uint64 {
+	return vol.dataPartitions.getTotalUsedSpace()
 }
 
 func (vol *Vol) checkStatus(c *Cluster) {

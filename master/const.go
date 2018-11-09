@@ -25,6 +25,7 @@ const (
 	ParaStart             = "start"
 	ParaEnable            = "enable"
 	ParaThreshold         = "threshold"
+	ParaVolCapacity       = "capacity"
 )
 
 const (
@@ -51,6 +52,7 @@ const (
 	NodesAliveRate                  float32 = 0.5
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
+	MinReadWriteDataPartitions              = 2
 )
 
 const (
@@ -61,4 +63,5 @@ const (
 const (
 	VolNormal     uint8 = 0
 	VolMarkDelete uint8 = 1
+	VolReadOnly   uint8 = 2
 )

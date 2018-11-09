@@ -523,7 +523,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	task = dp.GenerateDeleteTask(offlineAddr)
 	tasks = make([]*proto.AdminTask, 0)
 	tasks = append(tasks, task)
-	tasks = append(tasks,dp.generateCreateTask(newAddr))
+	tasks = append(tasks, dp.generateCreateTask(newAddr))
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
@@ -563,9 +563,30 @@ func (c *Cluster) delMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) createVol(name, volType string, replicaNum uint8) (err error) {
+func (c *Cluster) updateVol(name string, capacity int) (err error) {
 	var vol *Vol
-	if vol, err = c.createVolInternal(name, volType, replicaNum); err != nil {
+	if vol, err = c.getVol(name); err != nil {
+		goto errDeal
+	}
+	if uint64(capacity) < vol.Capacity {
+		err = fmt.Errorf("capacity[%v] less than old capacity[%v]", capacity, vol.Capacity)
+		goto errDeal
+	}
+	vol.setCapacity(uint64(capacity))
+	if err = c.syncUpdateVol(vol); err != nil {
+		goto errDeal
+	}
+	return
+errDeal:
+	err = fmt.Errorf("action[updateVol], clusterID[%v] name:%v, err:%v ", c.Name, name, err.Error())
+	log.LogError(errors.ErrorStack(err))
+	Warn(c.Name, err.Error())
+	return
+}
+
+func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int) (err error) {
+	var vol *Vol
+	if vol, err = c.createVolInternal(name, volType, replicaNum, capacity); err != nil {
 		goto errDeal
 	}
 
@@ -585,12 +606,12 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVolInternal(name, volType string, replicaNum uint8) (vol *Vol, err error) {
+func (c *Cluster) createVolInternal(name, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
 	}
-	vol = NewVol(name, volType, replicaNum)
+	vol = NewVol(name, volType, replicaNum, uint64(capacity))
 	if err = c.syncAddVol(vol); err != nil {
 		goto errDeal
 	}

@@ -482,9 +482,6 @@ func (partition *DataPartition) getMaxUsedSize() uint64 {
 	partition.Lock()
 	defer partition.Unlock()
 	for _, replica := range partition.Replicas {
-		if replica.Status == proto.ReadOnly {
-			return util.DefaultDataPartitionSize
-		}
 		if replica.Used > partition.used {
 			partition.used = replica.Used
 		}

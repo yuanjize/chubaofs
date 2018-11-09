@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/juju/errors"
+	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util/log"
 	"runtime"
 	"sync"
@@ -179,4 +180,21 @@ func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(everyLoadCount int, lo
 	}
 
 	return
+}
+
+func (dpMap *DataPartitionMap) getTotalUsedSpace() (totalUsed uint64) {
+	dpMap.RLock()
+	defer dpMap.RUnlock()
+	for _, dp := range dpMap.dataPartitions {
+		totalUsed = totalUsed + dp.getMaxUsedSize()
+	}
+	return
+}
+
+func (dpMap *DataPartitionMap) setAllDataPartitionsToReadOnly() {
+	dpMap.Lock()
+	defer dpMap.Unlock()
+	for _, dp := range dpMap.dataPartitions {
+		dp.Status = proto.ReadOnly
+	}
 }

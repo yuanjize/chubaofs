@@ -335,6 +335,27 @@ errDeal:
 	return
 }
 
+func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
+	var (
+		name     string
+		err      error
+		msg      string
+		capacity int
+	)
+	if name, capacity, err = parseUpdateVolPara(r); err != nil {
+		goto errDeal
+	}
+	if err = m.cluster.updateVol(name, capacity); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("update vol[%v] successed\n", name)
+	io.WriteString(w, msg)
+errDeal:
+	logMsg := getReturnMessage("updateVol", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name       string
@@ -342,13 +363,13 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		msg        string
 		volType    string
 		replicaNum int
-		capacity    int
+		capacity   int
 	)
 
-	if name, volType, replicaNum, capacity,err = parseCreateVolPara(r); err != nil {
+	if name, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.createVol(name, volType, uint8(replicaNum),capacity); err != nil {
+	if err = m.cluster.createVol(name, volType, uint8(replicaNum), capacity); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("create vol[%v] successed\n", name)
@@ -766,7 +787,22 @@ func parseDeleteVolPara(r *http.Request) (name string, err error) {
 	return checkVolPara(r)
 }
 
-func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum ,capacity int, err error) {
+func parseUpdateVolPara(r *http.Request) (name string, capacity int, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+			err = UnMatchPara
+		}
+	} else {
+		err = paraNotFound(ParaVolCapacity)
+	}
+	return
+}
+
+func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -784,6 +820,8 @@ func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum ,capa
 		if capacity, err = strconv.Atoi(capacityStr); err != nil {
 			err = UnMatchPara
 		}
+	} else {
+		err = paraNotFound(ParaVolCapacity)
 	}
 	return
 }
