@@ -523,6 +523,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	task = dp.GenerateDeleteTask(offlineAddr)
 	tasks = make([]*proto.AdminTask, 0)
 	tasks = append(tasks, task)
+	tasks = append(tasks,dp.generateCreateTask(newAddr))
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
