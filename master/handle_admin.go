@@ -185,14 +185,14 @@ errDeal:
 
 func (m *Master) createDataPartition(w http.ResponseWriter, r *http.Request) {
 	var (
-		rstMsg                  string
-		volName                 string
-		partitionType           string
-		vol                     *Vol
-		reqCreateCount          int
-		capacity                int
-		lastTotalDataPartitions int
-		err                     error
+		rstMsg                     string
+		volName                    string
+		partitionType              string
+		vol                        *Vol
+		reqCreateCount             int
+		lastTotalDataPartitions    int
+		clusterTotalDataPartitions int
+		err                        error
 	)
 
 	if reqCreateCount, volName, partitionType, err = parseCreateDataPartitionPara(r); err != nil {
@@ -202,18 +202,15 @@ func (m *Master) createDataPartition(w http.ResponseWriter, r *http.Request) {
 	if vol, err = m.cluster.getVol(volName); err != nil {
 		goto errDeal
 	}
-	capacity = m.cluster.getDataPartitionCapacity(vol)
 	lastTotalDataPartitions = len(vol.dataPartitions.dataPartitions)
+	clusterTotalDataPartitions = m.cluster.getDataPartitionCount()
 	for i := 0; i < reqCreateCount; i++ {
-		if (reqCreateCount + lastTotalDataPartitions) < len(vol.dataPartitions.dataPartitions) {
-			break
-		}
 		if _, err = m.cluster.createDataPartition(volName, partitionType); err != nil {
 			goto errDeal
 		}
 	}
-	rstMsg = fmt.Sprintf(" createDataPartition success. cluster capacity[%v],vol[%v] has %v data partitions last,%v data partitions now",
-		capacity, volName, lastTotalDataPartitions, len(vol.dataPartitions.dataPartitions))
+	rstMsg = fmt.Sprintf(" createDataPartition success. clusterLastTotalDataPartitions[%v],vol[%v] has %v data partitions last,%v data partitions now",
+		clusterTotalDataPartitions, volName, lastTotalDataPartitions, len(vol.dataPartitions.dataPartitions))
 	io.WriteString(w, rstMsg)
 
 	return
