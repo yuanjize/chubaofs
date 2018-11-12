@@ -209,6 +209,12 @@ func (s *ExtentStore) IsExistExtent(extentId uint64) (exist bool) {
 	return
 }
 
+func (s *ExtentStore)GetExtentCount()(count int){
+	s.extentInfoMux.RLock()
+	defer s.extentInfoMux.RUnlock()
+	return len(s.extentInfoMap)
+}
+
 func (s *ExtentStore) loadExtentFromDisk(extentId uint64) (e Extent, err error) {
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)

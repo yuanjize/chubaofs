@@ -63,6 +63,7 @@ type DataPartition interface {
 	ChangeStatus(status int)
 
 	GetExtentStore() *storage.ExtentStore
+	GetExtentCount() int
 	GetTinyStore() *storage.TinyStore
 	GetAllWaterMarker() (files []*storage.FileInfo, err error)
 
@@ -198,6 +199,10 @@ func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int)
 
 func (dp *dataPartition) ID() uint32 {
 	return dp.partitionId
+}
+
+func (dp *dataPartition) GetExtentCount() int {
+	return dp.extentStore.GetExtentCount()
 }
 
 func (dp *dataPartition) Path() string {

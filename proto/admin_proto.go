@@ -104,6 +104,7 @@ type PartitionReport struct {
 	Total           uint64
 	Used            uint64
 	DiskPath        string
+	ExtentCount     int
 }
 
 type DataNodeHeartBeatResponse struct {
