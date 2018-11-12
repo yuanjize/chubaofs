@@ -223,7 +223,7 @@ func (vol *Vol) checkAvailSpace(c *Cluster) {
 	} else {
 		vol.setStatus(VolNormal)
 	}
-	if vol.getStatus() == VolNormal {
+	if vol.getStatus() == VolNormal && !c.DisableAutoAlloc {
 		vol.autoCreateDataPartitions(c)
 	}
 }

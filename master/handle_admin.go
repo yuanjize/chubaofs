@@ -97,6 +97,23 @@ errDeal:
 	return
 }
 
+func (m *Master) setDisableAutoAlloc(w http.ResponseWriter, r *http.Request) {
+	var (
+		status bool
+		err    error
+	)
+	if status, err = parseDisableAutoAlloc(r); err != nil {
+		goto errDeal
+	}
+	m.cluster.DisableAutoAlloc = status
+	io.WriteString(w, fmt.Sprintf("set disableAutoAlloc  to %v success", status))
+	return
+errDeal:
+	logMsg := getReturnMessage("setDisableAutoAlloc", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) getCompactStatus(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf("%v", m.cluster.compactStatus))
 	return
@@ -947,6 +964,10 @@ func parseMetaPartitionOffline(r *http.Request) (volName, nodeAddr string, parti
 
 func parseCompactPara(r *http.Request) (status bool, err error) {
 	r.ParseForm()
+	return checkEnable(r)
+}
+
+func checkEnable(r *http.Request) (status bool, err error) {
 	var value string
 	if value = r.FormValue(ParaEnable); value == "" {
 		err = ParaEnableNotFound
@@ -956,6 +977,11 @@ func parseCompactPara(r *http.Request) (status bool, err error) {
 		return
 	}
 	return
+}
+
+func parseDisableAutoAlloc(r *http.Request) (status bool, err error) {
+	r.ParseForm()
+	return checkEnable(r)
 }
 
 func parseSetMetaNodeThresholdPara(r *http.Request) (threshold float64, err error) {
