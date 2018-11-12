@@ -223,6 +223,12 @@ func (vol *Vol) checkAvailSpace(c *Cluster) {
 	} else {
 		vol.setStatus(VolNormal)
 	}
+	if vol.getStatus() == VolNormal {
+		vol.autoCreateDataPartitions(c)
+	}
+}
+
+func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions {
 		for i := 0; i < MinReadWriteDataPartitions; i++ {
 			c.createDataPartition(vol.Name, vol.VolType)
