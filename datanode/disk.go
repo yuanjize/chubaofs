@@ -92,9 +92,9 @@ func NewDisk(path string, restSize uint64, maxErrs int) (d *Disk) {
 	d.RestSize = util.GB * 100
 	d.MaxErrs = 2000
 	d.compactCh = make(chan *CompactTask, CompactThreadNum)
-	for i := 0; i < CompactThreadNum; i++ {
-		go d.compact()
-	}
+	//for i := 0; i < CompactThreadNum; i++ {
+	//	go d.compact()
+	//}
 	d.computeUsage()
 
 	d.startScheduleTasks()

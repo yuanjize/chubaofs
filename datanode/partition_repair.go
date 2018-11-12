@@ -179,7 +179,7 @@ func (dp *dataPartition) getAllMemberFileMetas() (allMemberFileMetas []*MembersF
 			err = errors.Annotatef(err, "getAllMemberFileMetas dataPartition[%v] write to host[%v]", dp.partitionId, target)
 			return
 		}
-		err = p.ReadFromConn(conn, 60) //read it response
+		err = p.ReadFromConn(conn, proto.ReadDeadlineTime) //read it response
 		if err != nil {
 			gConnPool.Put(conn, true)
 			err = errors.Annotatef(err, "getAllMemberFileMetas dataPartition[%v] read from host[%v]", dp.partitionId, target)
