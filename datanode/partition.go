@@ -524,10 +524,6 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 				"failed err[%v]", dp.partitionId, chunkId, err.Error())
 		}
 	}
-	for _, fixTiny := range tinyFiles {
-		wg.Add(1)
-		go dp.doStreamTinyFixRepair(&wg, fixTiny)
-	}
 	wg.Wait()
 }
 
