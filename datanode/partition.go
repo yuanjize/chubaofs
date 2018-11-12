@@ -514,9 +514,6 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 		wg.Add(1)
 		recoverIndex++
 		go dp.doStreamExtentFixRepair(&wg, fixExtent)
-		if recoverIndex%SimultaneouslyRecoverFiles == 0 {
-			wg.Wait()
-		}
 	}
 	for chunkId, deleteTinyObject := range metas.NeedDeleteObjectsTasks {
 		if err := dp.DelObjects(uint32(chunkId), deleteTinyObject); err != nil {
