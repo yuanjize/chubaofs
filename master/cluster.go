@@ -112,6 +112,7 @@ func (c *Cluster) checkVols() {
 	vols := c.copyVols()
 	for _, vol := range vols {
 		vol.checkStatus(c)
+		vol.checkAvailSpace(c)
 	}
 }
 
