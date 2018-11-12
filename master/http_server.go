@@ -155,6 +155,10 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.createVol(w, r)
 	case AdminDeleteVol:
 		m.markDeleteVol(w, r)
+	case AdminUpdateVol:
+		m.updateVol(w, r)
+	case AdminClusterFreeze:
+		m.setDisableAutoAlloc(w, r)
 	case AddDataNode:
 		m.addDataNode(w, r)
 	case GetDataNode:
