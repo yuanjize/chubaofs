@@ -87,6 +87,7 @@ type DataPartitionValue struct {
 	ReplicaNum    uint8
 	Hosts         string
 	PartitionType string
+	IsFreeze      bool
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -95,6 +96,7 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		ReplicaNum:    dp.ReplicaNum,
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
+		IsFreeze:      dp.IsFreeze,
 	}
 	return
 }
@@ -524,6 +526,7 @@ func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
 		vol, _ := c.getVol(keys[2])
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsFreeze = dpv.IsFreeze
 		vol.dataPartitions.putDataPartitionByRaft(dp)
 	}
 }
@@ -541,6 +544,7 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsFreeze = dpv.IsFreeze
 		vol.dataPartitions.putDataPartitionByRaft(dp)
 	}
 }

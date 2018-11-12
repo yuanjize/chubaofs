@@ -98,14 +98,15 @@ func (vol *Vol) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err
 }
 
 func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
-	if vol.Status == VolReadOnly {
-		return
-	}
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
 	for _, dp := range vol.dataPartitions.dataPartitionMap {
 		dp.checkReplicaStatus(c.cfg.DataPartitionTimeOutSec)
-		dp.checkStatus(true, c.cfg.DataPartitionTimeOutSec)
+		if vol.Status == VolReadOnly {
+			dp.setStatus(proto.ReadOnly)
+		} else {
+			dp.checkStatus(true, c.cfg.DataPartitionTimeOutSec)
+		}
 		dp.checkMiss(c.Name, c.cfg.DataPartitionMissSec, c.cfg.DataPartitionWarnInterval)
 		dp.checkReplicaNum(c, vol.Name)
 		if dp.Status == proto.ReadWrite {
@@ -208,6 +209,9 @@ func (vol *Vol) getCapacity() uint64 {
 
 func (vol *Vol) checkAvailSpace(c *Cluster) {
 	if vol.getStatus() == VolMarkDelete {
+		return
+	}
+	if vol.getCapacity() == 0 {
 		return
 	}
 	usedSpace := vol.getTotalUsedSpace()

@@ -52,11 +52,12 @@ const (
 	NodesAliveRate                  float32 = 0.5
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
-	MinReadWriteDataPartitions              = 2
+	MinReadWriteDataPartitions              = 5
+	MaxFileNumberOfDataPartitions           = 10000
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 
