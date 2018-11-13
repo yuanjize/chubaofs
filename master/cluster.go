@@ -89,6 +89,8 @@ func (c *Cluster) startCheckAvailSpace() {
 
 func (c *Cluster) startCheckVols() {
 	go func() {
+		//check vols after switching leader two minutes
+		time.Sleep(2 * time.Minute)
 		for {
 			if c.partition.IsLeader() {
 				c.checkVols()
