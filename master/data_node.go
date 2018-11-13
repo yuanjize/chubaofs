@@ -101,7 +101,11 @@ func (dataNode *DataNode) UpdateNodeMetric(resp *proto.DataNodeHeartBeatResponse
 	dataNode.RackName = resp.RackName
 	dataNode.DataPartitionCount = resp.CreatedPartitionCnt
 	dataNode.dataPartitionInfos = resp.PartitionInfo
-	dataNode.Ratio = (float64)(dataNode.Used) / (float64)(dataNode.Total)
+	if dataNode.Total == 0 {
+		dataNode.Ratio = 0.0
+	} else {
+		dataNode.Ratio = (float64)(dataNode.Used) / (float64)(dataNode.Total)
+	}
 	dataNode.ReportTime = time.Now()
 }
 
