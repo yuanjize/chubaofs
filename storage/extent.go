@@ -85,7 +85,7 @@ type Extent interface {
 	InitToFS(ino uint64, overwrite bool) error
 
 	// RestoreFromFS restore entity data and status from entry file stored in filesystem.
-	RestoreFromFS() error
+	RestoreFromFS(loadHeader bool) error
 
 	// Write data to extent.
 	Write(data []byte, offset, size int64, crc uint32) (err error)
@@ -211,7 +211,7 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 }
 
 // RestoreFromFS restore entity data and status from entry file stored in filesystem.
-func (e *fsExtent) RestoreFromFS() (err error) {
+func (e *fsExtent) RestoreFromFS(loadHeader bool) (err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.file, err = os.OpenFile(e.filePath, os.O_RDWR, 0666); err != nil {
@@ -231,10 +231,13 @@ func (e *fsExtent) RestoreFromFS() (err error) {
 		err = BrokenExtentFileErr
 		return
 	}
-	if _, err = e.file.ReadAt(e.header, 0); err != nil {
-		err = fmt.Errorf("read file %v offset %v: %v", e.file.Name(), 0, err)
-		return
+	if loadHeader{
+		if _, err = e.file.ReadAt(e.header, 0); err != nil {
+			err = fmt.Errorf("read file %v offset %v: %v", e.file.Name(), 0, err)
+			return
+		}
 	}
+
 	e.dataSize = info.Size() - util.BlockHeaderSize
 	e.modifyTime = info.ModTime()
 	return

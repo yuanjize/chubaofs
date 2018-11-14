@@ -156,7 +156,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 			err = errors.New("extent already exist")
 			return
 		}
-		if extent, err = s.getExtent(extentId); err != nil {
+		if extent, err = s.getExtentWithHeader(extentId); err != nil {
 			return
 		}
 		extent.InitToFS(extentId, true)
@@ -194,7 +194,18 @@ func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
-		if e, err = s.loadExtentFromDisk(extentId); err != nil {
+		if e, err = s.loadExtentFromDisk(extentId,false); err != nil {
+			err = fmt.Errorf("load extent from disk: %v", err)
+			return
+		}
+	}
+	return
+}
+
+func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error) {
+	var ok bool
+	if e, ok = s.cache.Get(extentId); !ok {
+		if e, err = s.loadExtentFromDisk(extentId,true); err != nil {
 			err = fmt.Errorf("load extent from disk: %v", err)
 			return
 		}
@@ -215,16 +226,21 @@ func (s *ExtentStore)GetExtentCount()(count int){
 	return len(s.extentInfoMap)
 }
 
-func (s *ExtentStore) loadExtentFromDisk(extentId uint64) (e Extent, err error) {
+func (s *ExtentStore) loadExtentFromDisk(extentId uint64,loadHeader bool) (e Extent, err error) {
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)
-	if err = e.RestoreFromFS(); err != nil {
+	if err = e.RestoreFromFS(loadHeader); err != nil {
 		err = fmt.Errorf("restore from file system: %v", err)
 		return
 	}
-	s.cache.Put(e)
+	if loadHeader{
+		s.cache.Put(e)
+	}
+
 	return
 }
+
+
 
 func (s *ExtentStore) initBaseFileId() (err error) {
 	var (
@@ -282,7 +298,7 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 		err = fmt.Errorf("extent %v not exist", extentId)
 		return
 	}
-	extent, err := s.getExtent(extentId)
+	extent, err := s.getExtentWithHeader(extentId)
 	if err != nil {
 		return err
 	}
@@ -315,7 +331,7 @@ func (s *ExtentStore) checkOffsetAndSize(offset, size int64) error {
 
 func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (crc uint32, err error) {
 	var extent Extent
-	if extent, err = s.getExtent(extentId); err != nil {
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return
 	}
 	if err = s.checkOffsetAndSize(offset, size); err != nil {
@@ -343,7 +359,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64) (err error) {
 		return
 	}
 
-	if extent, err = s.getExtent(extentId); err != nil {
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return nil
 	}
 	if err = extent.MarkDelete(); err != nil {
@@ -429,7 +445,7 @@ func (s *ExtentStore) FlushDelete() (err error) {
 			break
 		}
 		delIdxOff += 8
-		_, err = s.getExtent(extentId)
+		_, err = s.getExtentWithHeader(extentId)
 		if err != nil {
 			continue
 		}
@@ -451,7 +467,7 @@ func (s *ExtentStore) FlushDelete() (err error) {
 
 func (s *ExtentStore) Sync(extentId uint64) (err error) {
 	var extent Extent
-	if extent, err = s.getExtent(extentId); err != nil {
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return
 	}
 	return extent.Flush()
@@ -493,7 +509,7 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 		return
 	}
 	if reload {
-		if extent, err = s.getExtent(extentId); err != nil {
+		if extent, err = s.getExtentWithHeader(extentId); err != nil {
 			return
 		}
 		extentInfo.FromExtent(extent)
