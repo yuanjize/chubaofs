@@ -71,12 +71,9 @@ type LoadDataPartitionResponse struct {
 type File struct {
 	Name      string
 	Crc       uint32
-	CheckSum  uint32
 	Size      uint32
 	Modified  int64
 	MarkDel   bool
-	LastObjID uint64
-	NeedleCnt int
 }
 
 type LoadMetaPartitionMetricRequest struct {
