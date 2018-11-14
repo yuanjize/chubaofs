@@ -34,7 +34,6 @@ type MembersFileMetas struct {
 	NeedDeleteExtentsTasks []*storage.FileInfo       //generator delete extent file task
 	NeedAddExtentsTasks    []*storage.FileInfo       //generator add extent file task
 	NeedFixFileSizeTasks   []*storage.FileInfo       //generator fixSize file task
-	NeedDeleteObjectsTasks map[int][]byte            //generator deleteObject on tiny file task
 }
 
 func NewMemberFileMetas() (mf *MembersFileMetas) {
@@ -43,7 +42,6 @@ func NewMemberFileMetas() (mf *MembersFileMetas) {
 		NeedDeleteExtentsTasks: make([]*storage.FileInfo, 0),
 		NeedAddExtentsTasks:    make([]*storage.FileInfo, 0),
 		NeedFixFileSizeTasks:   make([]*storage.FileInfo, 0),
-		NeedDeleteObjectsTasks: make(map[int][]byte),
 	}
 	return
 }
@@ -80,49 +78,13 @@ func (dp *dataPartition) fileRepair() {
 func (dp *dataPartition) getLocalFileMetas() (fileMetas *MembersFileMetas, err error) {
 	var (
 		extentFiles []*storage.FileInfo
-		tinyFiles   []*storage.FileInfo
 	)
 	if extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter()); err != nil {
 		return
 	}
-	if tinyFiles, err = dp.tinyStore.GetAllWatermark(); err != nil {
-		return
-	}
 	files := make([]*storage.FileInfo, 0)
 	files = append(files, extentFiles...)
-	files = append(files, tinyFiles...)
 
-	fileMetas = NewMemberFileMetas()
-	for _, file := range files {
-		fileMetas.files[file.FileId] = file
-	}
-	return
-}
-
-func (dp *dataPartition) getRemoteFileMetas(remote string) (fileMetas *MembersFileMetas, err error) {
-	var (
-		conn *net.TCPConn
-	)
-	if conn, err = gConnPool.Get(remote); err != nil {
-		err = errors.Annotatef(err, "getRemoteFileMetas partition[%v] get connection", dp.partitionId)
-		return
-	}
-	defer gConnPool.Put(conn, true)
-
-	packet := NewGetAllWaterMarker(dp.partitionId)
-	if err = packet.WriteToConn(conn); err != nil {
-		err = errors.Annotatef(err, "getRemoteFileMetas partition[%v] write to remote[%v]", dp.partitionId, remote)
-		return
-	}
-	if err = packet.ReadFromConn(conn, 10); err != nil {
-		err = errors.Annotatef(err, "getRemoteFileMetas partition[%v] read from connection[%v]", dp.partitionId, remote)
-		return
-	}
-	files := make([]*storage.FileInfo, 0)
-	if err = json.Unmarshal(packet.Data[:packet.Size], &files); err != nil {
-		err = errors.Annotatef(err, "getRemoteFileMetas partition[%v] unmarshal packet", dp.partitionId)
-		return
-	}
 	fileMetas = NewMemberFileMetas()
 	for _, file := range files {
 		fileMetas.files[file.FileId] = file
@@ -133,25 +95,14 @@ func (dp *dataPartition) getRemoteFileMetas(remote string) (fileMetas *MembersFi
 // Get all data partition group ,about all files meta
 func (dp *dataPartition) getAllMemberFileMetas() (allMemberFileMetas []*MembersFileMetas, err error) {
 	allMemberFileMetas = make([]*MembersFileMetas, len(dp.replicaHosts))
-	var (
-		extentFiles, tinyFiles []*storage.FileInfo
-	)
 	files := make([]*storage.FileInfo, 0)
 	// get local extent file metas
-	extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
+	files, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
 	if err != nil {
 		err = errors.Annotatef(err, "getAllMemberFileMetas extent dataPartition[%v] GetAllWaterMark", dp.partitionId)
 		return
 	}
-	// get local tiny file metas
-	tinyFiles, err = dp.tinyStore.GetAllWatermark()
-	if err != nil {
-		err = errors.Annotatef(err, "getAllMemberFileMetas tiny dataPartition[%v] GetAllWaterMark", dp.partitionId)
-		return
-	}
 	// write tiny files meta to extent files meta
-	files = append(files, extentFiles...)
-	files = append(files, tinyFiles...)
 	leaderFileMetas := NewMemberFileMetas()
 	if err != nil {
 		err = errors.Annotatef(err, "getAllMemberFileMetas dataPartition[%v] GetAllWaterMark", dp.partitionId)
@@ -208,7 +159,6 @@ func (dp *dataPartition) generatorFilesRepairTasks(allMembers []*MembersFileMeta
 	dp.generatorAddExtentsTasks(allMembers) //add extentTask
 	dp.generatorFixFileSizeTasks(allMembers)
 	dp.generatorDeleteExtentsTasks(allMembers)
-	dp.generatorTinyDeleteTasks(allMembers)
 
 }
 
@@ -295,27 +245,6 @@ func (dp *dataPartition) generatorDeleteExtentsTasks(allMembers []*MembersFileMe
 			}
 		}
 	}
-}
-
-//generator tinyObject delete task,send leader has delete object,notify follower delete it
-func (dp *dataPartition) generatorTinyDeleteTasks(allMembers []*MembersFileMetas) {
-	store := dp.tinyStore
-	for _, chunkInfo := range allMembers[0].files {
-		chunkId := chunkInfo.FileId
-		if chunkId > storage.TinyChunkCount {
-			continue
-		}
-		deletes := store.GetDelObjects(uint32(chunkId))
-		deleteBuf := make([]byte, len(deletes)*ObjectIDSize)
-		for index, deleteObject := range deletes {
-			binary.BigEndian.PutUint64(deleteBuf[index*ObjectIDSize:(index+1)*ObjectIDSize], deleteObject)
-		}
-		for index := 0; index < len(allMembers); index++ {
-			allMembers[index].NeedDeleteObjectsTasks[chunkId] = make([]byte, len(deleteBuf))
-			copy(allMembers[index].NeedDeleteObjectsTasks[chunkId], deleteBuf)
-		}
-	}
-
 }
 
 /*notify follower to repair dataPartition extentStore*/

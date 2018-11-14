@@ -32,24 +32,6 @@ import (
 	"github.com/tiglabs/containerfs/util/log"
 )
 
-type CompactTask struct {
-	partitionId uint32
-	chunkId     int
-	isLeader    bool
-}
-
-func (t *CompactTask) toString() (m string) {
-	return fmt.Sprintf("dataPartition[%v]_chunk[%v]_isLeader[%v]", t.partitionId, t.chunkId, t.isLeader)
-}
-
-const (
-	CompactThreadNum = 4
-)
-
-var (
-	ErrDiskCompactChanFull = errors.New("disk compact chan is full")
-)
-
 var (
 	// Regexp pattern for data partition dir name validate.
 	RegexpDataPartitionDir, _ = regexp.Compile("^datapartition_(\\d)+_(\\d)+$")
@@ -77,7 +59,6 @@ type Disk struct {
 	Status       int
 	RestSize     uint64
 	partitionMap map[uint32]DataPartition
-	compactCh    chan *CompactTask
 	space        SpaceManager
 }
 
@@ -89,12 +70,8 @@ func NewDisk(path string, restSize uint64, maxErrs int) (d *Disk) {
 	d.RestSize = restSize
 	d.MaxErrs = maxErrs
 	d.partitionMap = make(map[uint32]DataPartition)
-	d.RestSize = util.GB * 100
+	d.RestSize = util.GB * 30
 	d.MaxErrs = 2000
-	d.compactCh = make(chan *CompactTask, CompactThreadNum)
-	//for i := 0; i < CompactThreadNum; i++ {
-	//	go d.compact()
-	//}
 	d.computeUsage()
 
 	d.startScheduleTasks()
@@ -154,35 +131,8 @@ func (d *Disk) computeUsage() (err error) {
 	return
 }
 
-func (d *Disk) addTask(t *CompactTask) (err error) {
-	select {
-	case d.compactCh <- t:
-		return
-	default:
-		return errors.Annotatef(ErrDiskCompactChanFull, "diskPath:[%v] partitionId[%v]", d.Path, t.partitionId)
-	}
-}
-
 func (d *Disk) addReadErr() {
 	atomic.AddUint64(&d.ReadErrs, 1)
-}
-
-func (d *Disk) compact() {
-	for {
-		select {
-		case t := <-d.compactCh:
-			dp := d.space.GetPartition(t.partitionId)
-			if dp == nil {
-				continue
-			}
-			err, release := dp.GetTinyStore().DoCompactWork(t.chunkId)
-			if err != nil {
-				log.LogErrorf("action[compact] task[%v] compact error[%v]", t.toString(), err.Error())
-			} else {
-				log.LogInfof("action[compact] task[%v] compact success Release [%v]", t.toString(), release)
-			}
-		}
-	}
 }
 
 func (d *Disk) addWriteErr() {
