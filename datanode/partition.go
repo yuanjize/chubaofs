@@ -112,6 +112,7 @@ type dataPartition struct {
 
 	runtimeMetrics        *DataPartitionMetrics
 	updateReplicationTime int64
+	updatePartitionSizeTime int64
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
@@ -289,6 +290,9 @@ func (dp *dataPartition) computeUsage() {
 		files []os.FileInfo
 		err   error
 	)
+	if time.Now().Unix()-dp.updatePartitionSizeTime<UpdatePartitionSizeTime{
+		return
+	}
 	if files, err = ioutil.ReadDir(dp.path); err != nil {
 		return
 	}
@@ -296,6 +300,7 @@ func (dp *dataPartition) computeUsage() {
 		used += file.Size()
 	}
 	dp.used = int(used)
+	dp.updatePartitionSizeTime=time.Now().Unix()
 }
 
 func (dp *dataPartition) GetExtentStore() *storage.ExtentStore {

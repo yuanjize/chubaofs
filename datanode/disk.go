@@ -26,7 +26,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/juju/errors"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"

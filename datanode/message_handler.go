@@ -151,7 +151,6 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 			} else {
 				gConnPool.Put(request.NextConn, true)
 			}
-			s.headNodePutChunk(request)
 		}
 	}
 	replys := len(msgH.replyCh)
