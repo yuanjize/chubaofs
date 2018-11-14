@@ -241,9 +241,9 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 	if err != nil {
 		return err
 	}
-	filesArray:=make([][]string,9)
-	baseExtentIds:=make([]uint64,9)
-	for index:=1;index<=9;index++{
+	filesArray:=[10][]string{}
+	baseExtentIds:=make([]uint64,10)
+	for index:=0;index<10;index++{
 		if filesArray[index]==nil{
 			filesArray[index]=make([]string,0)
 		}
