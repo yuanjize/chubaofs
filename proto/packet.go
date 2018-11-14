@@ -151,15 +151,7 @@ func NewPacket() *Packet {
 }
 
 func (p *Packet) GetStoreModeMsg() (m string) {
-	switch p.StoreMode {
-	case TinyStoreMode:
-		m = "Tiny"
-	case ExtentStoreMode:
-		m = "Extent"
-	default:
-		m = "Unknown"
-	}
-	return
+	return "Extent"
 }
 
 func (p *Packet) GetOpMsg() (m string) {
