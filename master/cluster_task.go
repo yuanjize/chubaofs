@@ -169,7 +169,7 @@ func (c *Cluster) processLoadDataPartition(dp *DataPartition) {
 	if dp.checkLoadResponse(c.cfg.DataPartitionTimeOutSec) == false {
 		return
 	}
-	dp.getFileCount()
+	//dp.getFileCount()
 	dp.checkFile(c.Name)
 	dp.setToNormal()
 }
