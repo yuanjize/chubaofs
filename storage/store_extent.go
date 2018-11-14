@@ -32,6 +32,7 @@ import (
 
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util"
+	"github.com/tiglabs/containerfs/util/log"
 )
 
 const (
@@ -136,7 +137,6 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 			Crc:       extentInfo.Crc,
 			Size:      uint32(extentInfo.Size),
 			MarkDel:   extentInfo.Deleted,
-			NeedleCnt: 1,
 			Modified:  extentInfo.ModTime.Unix(),
 		}
 		files = append(files, file)
@@ -241,6 +241,43 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 	if err != nil {
 		return err
 	}
+	filesArray:=make([][]string,9)
+	baseExtentIds:=make([]uint64,9)
+	for index:=1;index<=9;index++{
+		if filesArray[index]==nil{
+			filesArray[index]=make([]string,0)
+		}
+	}
+	for _,f:=range files{
+		if _, isExtent := s.parseExtentId(f.Name()); !isExtent {
+			continue
+		}
+		prefix,err:=strconv.Atoi(f.Name()[0:1])
+		if err!=nil {
+			continue
+		}
+		filesArray[prefix]=append(filesArray[prefix],f.Name())
+	}
+	wg:=new(sync.WaitGroup)
+	for index,files:=range filesArray{
+		wg.Add(1)
+		go s.loadFiles(wg,files,&baseExtentIds[index])
+	}
+	wg.Wait()
+	for _,baseid:=range baseExtentIds{
+		if baseFileId<baseid{
+			baseFileId=baseid
+		}
+	}
+
+	atomic.StoreUint64(&s.baseExtentId, baseFileId)
+	log.LogInfof("datadir(%v) maxBaseId(%v)",s.dataDir,baseFileId)
+	return nil
+}
+
+
+
+func (s *ExtentStore)loadFiles(wg *sync.WaitGroup,filenames []string,baseExtentIds *uint64){
 	var (
 		extentId   uint64
 		isExtent   bool
@@ -248,8 +285,9 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		extentInfo *FileInfo
 		loadErr    error
 	)
-	for _, f := range files {
-		if extentId, isExtent = s.parseExtentId(f.Name()); !isExtent {
+	defer wg.Done()
+	for _,name :=range filenames{
+		if extentId, isExtent = s.parseExtentId(name); !isExtent {
 			continue
 		}
 		if extent, loadErr = s.getExtent(extentId); loadErr != nil {
@@ -260,12 +298,12 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentId] = extentInfo
 		s.extentInfoMux.Unlock()
-		if extentId > baseFileId {
-			baseFileId = extentId
+		if extentId > *baseExtentIds {
+			*baseExtentIds = extentId
 		}
 	}
-	atomic.StoreUint64(&s.baseExtentId, baseFileId)
-	return nil
+
+	return
 }
 
 func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
