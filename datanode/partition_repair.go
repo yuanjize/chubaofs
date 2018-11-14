@@ -170,6 +170,7 @@ func (dp *dataPartition) getAllMemberFileMetas() (allMemberFileMetas []*MembersF
 		target := dp.replicaHosts[i]
 		conn, err = gConnPool.Get(target) //get remote connect
 		if err != nil {
+			gConnPool.Put(conn, true)
 			err = errors.Annotatef(err, "getAllMemberFileMetas  dataPartition[%v] get host[%v] connect", dp.partitionId, target)
 			return
 		}
@@ -192,12 +193,12 @@ func (dp *dataPartition) getAllMemberFileMetas() (allMemberFileMetas []*MembersF
 			err = errors.Annotatef(err, "getAllMemberFileMetas dataPartition[%v] unmarshal json[%v]", dp.partitionId, string(p.Data[:p.Size]))
 			return
 		}
+		gConnPool.Put(conn, true)
 		slaverFileMetas := NewMemberFileMetas()
 		for _, fileInfo := range fileInfos {
 			slaverFileMetas.files[fileInfo.FileId] = fileInfo
 		}
 		allMemberFileMetas[i] = slaverFileMetas
-		gConnPool.Put(conn, true)
 	}
 	return
 }

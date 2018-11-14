@@ -65,6 +65,7 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	// Get a connection to leader host
 	conn, err = gConnPool.Get(remoteExtentInfo.Source)
 	if err != nil {
+		gConnPool.Put(conn, true)
 		return errors.Annotatef(err, "streamRepairExtent get conn from host[%v] error", remoteExtentInfo.Source)
 	}
 	defer gConnPool.Put(conn, true)
