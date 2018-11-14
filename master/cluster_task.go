@@ -170,9 +170,6 @@ func (c *Cluster) processLoadDataPartition(dp *DataPartition) {
 		return
 	}
 	dp.getFileCount()
-	if len(dp.FileInCoreMap) > MaxFileNumberOfDataPartitions && !dp.isFreezed() {
-		dp.freeze(c)
-	}
 	dp.checkFile(c.Name)
 	dp.setToNormal()
 }
@@ -527,6 +524,9 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 		}
 		if dp, err := c.getDataPartitionByID(vr.PartitionID); err == nil {
 			dp.UpdateMetric(vr, dataNode)
+			if vr.ExtentCount > MaxFileNumberOfDataPartitions && !dp.isFreezed() {
+				dp.freeze(c)
+			}
 		}
 	}
 }
