@@ -113,7 +113,6 @@ func NewExtentStore(dataDir string, storeSize int) (s *ExtentStore, err error) {
 	s.storeSize = storeSize
 	s.closeC = make(chan bool, 1)
 	s.closed = false
-	go s.cleanupScheduler()
 	return
 }
 
@@ -382,20 +381,8 @@ func (s *ExtentStore) MarkDelete(extentId uint64) (err error) {
 	return
 }
 
-func (s *ExtentStore) cleanupScheduler() {
-	ticker := time.NewTicker(5 * time.Minute)
-	for {
-		select {
-		case <-ticker.C:
-			s.cleanup()
-		case <-s.closeC:
-			ticker.Stop()
-			return
-		}
-	}
-}
 
-func (s *ExtentStore) cleanup() {
+func (s *ExtentStore) Cleanup() {
 
 	extentInfoSlice, err := s.GetAllWatermark(GetEmptyExtentFilter())
 	if err != nil {

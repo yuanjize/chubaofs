@@ -108,8 +108,8 @@ type dataPartition struct {
 	extentStore     *storage.ExtentStore
 	stopC           chan bool
 
-	runtimeMetrics        *DataPartitionMetrics
-	updateReplicationTime int64
+	runtimeMetrics          *DataPartitionMetrics
+	updateReplicationTime   int64
 	updatePartitionSizeTime int64
 }
 
@@ -251,11 +251,14 @@ func (dp *dataPartition) ChangeStatus(status int) {
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(2 * time.Second)
+	cleanUpTicker := time.NewTicker(time.Second * 5)
 	for {
 		select {
 		case <-ticker.C:
 			dp.statusUpdate()
 			dp.LaunchRepair()
+		case <-cleanUpTicker.C:
+			dp.extentStore.Cleanup()
 		case <-dp.stopC:
 			ticker.Stop()
 			return
@@ -283,7 +286,7 @@ func (dp *dataPartition) computeUsage() {
 		files []os.FileInfo
 		err   error
 	)
-	if time.Now().Unix()-dp.updatePartitionSizeTime<UpdatePartitionSizeTime{
+	if time.Now().Unix()-dp.updatePartitionSizeTime < UpdatePartitionSizeTime {
 		return
 	}
 	if files, err = ioutil.ReadDir(dp.path); err != nil {
@@ -293,7 +296,7 @@ func (dp *dataPartition) computeUsage() {
 		used += file.Size()
 	}
 	dp.used = int(used)
-	dp.updatePartitionSizeTime=time.Now().Unix()
+	dp.updatePartitionSizeTime = time.Now().Unix()
 }
 
 func (dp *dataPartition) GetExtentStore() *storage.ExtentStore {

@@ -27,17 +27,15 @@ const (
 )
 
 const (
-	ActionSendToNext                                 = "ActionSendToNext"
-	LocalProcessAddr                                 = "LocalProcess"
-	ActionReceiveFromNext                            = "ActionReceiveFromNext"
-	ActionStreamRead                                 = "ActionStreamRead"
-	ActionWriteToCli                                 = "ActionWriteToCli"
-	ActionGetDataPartitionMetrics                    = "ActionGetDataPartitionMetrics"
-	ActionCheckAndAddInfos                           = "ActionCheckAndAddInfos"
-	ActionCheckReplyAvail = "ActionCheckReplyAvail"
+	ActionSendToNext              = "ActionSendToNext"
+	LocalProcessAddr              = "LocalProcess"
+	ActionReceiveFromNext         = "ActionReceiveFromNext"
+	ActionStreamRead              = "ActionStreamRead"
+	ActionWriteToCli              = "ActionWriteToCli"
+	ActionGetDataPartitionMetrics = "ActionGetDataPartitionMetrics"
+	ActionCheckAndAddInfos        = "ActionCheckAndAddInfos"
+	ActionCheckReplyAvail         = "ActionCheckReplyAvail"
 )
-
-
 
 const (
 	InFlow = iota
@@ -47,8 +45,6 @@ const (
 const (
 	NetType = "tcp"
 )
-
-
 
 //pack cmd response
 const (
@@ -61,16 +57,16 @@ const (
 	ConnIsNullErr              = "ConnIsNullErr"
 	UpdateReplicationHostsTime = 60
 	SimultaneouslyRecoverFiles = 7
-	UpdatePartitionSizeTime = 300
+	UpdatePartitionSizeTime    = 300
 )
 
 const (
-	LogStats             = "Stats:"
-	LogCreateFile        = "CRF:"
-	LogMarkDel           = "MDEL:"
-	LogGetWm             = "WM:"
-	LogGetAllWm          = "AllWM:"
-	LogWrite             = "WR:"
-	LogRead              = "RD:"
-	LogRepair            = "Repair:"
+	LogStats      = "Stats:"
+	LogCreateFile = "CRF:"
+	LogMarkDel    = "MDEL:"
+	LogGetWm      = "WM:"
+	LogGetAllWm   = "AllWM:"
+	LogWrite      = "WR:"
+	LogRead       = "RD:"
+	LogRepair     = "Repair:"
 )
