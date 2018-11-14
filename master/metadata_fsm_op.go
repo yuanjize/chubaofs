@@ -739,6 +739,7 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, volName)
 		dp.Lock()
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsFreeze = dpv.IsFreeze
 		dp.Unlock()
 		vol.dataPartitions.putDataPartition(dp)
 		encodedKey.Free()
