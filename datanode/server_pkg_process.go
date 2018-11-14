@@ -34,6 +34,7 @@ func (s *DataNode) readFromCliAndDeal(msgH *MessageHandler) (err error) {
 	pkg := NewPacket()
 	s.statsFlow(pkg, InFlow)
 	if err = pkg.ReadFromConnFromCli(msgH.inConn, proto.NoReadDeadlineTime); err != nil {
+		msgH.inConn.Close()
 		return
 	}
 	log.LogDebugf("action[readFromCliAndDeal] read packet[%v] from remote[%v].",
