@@ -16,6 +16,7 @@ package master
 
 import (
 	"github.com/tiglabs/containerfs/proto"
+	"fmt"
 )
 
 /*this struct define chunk file metadata on  dataNode */
@@ -43,6 +44,12 @@ func NewFileMetaOnNode(volCrc uint32, volLoc string, volLocIndex int, lastObjID 
 	fm.LastObjID = lastObjID
 	fm.NeedleCnt = needleCnt
 	fm.Size = size
+	return
+}
+
+func (fm *FileMetaOnNode) ToString() (msg string) {
+	msg = fmt.Sprintf("Crc[%v] LocAddr[%d] LocIndex[%v]  LastObjID[%v] NeedleCnt[%v] Size[%v]",
+		fm.Crc, fm.LocAddr, fm.LocIndex, fm.LastObjID, fm.NeedleCnt, fm.Size)
 	return
 }
 

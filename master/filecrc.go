@@ -17,7 +17,6 @@ package master
 import (
 	"fmt"
 	"github.com/tiglabs/containerfs/proto"
-	"sort"
 	"time"
 )
 
@@ -71,39 +70,49 @@ func (fc *FileInCore) generateFileCrcTask(partitionID uint64, liveVols []*DataRe
 		return
 	}
 
-	fms, needRepair := fc.needCrcRepair(liveVols, volType)
+	fms, _ := fc.needCrcRepair(liveVols, volType)
 
-	if len(fms) < len(liveVols) && (time.Now().Unix()-fc.LastModify) > CheckMissFileReplicaTime {
-		liveAddrs := make([]string, 0)
-		for _, replica := range liveVols {
-			liveAddrs = append(liveAddrs, replica.Addr)
-		}
-		Warn(clusterID, fmt.Sprintf("partitionid[%v],file[%v],fms[%v],liveAddr[%v]", partitionID, fc.Name, fc.getFileMetaAddrs(), liveAddrs))
-	}
-	if !needRepair {
+	if isSameSize(fms) {
 		return
 	}
 
-	fileCrcArr := fc.calculateCrcCount(fms)
-	sort.Sort((FileCrcSorterByCount)(fileCrcArr))
-	maxCountFileCrcIndex := len(fileCrcArr) - 1
-	if fileCrcArr[maxCountFileCrcIndex].count == 1 {
-		msg := fmt.Sprintf("checkFileCrcTaskErr clusterID[%v] partitionID:%v  File:%v  Crc diffrent between all Node  "+
-			" it can not repair it ", clusterID, partitionID, fc.Name)
-		msg += (FileCrcSorterByCount)(fileCrcArr).log()
-		Warn(clusterID, msg)
-		return
+	msg := fmt.Sprintf("CheckFileError size not match,cluster[%v],", clusterID)
+	for _, fm := range fms {
+		msg = fmt.Sprintf(msg+"fm[%v]:%v\n", fm.LocIndex, fm.ToString())
 	}
+	Warn(clusterID, msg)
 
-	for index, crc := range fileCrcArr {
-		if index != maxCountFileCrcIndex {
-			badNode := crc.meta
-			msg := fmt.Sprintf("checkFileCrcTaskErr clusterID[%v] partitionID:%v  File:%v  badCrc On :%v  ",
-				clusterID, partitionID, fc.Name, badNode.getLocationAddr())
-			msg += (FileCrcSorterByCount)(fileCrcArr).log()
-			Warn(clusterID, msg)
-		}
-	}
+	//if len(fms) < len(liveVols) && (time.Now().Unix()-fc.LastModify) > CheckMissFileReplicaTime {
+	//	liveAddrs := make([]string, 0)
+	//	for _, replica := range liveVols {
+	//		liveAddrs = append(liveAddrs, replica.Addr)
+	//	}
+	//	Warn(clusterID, fmt.Sprintf("partitionid[%v],file[%v],fms[%v],liveAddr[%v]", partitionID, fc.Name, fc.getFileMetaAddrs(), liveAddrs))
+	//}
+	//if !needRepair {
+	//	return
+	//}
+	//
+	//fileCrcArr := fc.calculateCrcCount(fms)
+	//sort.Sort((FileCrcSorterByCount)(fileCrcArr))
+	//maxCountFileCrcIndex := len(fileCrcArr) - 1
+	//if fileCrcArr[maxCountFileCrcIndex].count == 1 {
+	//	msg := fmt.Sprintf("checkFileCrcTaskErr clusterID[%v] partitionID:%v  File:%v  Crc diffrent between all Node  "+
+	//		" it can not repair it ", clusterID, partitionID, fc.Name)
+	//	msg += (FileCrcSorterByCount)(fileCrcArr).log()
+	//	Warn(clusterID, msg)
+	//	return
+	//}
+	//
+	//for index, crc := range fileCrcArr {
+	//	if index != maxCountFileCrcIndex {
+	//		badNode := crc.meta
+	//		msg := fmt.Sprintf("checkFileCrcTaskErr clusterID[%v] partitionID:%v  File:%v  badCrc On :%v  ",
+	//			clusterID, partitionID, fc.Name, badNode.getLocationAddr())
+	//		msg += (FileCrcSorterByCount)(fileCrcArr).log()
+	//		Warn(clusterID, msg)
+	//	}
+	//}
 
 	return
 }
