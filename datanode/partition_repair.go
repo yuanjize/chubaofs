@@ -320,10 +320,6 @@ func (dp *dataPartition) generatorTinyDeleteTasks(allMembers []*MembersFileMetas
 
 /*notify follower to repair dataPartition extentStore*/
 func (dp *dataPartition) NotifyRepair(members []*MembersFileMetas) (err error) {
-	var (
-		errList []error
-	)
-	errList = make([]error, 0)
 	var wg sync.WaitGroup
 	for i := 1; i < len(members); i++ {
 		wg.Add(1)
@@ -334,7 +330,6 @@ func (dp *dataPartition) NotifyRepair(members []*MembersFileMetas) (err error) {
 			target := dp.replicaHosts[index]
 			conn, err = gConnPool.Get(target)
 			if err != nil {
-				errList = append(errList, err)
 				return
 			}
 			p.Data, err = json.Marshal(members[index])
@@ -342,23 +337,16 @@ func (dp *dataPartition) NotifyRepair(members []*MembersFileMetas) (err error) {
 			err = p.WriteToConn(conn)
 			if err != nil {
 				gConnPool.Put(conn, true)
-				errList = append(errList, err)
 				return
 			}
 			err = p.ReadFromConn(conn, proto.NoReadDeadlineTime)
 			if err != nil {
 				gConnPool.Put(conn, true)
-				errList = append(errList, err)
 				return
 			}
 			gConnPool.Put(conn, true)
 		}(i)
 	}
 	wg.Wait()
-	if len(errList) > 0 {
-		for _, errItem := range errList {
-			err = errors.Annotate(err, errItem.Error())
-		}
-	}
 	return
 }
