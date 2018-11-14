@@ -366,6 +366,7 @@ func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 	}
 	msg = fmt.Sprintf("update vol[%v] successed\n", name)
 	io.WriteString(w, msg)
+	return
 errDeal:
 	logMsg := getReturnMessage("updateVol", r.RemoteAddr, err.Error(), http.StatusBadRequest)
 	HandleError(logMsg, err, http.StatusBadRequest, w)
