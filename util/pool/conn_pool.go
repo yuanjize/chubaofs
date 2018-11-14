@@ -71,7 +71,9 @@ func (p *Pool) putconnect(c *ConnectObject) {
 	case p.pool <- c:
 		return
 	default:
-		c.conn.Close()
+		if c.conn!=nil {
+			c.conn.Close()
+		}
 		return
 	}
 }
