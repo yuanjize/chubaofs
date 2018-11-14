@@ -282,8 +282,8 @@ func (dp *dataPartition) statusUpdate() {
 	if dp.used >= dp.partitionSize {
 		status = proto.ReadOnly
 	}
-	if dp.extentStore.GetExtentCount()>=MaxActiveExtents{
-		status=proto.ReadOnly
+	if dp.extentStore.GetExtentCount() >= MaxActiveExtents {
+		status = proto.ReadOnly
 	}
 	if dp.isLeader {
 		dp.tinyStore.MoveChunkToUnavailChan()
@@ -508,9 +508,10 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 
 	tinyFiles := make([]*storage.FileInfo, 0)
 	var (
-		wg           sync.WaitGroup
+		wg           *sync.WaitGroup
 		recoverIndex int
 	)
+	wg=new(sync.WaitGroup)
 	for _, fixExtent := range metas.NeedFixFileSizeTasks {
 		if fixExtent.FileId <= storage.TinyChunkCount {
 			tinyFiles = append(tinyFiles, fixExtent)
@@ -520,8 +521,11 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 			continue
 		}
 		wg.Add(1)
+		go dp.doStreamExtentFixRepair(wg, fixExtent)
 		recoverIndex++
-		go dp.doStreamExtentFixRepair(&wg, fixExtent)
+		if recoverIndex%SimultaneouslyRecoverFiles==0{
+			wg.Wait()
+		}
 	}
 	for chunkId, deleteTinyObject := range metas.NeedDeleteObjectsTasks {
 		if err := dp.DelObjects(uint32(chunkId), deleteTinyObject); err != nil {
