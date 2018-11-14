@@ -15,7 +15,6 @@
 package datanode
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -107,7 +106,6 @@ type dataPartition struct {
 	path            string
 	used            int
 	extentStore     *storage.ExtentStore
-	tinyStore       *storage.TinyStore
 	stopC           chan bool
 
 	runtimeMetrics        *DataPartitionMetrics
@@ -183,10 +181,6 @@ func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int)
 	if err != nil {
 		return
 	}
-	partition.tinyStore, err = storage.NewTinyStore(partition.path, size)
-	if err != nil {
-		return
-	}
 	disk.AttachDataPartition(partition)
 	dp = partition
 	go partition.statusUpdateScheduler()
@@ -219,7 +213,6 @@ func (dp *dataPartition) Stop() {
 	}
 	// Close all store and backup partition data file.
 	dp.extentStore.Close()
-	dp.tinyStore.CloseAll()
 
 }
 
