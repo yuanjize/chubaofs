@@ -74,6 +74,8 @@ type File struct {
 	Size      uint32
 	Modified  int64
 	MarkDel   bool
+	LastObjID uint64
+	NeedleCnt int
 }
 
 type LoadMetaPartitionMetricRequest struct {
