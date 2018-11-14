@@ -87,6 +87,7 @@ type DataPartitionValue struct {
 	ReplicaNum    uint8
 	Hosts         string
 	PartitionType string
+	IsFreeze      bool
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -95,6 +96,7 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		ReplicaNum:    dp.ReplicaNum,
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
+		IsFreeze:      dp.IsFreeze,
 	}
 	return
 }
@@ -103,6 +105,7 @@ type VolValue struct {
 	VolType    string
 	ReplicaNum uint8
 	Status     uint8
+	Capacity   uint64
 }
 
 func newVolValue(vol *Vol) (vv *VolValue) {
@@ -110,6 +113,7 @@ func newVolValue(vol *Vol) (vv *VolValue) {
 		VolType:    vol.VolType,
 		ReplicaNum: vol.dpReplicaNum,
 		Status:     vol.Status,
+		Capacity:   vol.Capacity,
 	}
 	return
 }
@@ -439,7 +443,7 @@ func (c *Cluster) applyAddVol(cmd *Metadata) {
 			log.LogError(fmt.Sprintf("action[applyAddVol] failed,err:%v", err))
 			return
 		}
-		vol := NewVol(keys[2], vv.VolType, vv.ReplicaNum)
+		vol := NewVol(keys[2], vv.VolType, vv.ReplicaNum, vv.Capacity)
 		c.putVol(vol)
 	}
 }
@@ -463,6 +467,7 @@ func (c *Cluster) applyUpdateVol(cmd *Metadata) {
 			return
 		}
 		vol.setStatus(vv.Status)
+		vol.setCapacity(vv.Capacity)
 	}
 }
 
@@ -521,6 +526,7 @@ func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
 		vol, _ := c.getVol(keys[2])
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsFreeze = dpv.IsFreeze
 		vol.dataPartitions.putDataPartitionByRaft(dp)
 	}
 }
@@ -538,6 +544,7 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsFreeze = dpv.IsFreeze
 		vol.dataPartitions.putDataPartitionByRaft(dp)
 	}
 }
@@ -661,7 +668,7 @@ func (c *Cluster) loadVols() (err error) {
 			err = fmt.Errorf("action[loadVols],value:%v,err:%v", encodedValue.Data(), err)
 			return err
 		}
-		vol := NewVol(volName, vv.VolType, vv.ReplicaNum)
+		vol := NewVol(volName, vv.VolType, vv.ReplicaNum, vv.Capacity)
 		vol.Status = vv.Status
 		c.putVol(vol)
 		encodedKey.Free()

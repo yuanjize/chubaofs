@@ -170,6 +170,9 @@ func (c *Cluster) processLoadDataPartition(dp *DataPartition) {
 		return
 	}
 	dp.getFileCount()
+	if len(dp.FileInCoreMap) > MaxFileNumberOfDataPartitions && !dp.isFreezed() {
+		dp.freeze(c)
+	}
 	dp.checkFile(c.Name)
 	dp.setToNormal()
 }

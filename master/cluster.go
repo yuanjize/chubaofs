@@ -27,6 +27,7 @@ import (
 
 type Cluster struct {
 	Name                string
+	DisableAutoAlloc    bool
 	vols                map[string]*Vol
 	dataNodes           sync.Map
 	metaNodes           sync.Map
@@ -88,6 +89,8 @@ func (c *Cluster) startCheckAvailSpace() {
 
 func (c *Cluster) startCheckVols() {
 	go func() {
+		//check vols after switching leader two minutes
+		time.Sleep(2 * time.Minute)
 		for {
 			if c.partition.IsLeader() {
 				c.checkVols()
@@ -112,6 +115,7 @@ func (c *Cluster) checkVols() {
 	vols := c.copyVols()
 	for _, vol := range vols {
 		vol.checkStatus(c)
+		vol.checkAvailSpace(c)
 	}
 }
 
@@ -523,11 +527,11 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	task = dp.GenerateDeleteTask(offlineAddr)
 	tasks = make([]*proto.AdminTask, 0)
 	tasks = append(tasks, task)
-	tasks = append(tasks,dp.generateCreateTask(newAddr))
+	tasks = append(tasks, dp.generateCreateTask(newAddr))
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
@@ -563,9 +567,30 @@ func (c *Cluster) delMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) createVol(name, volType string, replicaNum uint8) (err error) {
+func (c *Cluster) updateVol(name string, capacity int) (err error) {
 	var vol *Vol
-	if vol, err = c.createVolInternal(name, volType, replicaNum); err != nil {
+	if vol, err = c.getVol(name); err != nil {
+		goto errDeal
+	}
+	if uint64(capacity) < vol.Capacity {
+		err = fmt.Errorf("capacity[%v] less than old capacity[%v]", capacity, vol.Capacity)
+		goto errDeal
+	}
+	vol.setCapacity(uint64(capacity))
+	if err = c.syncUpdateVol(vol); err != nil {
+		goto errDeal
+	}
+	return
+errDeal:
+	err = fmt.Errorf("action[updateVol], clusterID[%v] name:%v, err:%v ", c.Name, name, err.Error())
+	log.LogError(errors.ErrorStack(err))
+	Warn(c.Name, err.Error())
+	return
+}
+
+func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int) (err error) {
+	var vol *Vol
+	if vol, err = c.createVolInternal(name, volType, replicaNum, capacity); err != nil {
 		goto errDeal
 	}
 
@@ -585,12 +610,12 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVolInternal(name, volType string, replicaNum uint8) (vol *Vol, err error) {
+func (c *Cluster) createVolInternal(name, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
 	}
-	vol = NewVol(name, volType, replicaNum)
+	vol = NewVol(name, volType, replicaNum, uint64(capacity))
 	if err = c.syncAddVol(vol); err != nil {
 		goto errDeal
 	}
@@ -798,6 +823,15 @@ func (c *Cluster) getDataPartitionCapacity(vol *Vol) (count int) {
 		return true
 	})
 	count = int(totalCount / uint64(vol.dpReplicaNum))
+	return
+}
+
+func (c *Cluster) getDataPartitionCount() (count int) {
+	c.volsLock.RLock()
+	defer c.volsLock.RUnlock()
+	for _, vol := range c.vols {
+		count = count + len(vol.dataPartitions.dataPartitions)
+	}
 	return
 }
 

@@ -251,10 +251,10 @@ func (rack *Rack) GetAvailCarryDataNodeTab(maxTotal uint64, excludeHosts []strin
 		}
 		nt := new(NodeTab)
 		nt.Carry = dataNode.Carry
-		if dataNode.Used < 0 {
+		if dataNode.Available < 0 {
 			nt.Weight = 1.0
 		} else {
-			nt.Weight = float64(dataNode.RemainWeightsForCreateVol) / float64(maxTotal)
+			nt.Weight = float64(dataNode.Available) / float64(maxTotal)
 		}
 		nt.Ptr = dataNode
 		nodeTabs = append(nodeTabs, nt)

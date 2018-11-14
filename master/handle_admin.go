@@ -32,6 +32,7 @@ type ClusterView struct {
 	Name               string
 	LeaderAddr         string
 	CompactStatus      bool
+	DisableAutoAlloc   bool
 	Applied            uint64
 	MaxDataPartitionID uint64
 	MaxMetaNodeID      uint64
@@ -97,6 +98,23 @@ errDeal:
 	return
 }
 
+func (m *Master) setDisableAutoAlloc(w http.ResponseWriter, r *http.Request) {
+	var (
+		status bool
+		err    error
+	)
+	if status, err = parseDisableAutoAlloc(r); err != nil {
+		goto errDeal
+	}
+	m.cluster.DisableAutoAlloc = status
+	io.WriteString(w, fmt.Sprintf("set disableAutoAlloc  to %v success", status))
+	return
+errDeal:
+	logMsg := getReturnMessage("setDisableAutoAlloc", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) getCompactStatus(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf("%v", m.cluster.compactStatus))
 	return
@@ -111,6 +129,7 @@ func (m *Master) getCluster(w http.ResponseWriter, r *http.Request) {
 		Name:               m.cluster.Name,
 		LeaderAddr:         m.leaderInfo.addr,
 		CompactStatus:      m.cluster.compactStatus,
+		DisableAutoAlloc:   m.cluster.DisableAutoAlloc,
 		Applied:            m.fsm.applied,
 		MaxDataPartitionID: m.cluster.idAlloc.dataPartitionID,
 		MaxMetaNodeID:      m.cluster.idAlloc.metaNodeID,
@@ -185,14 +204,14 @@ errDeal:
 
 func (m *Master) createDataPartition(w http.ResponseWriter, r *http.Request) {
 	var (
-		rstMsg                  string
-		volName                 string
-		partitionType           string
-		vol                     *Vol
-		reqCreateCount          int
-		capacity                int
-		lastTotalDataPartitions int
-		err                     error
+		rstMsg                     string
+		volName                    string
+		partitionType              string
+		vol                        *Vol
+		reqCreateCount             int
+		lastTotalDataPartitions    int
+		clusterTotalDataPartitions int
+		err                        error
 	)
 
 	if reqCreateCount, volName, partitionType, err = parseCreateDataPartitionPara(r); err != nil {
@@ -202,18 +221,15 @@ func (m *Master) createDataPartition(w http.ResponseWriter, r *http.Request) {
 	if vol, err = m.cluster.getVol(volName); err != nil {
 		goto errDeal
 	}
-	capacity = m.cluster.getDataPartitionCapacity(vol)
 	lastTotalDataPartitions = len(vol.dataPartitions.dataPartitions)
+	clusterTotalDataPartitions = m.cluster.getDataPartitionCount()
 	for i := 0; i < reqCreateCount; i++ {
-		if (reqCreateCount + lastTotalDataPartitions) < len(vol.dataPartitions.dataPartitions) {
-			break
-		}
 		if _, err = m.cluster.createDataPartition(volName, partitionType); err != nil {
 			goto errDeal
 		}
 	}
-	rstMsg = fmt.Sprintf(" createDataPartition success. cluster capacity[%v],vol[%v] has %v data partitions last,%v data partitions now",
-		capacity, volName, lastTotalDataPartitions, len(vol.dataPartitions.dataPartitions))
+	rstMsg = fmt.Sprintf(" createDataPartition success. clusterLastTotalDataPartitions[%v],vol[%v] has %v data partitions last,%v data partitions now",
+		clusterTotalDataPartitions, volName, lastTotalDataPartitions, len(vol.dataPartitions.dataPartitions))
 	io.WriteString(w, rstMsg)
 
 	return
@@ -335,6 +351,27 @@ errDeal:
 	return
 }
 
+func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
+	var (
+		name     string
+		err      error
+		msg      string
+		capacity int
+	)
+	if name, capacity, err = parseUpdateVolPara(r); err != nil {
+		goto errDeal
+	}
+	if err = m.cluster.updateVol(name, capacity); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("update vol[%v] successed\n", name)
+	io.WriteString(w, msg)
+errDeal:
+	logMsg := getReturnMessage("updateVol", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name       string
@@ -342,15 +379,26 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		msg        string
 		volType    string
 		replicaNum int
+		capacity   int
+		vol        *Vol
 	)
 
-	if name, volType, replicaNum, err = parseCreateVolPara(r); err != nil {
+	if name, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.createVol(name, volType, uint8(replicaNum)); err != nil {
+
+	if err = m.cluster.createVol(name, volType, uint8(replicaNum), capacity); err != nil {
 		goto errDeal
 	}
-	msg = fmt.Sprintf("create vol[%v] successed\n", name)
+	if vol, err = m.cluster.getVol(name); err != nil {
+		goto errDeal
+	}
+	for i := 0; i < MinReadWriteDataPartitions; i++ {
+		if _, err = m.cluster.createDataPartition(name, volType); err != nil {
+			goto errDeal
+		}
+	}
+	msg = fmt.Sprintf("create vol[%v] success,has allocate [%v] data partitions", name, len(vol.dataPartitions.dataPartitions))
 	io.WriteString(w, msg)
 	return
 
@@ -765,7 +813,22 @@ func parseDeleteVolPara(r *http.Request) (name string, err error) {
 	return checkVolPara(r)
 }
 
-func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum int, err error) {
+func parseUpdateVolPara(r *http.Request) (name string, capacity int, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+			err = UnMatchPara
+		}
+	} else {
+		err = paraNotFound(ParaVolCapacity)
+	}
+	return
+}
+
+func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -778,6 +841,13 @@ func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum int, 
 	}
 	if volType, err = parseDataPartitionType(r); err != nil {
 		return
+	}
+	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+			err = UnMatchPara
+		}
+	} else {
+		err = paraNotFound(ParaVolCapacity)
 	}
 	return
 }
@@ -896,6 +966,10 @@ func parseMetaPartitionOffline(r *http.Request) (volName, nodeAddr string, parti
 
 func parseCompactPara(r *http.Request) (status bool, err error) {
 	r.ParseForm()
+	return checkEnable(r)
+}
+
+func checkEnable(r *http.Request) (status bool, err error) {
 	var value string
 	if value = r.FormValue(ParaEnable); value == "" {
 		err = ParaEnableNotFound
@@ -905,6 +979,11 @@ func parseCompactPara(r *http.Request) (status bool, err error) {
 		return
 	}
 	return
+}
+
+func parseDisableAutoAlloc(r *http.Request) (status bool, err error) {
+	r.ParseForm()
+	return checkEnable(r)
 }
 
 func parseSetMetaNodeThresholdPara(r *http.Request) (threshold float64, err error) {

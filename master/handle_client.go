@@ -17,6 +17,7 @@ package master
 import (
 	"encoding/json"
 	"github.com/juju/errors"
+	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"net/http"
 	"regexp"
@@ -194,11 +195,8 @@ func setMetaPartitions(vol *Vol, view *VolView, liveRate float32) {
 func volStat(vol *Vol) (stat *VolStatInfo) {
 	stat = new(VolStatInfo)
 	stat.Name = vol.Name
-	for _, dp := range vol.dataPartitions.dataPartitions {
-		stat.TotalSize = stat.TotalSize + dp.total
-		usedSize := dp.getMaxUsedSize()
-		stat.UsedSize = stat.UsedSize + usedSize
-	}
+	stat.TotalSize = vol.Capacity * util.GB
+	stat.UsedSize = vol.getTotalUsedSpace()
 	if stat.UsedSize > stat.TotalSize {
 		stat.UsedSize = stat.TotalSize
 	}

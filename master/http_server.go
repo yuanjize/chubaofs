@@ -31,7 +31,9 @@ const (
 	AdminCreateDataPartition  = "/dataPartition/create"
 	AdminDataPartitionOffline = "/dataPartition/offline"
 	AdminDeleteVol            = "/vol/delete"
+	AdminUpdateVol            = "/vol/update"
 	AdminCreateVol            = "/admin/createVol"
+	AdminClusterFreeze        = "/cluster/freeze"
 	AdminGetIp                = "/admin/getIp"
 	AdminCreateMP             = "/metaPartition/create"
 	AdminSetCompactStatus     = "/compactStatus/set"
@@ -81,6 +83,8 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminDataPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminCreateVol, m.handlerWithInterceptor())
 	http.Handle(AdminDeleteVol, m.handlerWithInterceptor())
+	http.Handle(AdminUpdateVol, m.handlerWithInterceptor())
+	http.Handle(AdminClusterFreeze, m.handlerWithInterceptor())
 	http.Handle(AddDataNode, m.handlerWithInterceptor())
 	http.Handle(AddMetaNode, m.handlerWithInterceptor())
 	http.Handle(DataNodeOffline, m.handlerWithInterceptor())
@@ -151,6 +155,10 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.createVol(w, r)
 	case AdminDeleteVol:
 		m.markDeleteVol(w, r)
+	case AdminUpdateVol:
+		m.updateVol(w, r)
+	case AdminClusterFreeze:
+		m.setDisableAutoAlloc(w, r)
 	case AddDataNode:
 		m.addDataNode(w, r)
 	case GetDataNode:

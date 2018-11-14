@@ -101,19 +101,20 @@ func (dataNode *DataNode) UpdateNodeMetric(resp *proto.DataNodeHeartBeatResponse
 	dataNode.RackName = resp.RackName
 	dataNode.DataPartitionCount = resp.CreatedPartitionCnt
 	dataNode.dataPartitionInfos = resp.PartitionInfo
-	dataNode.Ratio = (float64)(dataNode.Used) / (float64)(dataNode.Total)
+	if dataNode.Total == 0 {
+		dataNode.Ratio = 0.0
+	} else {
+		dataNode.Ratio = (float64)(dataNode.Used) / (float64)(dataNode.Total)
+	}
 	dataNode.ReportTime = time.Now()
 }
 
 func (dataNode *DataNode) IsWriteAble() (ok bool) {
 	dataNode.RLock()
 	defer dataNode.RUnlock()
-
-	if dataNode.isActive == true && dataNode.MaxDiskAvailWeight > (uint64)(util.DefaultDataPartitionSize) &&
-		dataNode.Total-dataNode.Used > (uint64)(util.DefaultDataPartitionSize)*ReservedVolCount {
+	if dataNode.isActive == true && dataNode.Available > util.DefaultDataPartitionSize {
 		ok = true
 	}
-
 	return
 }
 
@@ -135,7 +136,6 @@ func (dataNode *DataNode) SelectNodeForWrite() {
 	defer dataNode.Unlock()
 	dataNode.Ratio = float64(dataNode.Used) / float64(dataNode.Total)
 	dataNode.SelectCount++
-	dataNode.Used += (uint64)(util.DefaultDataPartitionSize)
 	dataNode.Carry = dataNode.Carry - 1.0
 }
 
