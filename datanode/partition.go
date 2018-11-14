@@ -282,9 +282,6 @@ func (dp *dataPartition) statusUpdate() {
 	if dp.used >= dp.partitionSize {
 		status = proto.ReadOnly
 	}
-	if dp.extentStore.GetExtentCount() >= MaxActiveExtents {
-		status = proto.ReadOnly
-	}
 	if dp.isLeader {
 		dp.tinyStore.MoveChunkToUnavailChan()
 	}
