@@ -157,9 +157,6 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	for i := 0; i < replys; i++ {
 		<-msgH.replyCh
 	}
-	if msgH.inConn!=nil {
-		msgH.inConn.Close()
-	}
 	msgH.sentList = list.New()
 	for _, conn := range msgH.connectMap {
 		conn.Close()
