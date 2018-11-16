@@ -267,7 +267,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		if extentId, isExtent = s.parseExtentId(f.Name()); !isExtent {
 			continue
 		}
-		if extent, loadErr = s.getExtent(extentId); loadErr != nil {
+		if extent, loadErr = s.getExtentWithHeader(extentId); loadErr != nil {
 			continue
 		}
 		extentInfo = &FileInfo{}
