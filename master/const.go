@@ -52,7 +52,7 @@ const (
 	NodesAliveRate                  float32 = 0.5
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
-	MinReadWriteDataPartitions              = 20
+	MinReadWriteDataPartitions              = 10
 	MaxFileNumberOfDataPartitions           = 10000
 )
 
