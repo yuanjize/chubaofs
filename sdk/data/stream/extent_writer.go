@@ -63,6 +63,7 @@ type ExtentWriter struct {
 	hasExitRecvThead int32
 	updateSizeLock   sync.Mutex
 	extentOffset     uint64
+	storeMode        int
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
@@ -76,6 +77,7 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 	writer.dp = dp
 	writer.inode = inode
 	writer.flushSignleCh = make(chan bool, 1)
+	writer.storeMode = proto.NormalExtentMode
 	var connect *net.TCPConn
 	conn, err := net.DialTimeout("tcp", dp.Hosts[0], time.Second)
 	if err == nil {
@@ -132,6 +134,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset)
 			if kernelOffset == 0 {
 				writer.currentPacket.StoreMode = uint8(proto.TinyExtentMode)
+				writer.storeMode = proto.TinyExtentMode
 			}
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet

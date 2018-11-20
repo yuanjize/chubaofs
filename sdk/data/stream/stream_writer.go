@@ -104,7 +104,7 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useExtent bool) (err error) {
-	if stream.currentWriter != nil && stream.currentWriter.isFullExtent() {
+	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
 		if err = stream.flushCurrExtentWriter(); err != nil {
 			return errors.Annotatef(err, "WriteInit")
 		}
