@@ -185,14 +185,14 @@ func TestExtents(t *testing.T) {
 	}
 	t.Logf("Create a file ino(%v) name(%v)", info.Inode, uuid.String())
 
-	ek := proto.ExtentKey{PartitionId: 1, ExtentId: 2, Size: 3, Crc: 4}
+	ek := proto.ExtentKey{PartitionId: 1, ExtentId: 2, Size: 3, ExtentOffset: 4}
 	t.Logf("ExtentKey append: %v", ek)
 	err = gMetaWrapper.AppendExtentKey(info.Inode, ek)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ek = proto.ExtentKey{PartitionId: 5, ExtentId: 6, Size: 7, Crc: 8}
+	ek = proto.ExtentKey{PartitionId: 5, ExtentId: 6, Size: 7, ExtentOffset: 8}
 	t.Logf("ExtentKey append: %v", ek)
 	err = gMetaWrapper.AppendExtentKey(info.Inode, ek)
 	if err != nil {

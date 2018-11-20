@@ -150,7 +150,7 @@ func checkReadDataCrc(rdata []byte, writeSize int, seqNo uint64) (err error) {
 	crc := uint32ToBytes(crc32.ChecksumIEEE(tempData))
 	crcData := rdata[writeSize:]
 
-	fmt.Printf("read crc seqNo[%v], Crc[%v], record write Crc[%v]\n", seqNo, crc, crcData)
+	fmt.Printf("read crc seqNo[%v], ExtentOffset[%v], record write ExtentOffset[%v]\n", seqNo, crc, crcData)
 
 	for i := 0; i < CRCBYTELEN; i++ {
 		if crc[i] != crcData[i] {
@@ -207,7 +207,7 @@ func main() {
 		//add checksum
 		tempData := writeData[:writeSize]
 		crc := uint32ToBytes(crc32.ChecksumIEEE(tempData))
-		fmt.Printf("write crc seqNo[%v], Crc[%v]\n", seqNo, crc)
+		fmt.Printf("write crc seqNo[%v], ExtentOffset[%v]\n", seqNo, crc)
 		for i := 0; i < CRCBYTELEN; i++ {
 			writeData[writeSize+i] = crc[i]
 		}

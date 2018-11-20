@@ -26,14 +26,14 @@ import (
 var InvalidKey = errors.New("invalid key error")
 
 type ExtentKey struct {
-	PartitionId uint32
-	ExtentId    uint64
-	Size        uint32
-	Crc         uint32
+	PartitionId  uint32
+	ExtentId     uint64
+	Size         uint32
+	ExtentOffset uint32
 }
 
 func (ek ExtentKey) String() string {
-	return fmt.Sprintf("ExtentKey{Partition(%v),ExtentID(%v),Size(%v),CRC(%v)}", ek.PartitionId, ek.ExtentId, ek.Size, ek.Crc)
+	return fmt.Sprintf("ExtentKey{Partition(%v),ExtentID(%v),Size(%v),CRC(%v)}", ek.PartitionId, ek.ExtentId, ek.Size, ek.ExtentOffset)
 }
 
 func (ek *ExtentKey) Equal(k ExtentKey) bool {
@@ -45,7 +45,7 @@ func (ek *ExtentKey) FullEqual(k ExtentKey) bool {
 }
 
 func (k *ExtentKey) Marshal() (m string) {
-	return fmt.Sprintf("%v_%v_%v_%v", k.PartitionId, k.ExtentId, k.Size, k.Crc)
+	return fmt.Sprintf("%v_%v_%v_%v", k.PartitionId, k.ExtentId, k.Size, k.ExtentOffset)
 }
 
 func (k *ExtentKey) MarshalBinary() ([]byte, error) {
@@ -59,7 +59,7 @@ func (k *ExtentKey) MarshalBinary() ([]byte, error) {
 	if err := binary.Write(buf, binary.BigEndian, k.Size); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(buf, binary.BigEndian, k.Crc); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, k.ExtentOffset); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -75,7 +75,7 @@ func (k *ExtentKey) UnmarshalBinary(buf *bytes.Buffer) (err error) {
 	if err = binary.Read(buf, binary.BigEndian, &k.Size); err != nil {
 		return
 	}
-	if err = binary.Read(buf, binary.BigEndian, &k.Crc); err != nil {
+	if err = binary.Read(buf, binary.BigEndian, &k.ExtentOffset); err != nil {
 		return
 	}
 	return
@@ -104,7 +104,7 @@ func (k *ExtentKey) UnMarshal(m string) (err error) {
 	k.ExtentId, _ = strconv.ParseUint(keyArr[1], 10, 64)
 	k.PartitionId = uint32(vId)
 	k.Size = uint32(size)
-	k.Crc = uint32(crc)
+	k.ExtentOffset = uint32(crc)
 
 	return nil
 }

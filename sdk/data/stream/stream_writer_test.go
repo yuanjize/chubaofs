@@ -289,7 +289,7 @@ func writeFlushReadTest(t *testing.T, inode uint64, seqNo int, client *ExtentCli
 	if err != nil || write != len(writeData) {
 		OccoursErr(fmt.Errorf("write seqNO(%v) bytes(%v) len(%v) err(%v)\n", seqNo, write, len(writeData), err), t)
 	}
-	//fmt.Printf("write ok seqNo(%v), Size(%v), Crc(%v)\n", seqNo, write, writeData[CLIENTWRITESIZE])
+	//fmt.Printf("write ok seqNo(%v), Size(%v), ExtentOffset(%v)\n", seqNo, write, writeData[CLIENTWRITESIZE])
 
 	//flush
 	err = client.Flush(inode)
@@ -328,7 +328,7 @@ func TestExtentClient_MultiRoutineWrite(t *testing.T) {
 		//add checksum
 		tempData := writeData[:CLIENTWRITESIZE]
 		crc := uint32ToBytes(crc32.ChecksumIEEE(tempData))
-		fmt.Printf("write crc seqNo(%v), Crc(%v)\n", seqNo, crc)
+		fmt.Printf("write crc seqNo(%v), ExtentOffset(%v)\n", seqNo, crc)
 		for i := 0; i < CRCBYTELEN; i++ {
 			writeData[CLIENTWRITESIZE+i] = crc[i]
 		}
