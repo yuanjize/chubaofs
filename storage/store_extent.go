@@ -48,6 +48,7 @@ const (
 	ExtMetaFileSize        = ExtMetaBaseIdSize + ExtMetaDeleteIdxSize
 	TinyExtentCount        = 128
 	TinyExtentStartId      = 5000000
+	MinExtentId  			= 2
 )
 
 var (
@@ -291,6 +292,9 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		if extentId, isExtent = s.parseExtentId(f.Name()); !isExtent {
 			continue
 		}
+		if extentId<MinExtentId{
+			continue
+		}
 		if extent, loadErr = s.getExtentWithHeader(extentId); loadErr != nil {
 			continue
 		}
@@ -299,9 +303,12 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentId] = extentInfo
 		s.extentInfoMux.Unlock()
-		if extentId > baseFileId {
+		if !IsTinyExtent(extentId) && extentId > baseFileId {
 			baseFileId = extentId
 		}
+	}
+	if baseFileId<MinExtentId{
+		baseFileId=MinExtentId
 	}
 	atomic.StoreUint64(&s.baseExtentId, baseFileId)
 	log.LogInfof("datadir(%v) maxBaseId(%v)", s.dataDir, baseFileId)
