@@ -62,6 +62,7 @@ type ExtentWriter struct {
 	flushSignleCh    chan bool
 	hasExitRecvThead int32
 	updateSizeLock   sync.Mutex
+	extentOffset     uint64
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
@@ -129,6 +130,9 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 	for total < size {
 		if writer.currentPacket == nil {
 			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset)
+			if kernelOffset == 0 {
+				writer.currentPacket.StoreMode = uint8(proto.TinyExtentMode)
+			}
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		if writer.IsFullCurrentPacket() || canWrite == 0 {
@@ -308,6 +312,8 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 	}
 	writer.removeRquest(e)
 	writer.addByteAck(uint64(request.Size))
+	writer.extentId = reply.FileID
+	writer.extentOffset = uint64(reply.Offset)
 	writer.updateSizeLock.Unlock()
 	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng && !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
@@ -332,6 +338,10 @@ func (writer *ExtentWriter) toKey() (k proto.ExtentKey) {
 	k.PartitionId = writer.dp.PartitionID
 	k.Size = uint32(writer.getByteAck())
 	k.ExtentId = writer.extentId
+	if writer.extentOffset >= 4*util.GB {
+		log.LogErrorf("toKey: extent offset larger than 4G, extent(%v) extentOffset(%v)", writer.toString(), writer.extentOffset)
+	}
+	k.ExtentOffset = uint32(writer.extentOffset)
 	if atomic.LoadInt64(&writer.forbidUpdate) == ForBidUpdateMetaNode {
 		k.Size = 0
 	}
@@ -359,6 +369,7 @@ func (writer *ExtentWriter) receive() {
 			reply.Opcode = request.Opcode
 			reply.Offset = request.Offset
 			reply.Size = request.Size
+			reply.StoreMode = request.StoreMode
 			err := reply.ReadFromConn(writer.getConnect(), proto.ReadDeadlineTime)
 			if err != nil {
 				writer.getConnect().Close()

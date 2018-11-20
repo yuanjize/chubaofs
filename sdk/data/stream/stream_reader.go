@@ -213,6 +213,9 @@ func (stream *StreamReader) GetReader(offset, size int) (readers []*ExtentReader
 		if currReaderSize == 0 {
 			continue
 		}
+		if r.key.ExtentOffset != 0 {
+			currReaderOffset += int(r.key.ExtentOffset)
+		}
 		readersSize = append(readersSize, currReaderSize)
 		readersOffsets = append(readersOffsets, currReaderOffset)
 		readers = append(readers, r)
