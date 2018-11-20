@@ -518,21 +518,18 @@ errDeal:
 func (m *Master) dataNodeTaskResponse(w http.ResponseWriter, r *http.Request) {
 	var (
 		dataNode *DataNode
-		code     = http.StatusOK
+		code     = http.StatusBadRequest
 		tr       *proto.AdminTask
 		err      error
 	)
 
 	if tr, err = parseTaskResponse(r); err != nil {
-		code = http.StatusBadRequest
 		goto errDeal
 	}
 	io.WriteString(w, fmt.Sprintf("%v", http.StatusOK))
 	if dataNode, err = m.cluster.getDataNode(tr.OperatorAddr); err != nil {
-		code = http.StatusInternalServerError
 		goto errDeal
 	}
-
 	m.cluster.dealDataNodeTaskResponse(dataNode.Addr, tr)
 
 	return
