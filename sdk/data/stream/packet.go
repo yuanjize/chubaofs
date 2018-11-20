@@ -38,7 +38,7 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.PartitionID = dp.PartitionID
 	p.Magic = proto.ProtoMagic
 	p.Data = make([]byte, 0)
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 	p.FileID = extentId
 	p.Offset = int64(offset)
 	p.Arg = ([]byte)(dp.GetAllAddrs())
@@ -60,7 +60,7 @@ func NewReadPacket(key *proto.ExtentKey, offset, size int) (p *Packet) {
 	p.Offset = int64(offset)
 	p.Size = uint32(size)
 	p.Opcode = proto.OpRead
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 	p.ReqID = proto.GetReqID()
 	p.Nodes = 0
 
@@ -75,7 +75,7 @@ func NewStreamReadPacket(key *proto.ExtentKey, offset, size int) (p *Packet) {
 	p.Offset = int64(offset)
 	p.Size = uint32(size)
 	p.Opcode = proto.OpStreamRead
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 	p.ReqID = proto.GetReqID()
 	p.Nodes = 0
 
@@ -87,7 +87,7 @@ func NewCreateExtentPacket(dp *wrapper.DataPartition, inodeId uint64) (p *Packet
 	p.PartitionID = dp.PartitionID
 	p.Magic = proto.ProtoMagic
 	p.Data = make([]byte, 0)
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 	p.Arg = ([]byte)(dp.GetAllAddrs())
 	p.Arglen = uint32(len(p.Arg))
 	p.Nodes = uint8(len(dp.Hosts) - 1)
@@ -105,7 +105,7 @@ func NewDeleteExtentPacket(dp *wrapper.DataPartition, extentId uint64) (p *Packe
 	p = new(Packet)
 	p.Magic = proto.ProtoMagic
 	p.Opcode = proto.OpMarkDelete
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 	p.PartitionID = dp.PartitionID
 	p.FileID = extentId
 	p.ReqID = proto.GetReqID()
@@ -121,13 +121,13 @@ func NewReply(reqId int64, partition uint32, extentId uint64) (p *Packet) {
 	p.PartitionID = partition
 	p.FileID = extentId
 	p.Magic = proto.ProtoMagic
-	p.StoreMode = proto.ExtentStoreMode
+	p.StoreMode = proto.NormalExtentMode
 
 	return
 }
 
 func (p *Packet) IsEqualWriteReply(q *Packet) bool {
-	if p.ReqID == q.ReqID && p.PartitionID == q.PartitionID && p.FileID == q.FileID && p.Offset == q.Offset {
+	if p.ReqID == q.ReqID && p.PartitionID == q.PartitionID {
 		return true
 	}
 
