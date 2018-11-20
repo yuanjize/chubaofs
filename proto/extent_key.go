@@ -33,7 +33,8 @@ type ExtentKey struct {
 }
 
 func (ek ExtentKey) String() string {
-	return fmt.Sprintf("ExtentKey{Partition(%v),ExtentID(%v),Size(%v),CRC(%v)}", ek.PartitionId, ek.ExtentId, ek.Size, ek.ExtentOffset)
+	return fmt.Sprintf("ExtentKey{Partition(%v),ExtentID(%v),Size(%v),"+
+		"ExtentOffset(%v)}", ek.PartitionId, ek.ExtentId, ek.Size, ek.ExtentOffset)
 }
 
 func (ek *ExtentKey) Equal(k ExtentKey) bool {
