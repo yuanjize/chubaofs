@@ -39,6 +39,7 @@ var (
 	ErrNotLeader           = errors.New("not raft leader")
 	ErrNoLeader            = errors.New("raft no leader")
 	ErrorExtentNotFound    = errors.New("extent not exist")
+	ErrorExtentHasFull     =  errors.New("extent has full")
 )
 
 func NewParamMismatchErr(msg string) (err error) {
