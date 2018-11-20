@@ -45,22 +45,22 @@ const (
 
 //operations
 const (
-	ProtoMagic                uint8 = 0xFF
-	OpInitResultCode          uint8 = 0x00
-	OpCreateFile              uint8 = 0x01
-	OpMarkDelete              uint8 = 0x02
-	OpWrite                   uint8 = 0x03
-	OpRead                    uint8 = 0x04
-	OpStreamRead              uint8 = 0x05
-	OpGetWatermark            uint8 = 0x06
-	OpGetAllWatermark         uint8 = 0x07
-	OpNotifyRepair            uint8 = 0x08
-	OpERepairRead             uint8 = 0x09
-	OpChunkRepairRead         uint8 = 0x0A
-	OpFlowInfo                uint8 = 0x0B
-	OpSyncDelNeedle           uint8 = 0x0C
-	OpNotifyCompact           uint8 = 0x0D
-	OpGetDataPartitionMetrics uint8 = 0x0E
+	ProtoMagic                   uint8 = 0xFF
+	OpInitResultCode             uint8 = 0x00
+	OpCreateFile                 uint8 = 0x01
+	OpMarkDelete                 uint8 = 0x02
+	OpWrite                      uint8 = 0x03
+	OpRead                       uint8 = 0x04
+	OpStreamRead                 uint8 = 0x05
+	OpGetWatermark               uint8 = 0x06
+	OpExtentStoreGetAllWaterMark uint8 = 0x07
+	OpNotifyExtentRepair         uint8 = 0x08
+	OpExtentRepairRead           uint8 = 0x09
+	OpChunkRepairRead            uint8 = 0x0A
+	OpFlowInfo                   uint8 = 0x0B
+	OpSyncDelNeedle              uint8 = 0x0C
+	OpNotifyCompact              uint8 = 0x0D
+	OpGetDataPartitionMetrics    uint8 = 0x0E
 
 	// Operations: Client -> MetaNode.
 	OpMetaCreateInode   uint8 = 0x20
@@ -106,6 +106,7 @@ const (
 	OpAgain            uint8 = 0xF9
 	OpExistErr         uint8 = 0xFA
 	OpInodeFullErr     uint8 = 0xFB
+	OpNotLeaderErr     uint8 = 0xFC
 	OpOk               uint8 = 0xF0
 
 	// For connection diagnosis
@@ -120,8 +121,8 @@ const (
 )
 
 const (
-	TinyStoreMode   = 0
-	ExtentStoreMode = 1
+	TinyExtentMode   = 0
+	NormalExtentMode = 1
 )
 
 type Packet struct {
@@ -151,7 +152,15 @@ func NewPacket() *Packet {
 }
 
 func (p *Packet) GetStoreModeMsg() (m string) {
-	return "Extent"
+	switch p.StoreMode {
+	case TinyExtentMode:
+		m = "TinyExtent"
+	case NormalExtentMode:
+		m = "NormalExtent"
+	default:
+		m = "Unknown"
+	}
+	return
 }
 
 func (p *Packet) GetOpMsg() (m string) {
@@ -168,15 +177,15 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "StreamRead"
 	case OpGetWatermark:
 		m = "GetWatermark"
-	case OpGetAllWatermark:
-		m = "GetAllWatermark"
-	case OpNotifyRepair:
-		m = "NotifyRepair"
+	case OpExtentStoreGetAllWaterMark:
+		m = "ExtentStoreGetAllWaterMark"
+	case OpNotifyExtentRepair:
+		m = "NotifyExtentRepair"
 	case OpChunkRepairRead:
 		m = "ChunkRepairRead"
 	case OpNotifyCompact:
 		m = "NotifyCompact"
-	case OpERepairRead:
+	case OpExtentRepairRead:
 		m = "ExtentRepairRead"
 	case OpFlowInfo:
 		m = "FlowInfo"
@@ -274,6 +283,8 @@ func (p *Packet) GetResultMesg() (m string) {
 		m = "ArgUnmatchErr"
 	case OpNotExistErr:
 		m = "NotExistErr"
+	case OpNotLeaderErr:
+		m = "NotLeaderErr"
 	default:
 		return fmt.Sprintf("Unknown ResultCode(%v)", p.ResultCode)
 	}
@@ -420,7 +431,7 @@ func (p *Packet) ReadFromConn(c net.Conn, timeoutSec int) (err error) {
 		return
 	}
 	size := p.Size
-	if (p.Opcode == OpRead || p.Opcode == OpStreamRead) && p.ResultCode == OpInitResultCode {
+	if (p.Opcode == OpRead || p.Opcode == OpStreamRead || p.Opcode == OpExtentRepairRead) && p.ResultCode == OpInitResultCode {
 		size = 0
 	}
 	return ReadFull(c, &p.Data, int(size))

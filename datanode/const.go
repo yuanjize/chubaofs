@@ -27,14 +27,21 @@ const (
 )
 
 const (
-	ActionSendToNext              = "ActionSendToNext"
-	LocalProcessAddr              = "LocalProcess"
-	ActionReceiveFromNext         = "ActionReceiveFromNext"
-	ActionStreamRead              = "ActionStreamRead"
-	ActionWriteToCli              = "ActionWriteToCli"
-	ActionGetDataPartitionMetrics = "ActionGetDataPartitionMetrics"
-	ActionCheckAndAddInfos        = "ActionCheckAndAddInfos"
-	ActionCheckReplyAvail         = "ActionCheckReplyAvail"
+	ActionSendToNext                                 = "ActionSendToNext"
+	LocalProcessAddr                                 = "LocalProcess"
+	ActionReceiveFromNext                            = "ActionReceiveFromNext"
+	ActionStreamRead                                 = "ActionStreamRead"
+	ActionWriteToCli                                 = "ActionWriteToCli"
+	ActionGetDataPartitionMetrics                    = "ActionGetDataPartitionMetrics"
+	ActionCheckAndAddInfos                           = "ActionCheckAndAddInfos"
+	ActionCheckBlobFileInfo                          = "ActionCheckBlobFileInfo"
+	ActionPostToMaster                               = "ActionPostToMaster"
+	ActionFollowerRequireBlobFileRepairCmd           = "ActionFollowerRequireBlobFileRepairCmd"
+	ActionLeaderToFollowerOpRepairReadPackBuffer     = "ActionLeaderToFollowerOpRepairReadPackBuffer"
+	ActionLeaderToFollowerOpRepairReadSendPackBuffer = "ActionLeaderToFollowerOpRepairReadSendPackBuffer"
+
+	ActionGetFollowers    = "ActionGetFollowers"
+	ActionCheckReplyAvail = "ActionCheckReplyAvail"
 )
 
 const (
@@ -50,7 +57,7 @@ const (
 const (
 	ReadFlag         = 1
 	WriteFlag        = 2
-	MaxActiveExtents = 10000
+	MaxActiveExtents = 50000
 )
 
 const (

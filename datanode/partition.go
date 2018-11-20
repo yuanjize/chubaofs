@@ -63,10 +63,9 @@ type DataPartition interface {
 
 	GetExtentStore() *storage.ExtentStore
 	GetExtentCount() int
-	GetAllWaterMarker() (files []*storage.FileInfo, err error)
 
-	LaunchRepair()
-	MergeRepair(metas *MembersFileMetas)
+	LaunchRepair(fixExtentType uint8)
+	MergeExtentStoreRepair(metas *MembersFileMetas)
 
 	FlushDelete() error
 
@@ -111,6 +110,7 @@ type dataPartition struct {
 	runtimeMetrics          *DataPartitionMetrics
 	updateReplicationTime   int64
 	updatePartitionSizeTime int64
+	isFirstFixTinyExtents   bool
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
@@ -252,11 +252,17 @@ func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(2 * time.Second)
 	cleanUpTicker := time.NewTicker(time.Second * 5)
+	var index int
 	for {
 		select {
 		case <-ticker.C:
 			dp.statusUpdate()
-			dp.LaunchRepair()
+			index++
+			if index%2 == 0 {
+				dp.LaunchRepair(proto.TinyExtentMode)
+			} else {
+				dp.LaunchRepair(proto.NormalExtentMode)
+			}
 		case <-cleanUpTicker.C:
 			dp.extentStore.Cleanup()
 		case <-dp.stopC:
@@ -307,7 +313,7 @@ func (dp *dataPartition) String() (m string) {
 	return fmt.Sprintf(DataPartitionPrefix+"_%v_%v", dp.partitionId, dp.partitionSize)
 }
 
-func (dp *dataPartition) LaunchRepair() {
+func (dp *dataPartition) LaunchRepair(fixExtentType uint8) {
 	if dp.partitionStatus == proto.Unavaliable {
 		return
 	}
@@ -323,7 +329,10 @@ func (dp *dataPartition) LaunchRepair() {
 	if !dp.isLeader {
 		return
 	}
-	dp.fileRepair()
+	if dp.extentStore.GetUnAvaliExtentLen() == 0 {
+		dp.extentStore.MoveAvaliExtentToUnavali(1)
+	}
+	dp.extentFileRepair(fixExtentType)
 }
 
 func (dp *dataPartition) updateReplicaHosts() (err error) {
@@ -408,7 +417,7 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	return
 }
 
-func (dp *dataPartition) GetAllWaterMarker() (files []*storage.FileInfo, err error) {
+func (dp *dataPartition) GetAllExtentsMeta() (files []*storage.FileInfo, err error) {
 	files, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
 	if err != nil {
 		return nil, err
@@ -416,21 +425,21 @@ func (dp *dataPartition) GetAllWaterMarker() (files []*storage.FileInfo, err err
 	return
 }
 
-func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
+func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	store := dp.extentStore
 	for _, deleteExtentId := range metas.NeedDeleteExtentsTasks {
-		if deleteExtentId.FileId <= storage.TinyChunkCount {
+		if storage.IsTinyExtent(deleteExtentId.FileId) {
 			continue
 		}
-		store.MarkDelete(uint64(deleteExtentId.FileId))
+		store.MarkDelete(uint64(deleteExtentId.FileId), 0, 0)
 	}
 	for _, addExtent := range metas.NeedAddExtentsTasks {
-		if addExtent.FileId <= storage.TinyChunkCount {
+		if storage.IsTinyExtent(addExtent.FileId) {
 			continue
 		}
 		if store.IsExistExtent(uint64(addExtent.FileId)) {
 			fixFileSizeTask := &storage.FileInfo{Source: addExtent.Source, FileId: addExtent.FileId, Size: addExtent.Size}
-			metas.NeedFixFileSizeTasks = append(metas.NeedFixFileSizeTasks, fixFileSizeTask)
+			metas.NeedFixExtentSizeTasks = append(metas.NeedFixExtentSizeTasks, fixFileSizeTask)
 			continue
 		}
 		err := store.Create(uint64(addExtent.FileId), addExtent.Inode, false)
@@ -438,7 +447,7 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 			continue
 		}
 		fixFileSizeTask := &storage.FileInfo{Source: addExtent.Source, FileId: addExtent.FileId, Size: addExtent.Size}
-		metas.NeedFixFileSizeTasks = append(metas.NeedFixFileSizeTasks, fixFileSizeTask)
+		metas.NeedFixExtentSizeTasks = append(metas.NeedFixExtentSizeTasks, fixFileSizeTask)
 	}
 
 	var (
@@ -446,10 +455,7 @@ func (dp *dataPartition) MergeRepair(metas *MembersFileMetas) {
 		recoverIndex int
 	)
 	wg = new(sync.WaitGroup)
-	for _, fixExtent := range metas.NeedFixFileSizeTasks {
-		if fixExtent.FileId <= storage.TinyChunkCount {
-			continue
-		}
+	for _, fixExtent := range metas.NeedFixExtentSizeTasks {
 		if !store.IsExistExtent(uint64(fixExtent.FileId)) {
 			continue
 		}

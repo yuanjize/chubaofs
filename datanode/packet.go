@@ -37,8 +37,8 @@ var (
 
 type Packet struct {
 	proto.Packet
-	NextConn      *net.TCPConn
-	NextAddr      string
+	NextConns     []*net.TCPConn
+	NextAddrs     []string
 	IsReturn      bool
 	DataPartition DataPartition
 	goals         uint8
@@ -63,6 +63,11 @@ func (p *Packet) beforeTp(clusterId string) (ok bool) {
 	return
 }
 
+const (
+	ForceCloseConnect = true
+	NoCloseConnect    = false
+)
+
 func (p *Packet) UnmarshalAddrs() (addrs []string, err error) {
 	if len(p.Arg) < int(p.Arglen) {
 		return nil, ErrArgLenMismatch
@@ -70,16 +75,29 @@ func (p *Packet) UnmarshalAddrs() (addrs []string, err error) {
 	str := string(p.Arg[:int(p.Arglen)])
 	goalAddrs := strings.SplitN(str, proto.AddrSplit, -1)
 	p.goals = uint8(len(goalAddrs) - 1)
+	p.NextAddrs = make([]string, p.goals)
+	p.NextConns = make([]*net.TCPConn, p.goals)
 	if p.goals > 0 {
-		addrs = goalAddrs[:int(p.goals)]
+		p.NextAddrs = goalAddrs[:int(p.goals)]
 	}
 	if p.Nodes < 0 {
 		err = ErrBadNodes
 		return
 	}
-	copy(p.addrs, addrs)
 
 	return
+}
+
+func (p *Packet) forceDestoryAllConnect() {
+	for i := 0; i < len(p.NextConns); i++ {
+		gConnPool.Put(p.NextConns[i], ForceCloseConnect)
+	}
+}
+
+func (p *Packet) PutConnectsToPool() {
+	for i := 0; i < len(p.NextConns); i++ {
+		gConnPool.Put(p.NextConns[i], NoCloseConnect)
+	}
 }
 
 func NewPacket() (p *Packet) {
@@ -110,8 +128,6 @@ func (p *Packet) GetNextAddr(addrs []string) error {
 		return nil
 	}
 
-	p.NextAddr = fmt.Sprint(addrs[sub])
-
 	return nil
 }
 
@@ -132,47 +148,37 @@ func (p *Packet) CheckCrc() (err error) {
 	return storage.ErrPkgCrcMismatch
 }
 
-func NewGetAllWaterMarker(partitionId uint32) (p *Packet) {
+func NewExtentStoreGetAllWaterMarker(partitionId uint32, extentType uint8) (p *Packet) {
 	p = new(Packet)
-	p.Opcode = proto.OpGetAllWatermark
+	p.Opcode = proto.OpExtentStoreGetAllWaterMark
 	p.PartitionID = partitionId
 	p.Magic = proto.ProtoMagic
 	p.ReqID = proto.GetReqID()
+	p.StoreMode = extentType
 
 	return
 }
 
-func NewStreamReadPacket(partitionId uint32, extentId, offset, size int) (p *Packet) {
+func NewExtentRepairReadPacket(partitionId uint32, extentId uint64, offset, size int) (p *Packet) {
 	p = new(Packet)
-	p.FileID = uint64(extentId)
+	p.FileID = extentId
 	p.PartitionID = partitionId
 	p.Magic = proto.ProtoMagic
 	p.Offset = int64(offset)
 	p.Size = uint32(size)
-	p.Opcode = proto.OpStreamRead
-	p.StoreMode = proto.ExtentStoreMode
+	p.Opcode = proto.OpExtentRepairRead
+	p.StoreMode = proto.NormalExtentMode
 	p.ReqID = proto.GetReqID()
 
 	return
 }
 
-func NewStreamChunkRepairReadPacket(partitionId uint32, chunkId int) (p *Packet) {
+func NewNotifyExtentRepair(partitionId uint32) (p *Packet) {
 	p = new(Packet)
-	p.FileID = uint64(chunkId)
+	p.Opcode = proto.OpNotifyExtentRepair
 	p.PartitionID = partitionId
 	p.Magic = proto.ProtoMagic
-	p.Opcode = proto.OpChunkRepairRead
-	p.StoreMode = proto.TinyStoreMode
-	p.ReqID = proto.GetReqID()
-
-	return
-}
-
-func NewNotifyRepair(partitionId uint32) (p *Packet) {
-	p = new(Packet)
-	p.Opcode = proto.OpNotifyRepair
-	p.PartitionID = partitionId
-	p.Magic = proto.ProtoMagic
+	p.StoreMode = proto.NormalExtentMode
 	p.ReqID = proto.GetReqID()
 
 	return
@@ -180,7 +186,7 @@ func NewNotifyRepair(partitionId uint32) (p *Packet) {
 
 func (p *Packet) IsTailNode() (ok bool) {
 	if p.Nodes == 0 && (p.IsWriteOperation() || p.Opcode == proto.OpCreateFile ||
-		(p.Opcode == proto.OpMarkDelete && p.StoreMode == proto.TinyStoreMode)) {
+		(p.Opcode == proto.OpMarkDelete && p.StoreMode == proto.TinyExtentMode)) {
 		return true
 	}
 
@@ -200,11 +206,11 @@ func (p *Packet) IsMarkDeleteOperation() bool {
 }
 
 func (p *Packet) IsExtentWritePacket() bool {
-	return p.StoreMode == proto.ExtentStoreMode && p.IsWriteOperation()
+	return p.StoreMode == proto.NormalExtentMode && p.IsWriteOperation()
 }
 
 func (p *Packet) IsReadOperation() bool {
-	return p.Opcode == proto.OpStreamRead || p.Opcode == proto.OpRead
+	return p.Opcode == proto.OpStreamRead || p.Opcode == proto.OpRead || p.Opcode == proto.OpExtentRepairRead
 }
 
 func (p *Packet) IsMarkDeleteReq() bool {
@@ -251,6 +257,8 @@ func (p *Packet) ClassifyErrorOp(errLog string, errMsg string) {
 		p.ResultCode = proto.OpDiskNoSpaceErr
 	} else if strings.Contains(errMsg, storage.ErrorAgain.Error()) {
 		p.ResultCode = proto.OpIntraGroupNetErr
+	} else if strings.Contains(errMsg, storage.ErrNotLeader.Error()) {
+		p.ResultCode = proto.OpNotLeaderErr
 	} else if strings.Contains(errMsg, storage.ErrorFileNotFound.Error()) {
 		if p.Opcode != proto.OpWrite {
 			p.ResultCode = proto.OpNotExistErr
@@ -308,7 +316,7 @@ func (p *Packet) ReadFromConnFromCli(c net.Conn, deadlineTime time.Duration) (er
 		return
 	}
 	size := p.Size
-	if (p.Opcode == proto.OpRead || p.Opcode == proto.OpStreamRead) && p.ResultCode == proto.OpInitResultCode {
+	if p.IsReadOperation() && p.ResultCode == proto.OpInitResultCode {
 		size = 0
 	}
 	return p.ReadFull(c, int(size))

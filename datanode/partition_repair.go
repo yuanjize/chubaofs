@@ -37,7 +37,7 @@ type MembersFileMetas struct {
 
 func NewMemberFileMetas() (mf *MembersFileMetas) {
 	mf = &MembersFileMetas{
-		files: make(map[int]*storage.FileInfo),
+		files:                  make(map[int]*storage.FileInfo),
 		NeedDeleteExtentsTasks: make([]*storage.FileInfo, 0),
 		NeedAddExtentsTasks:    make([]*storage.FileInfo, 0),
 		NeedFixFileSizeTasks:   make([]*storage.FileInfo, 0),

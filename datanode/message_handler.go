@@ -82,15 +82,15 @@ func (msgH *MessageHandler) ExitSign() {
 	}
 }
 
-func (msgH *MessageHandler) AllocateNextConn(pkg *Packet) (err error) {
+func (msgH *MessageHandler) AllocateNextConn(pkg *Packet, index int) (err error) {
 	var conn *net.TCPConn
-	if pkg.StoreMode == proto.ExtentStoreMode && pkg.IsWriteOperation() {
-		key := fmt.Sprintf("%v_%v", pkg.PartitionID, pkg.FileID)
+	if pkg.StoreMode == proto.NormalExtentMode && pkg.IsWriteOperation() {
+		key := fmt.Sprintf("%v_%v_%v", pkg.PartitionID, pkg.FileID, pkg.NextAddrs[index])
 		msgH.connectLock.RLock()
 		conn := msgH.connectMap[key]
 		msgH.connectLock.RUnlock()
 		if conn == nil {
-			conn, err = gConnPool.Get(pkg.NextAddr)
+			conn, err = gConnPool.Get(pkg.NextAddrs[index])
 			if err != nil {
 				return
 			}
@@ -99,18 +99,18 @@ func (msgH *MessageHandler) AllocateNextConn(pkg *Packet) (err error) {
 			msgH.connectLock.Unlock()
 		}
 		pkg.useConnectMap = true
-		pkg.NextConn = conn
+		pkg.NextConns[index] = conn
 	} else {
-		conn, err = gConnPool.Get(pkg.NextAddr)
+		conn, err = gConnPool.Get(pkg.NextAddrs[index])
 		if err != nil {
 			return
 		}
-		pkg.NextConn = conn
+		pkg.NextConns[index] = conn
 	}
 	return nil
 }
 
-func (msgH *MessageHandler) checkReplyAvail(reply *Packet) (err error) {
+func (msgH *MessageHandler) checkReplyAvail(reply *Packet, index int) (err error) {
 	msgH.listMux.Lock()
 	defer msgH.listMux.Unlock()
 
@@ -119,9 +119,9 @@ func (msgH *MessageHandler) checkReplyAvail(reply *Packet) (err error) {
 		if reply.ReqID == request.ReqID {
 			return
 		}
-		return fmt.Errorf(ActionCheckReplyAvail+" request [%v] reply[%v] from %v localaddr %v"+
-			" remoteaddr %v requestCrc[%v] replyCrc[%v]", request.GetUniqueLogId(), reply.GetUniqueLogId(), request.NextAddr,
-			request.NextConn.LocalAddr().String(), request.NextConn.RemoteAddr().String(), request.Crc, reply.Crc)
+		return fmt.Errorf(ActionCheckReplyAvail+" request (%v) reply(%v) from %v localaddr %v"+
+			" remoteaddr %v requestCrc(%v) replyCrc(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId(), request.NextAddrs[index],
+			request.NextConns[index].LocalAddr().String(), request.NextConns[index].RemoteAddr().String(), request.Crc, reply.Crc)
 	}
 
 	return
@@ -145,17 +145,19 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	msgH.listMux.Lock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
 		request := e.Value.(*Packet)
-		if request.NextAddr != "" {
-			if request.useConnectMap {
-				request.NextConn.Close()
-			} else {
-				gConnPool.Put(request.NextConn, true)
-			}
-		}
+		request.forceDestoryAllConnect()
+		s.leaderPutTinyExtentToStore(request)
+
 	}
 	replys := len(msgH.replyCh)
 	for i := 0; i < replys; i++ {
-		<-msgH.replyCh
+		reply := <-msgH.replyCh
+		s.leaderPutTinyExtentToStore(reply)
+	}
+	requestLen := len(msgH.requestCh)
+	for i := 0; i < requestLen; i++ {
+		request := <-msgH.requestCh
+		s.leaderPutTinyExtentToStore(request)
 	}
 	msgH.sentList = list.New()
 	for _, conn := range msgH.connectMap {
@@ -164,34 +166,28 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	msgH.listMux.Unlock()
 }
 
-func (msgH *MessageHandler) ClearReplys() {
-	replys := len(msgH.replyCh)
-	for i := 0; i < replys; i++ {
-		<-msgH.replyCh
-	}
+func (msgH *MessageHandler) isUsedCloseFiles(conn *net.TCPConn, target string, err error) {
+	gConnPool.CheckErrorForPutConnect(conn, target, err)
 }
 
-func (msgH *MessageHandler) DelListElement(reply *Packet, e *list.Element, isForClose bool) {
+func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) {
 	msgH.listMux.Lock()
 	defer msgH.listMux.Unlock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
 		request := e.Value.(*Packet)
-		if reply.ReqID == request.ReqID && reply.PartitionID == request.PartitionID &&
-			reply.FileID == request.FileID && reply.Offset == request.Offset {
-			msgH.sentList.Remove(e)
-			if request.useConnectMap {
-				if request.NextConn != nil && isForClose {
-					request.NextConn.Close()
-				}
-			} else {
-				gConnPool.Put(request.NextConn, isForClose)
-			}
-			pkg := e.Value.(*Packet)
-			msgH.replyCh <- pkg
-			break
-		} else {
-			gConnPool.Put(request.NextConn, true)
+		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
+			reply.Offset != request.Offset || reply.Crc != request.Crc || reply.FileID != request.FileID {
+			request.forceDestoryAllConnect()
+			continue
 		}
+		msgH.sentList.Remove(e)
+		if isForClose {
+			request.forceDestoryAllConnect()
+		}
+		if !request.useConnectMap && !isForClose {
+			request.PutConnectsToPool()
+		}
+		msgH.replyCh <- reply
 	}
 
 	return

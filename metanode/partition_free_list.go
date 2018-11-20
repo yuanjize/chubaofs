@@ -156,7 +156,7 @@ func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
 				err.Error(), ext.PartitionId, ext.ExtentId)
 			return
 		}
-		p := NewExtentDeletePacket(dp, ext.ExtentId)
+		p := NewExtentDeletePacket(dp, &ext)
 		if err = p.WriteToConn(conn); err != nil {
 			mp.config.ConnPool.Put(conn, ForceCloseConnect)
 			err = errors.Errorf("write to dataNode %s, %s", p.GetUniqueLogId(),

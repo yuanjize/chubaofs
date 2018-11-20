@@ -15,8 +15,8 @@
 package master
 
 import (
-	"github.com/tiglabs/containerfs/proto"
 	"fmt"
+	"github.com/tiglabs/containerfs/proto"
 )
 
 /*this struct define chunk file metadata on  dataNode */

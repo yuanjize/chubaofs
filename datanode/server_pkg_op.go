@@ -73,12 +73,12 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 		s.handleStreamRead(pkg, c)
 	case proto.OpMarkDelete:
 		s.handleMarkDelete(pkg)
-	case proto.OpNotifyRepair:
-		s.handleNotifyRepair(pkg)
+	case proto.OpNotifyExtentRepair:
+		s.handleNotifyExtentRepair(pkg)
 	case proto.OpGetWatermark:
 		s.handleGetWatermark(pkg)
-	case proto.OpGetAllWatermark:
-		s.handleGetAllWatermark(pkg)
+	case proto.OpExtentStoreGetAllWaterMark:
+		s.handleExtentStoreGetAllWatermark(pkg)
 	case proto.OpCreateDataPartition:
 		s.handleCreateDataPartition(pkg)
 	case proto.OpLoadDataPartition:
@@ -267,11 +267,22 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 }
 
 // Handle OpMarkDelete packet.
+// Handle OpMarkDelete packet.
 func (s *DataNode) handleMarkDelete(pkg *Packet) {
-	var err error
-	err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID)
+	var (
+		err error
+	)
+	if pkg.StoreMode == proto.TinyExtentMode {
+		ext := new(proto.ExtentKey)
+		err = json.Unmarshal(pkg.Data, ext)
+		if err == nil {
+			err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, int64(ext.Crc), int64(ext.Size))
+		}
+	} else {
+		err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, 0, 0)
+	}
 	if err != nil {
-		err = errors.Annotatef(err, "Request[%v] MarkDelete Error", pkg.GetUniqueLogId())
+		err = errors.Annotatef(err, "Request(%v) MarkDelete Error", pkg.GetUniqueLogId())
 		pkg.PackErrorBody(LogMarkDel, err.Error())
 	} else {
 		pkg.PackOkReply()
@@ -391,12 +402,24 @@ func (s *DataNode) handleGetWatermark(pkg *Packet) {
 	return
 }
 
-// Handle OpGetAllWatermark packet.
-func (s *DataNode) handleGetAllWatermark(pkg *Packet) {
-	var buf []byte
-	fInfoList, err := pkg.DataPartition.GetAllWaterMarker()
+func (s *DataNode) handleExtentStoreGetAllWatermark(pkg *Packet) {
+	var (
+		buf       []byte
+		fInfoList []*storage.FileInfo
+		err       error
+	)
+	store := pkg.DataPartition.GetExtentStore()
+	if pkg.StoreMode == proto.NormalExtentMode {
+		fInfoList, err = store.GetAllWatermark(storage.GetStableExtentFilter())
+	} else {
+		extents := make([]uint64, 0)
+		err = json.Unmarshal(pkg.Data, &extents)
+		if err == nil {
+			fInfoList, err = store.GetAllWatermark(storage.GetStableTinyExtentFilter(extents))
+		}
+	}
 	if err != nil {
-		err = errors.Annotatef(err, "Request[%v] handleGetAllWatermark Error", pkg.GetUniqueLogId())
+		err = errors.Annotatef(err, "Request(%v) handleExtentStoreGetAllWatermark Error", pkg.GetUniqueLogId())
 		pkg.PackErrorBody(LogGetAllWm, err.Error())
 	} else {
 		buf, err = json.Marshal(fInfoList)
@@ -406,7 +429,7 @@ func (s *DataNode) handleGetAllWatermark(pkg *Packet) {
 }
 
 // Handle OpNotifyRepair packet.
-func (s *DataNode) handleNotifyRepair(pkg *Packet) {
+func (s *DataNode) handleNotifyExtentRepair(pkg *Packet) {
 	var (
 		err error
 	)
@@ -416,7 +439,7 @@ func (s *DataNode) handleNotifyRepair(pkg *Packet) {
 		pkg.PackErrorBody(LogRepair, err.Error())
 		return
 	}
-	pkg.DataPartition.MergeRepair(mf)
+	pkg.DataPartition.MergeExtentStoreRepair(mf)
 	pkg.PackOkReply()
 	return
 }
