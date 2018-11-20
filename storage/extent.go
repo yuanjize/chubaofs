@@ -293,7 +293,7 @@ func (e *fsExtent) ModTime() time.Time {
 }
 
 func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err error) {
-	if offset+size>=math.MaxUint32{
+	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
 	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
