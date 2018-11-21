@@ -211,8 +211,8 @@ func (writer *ExtentWriter) isAllFlushed() bool {
 }
 
 func (writer *ExtentWriter) toString() string {
-	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v handleCh(%v) requestQueueLen(%v) }",
-		writer.inode, writer.dp.PartitionID, writer.extentId,
+	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
+		writer.inode, writer.dp.PartitionID, writer.extentId, writer.extentOffset,
 		len(writer.handleCh), writer.getQueueListLen())
 }
 
@@ -312,8 +312,10 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 	}
 	writer.removeRquest(e)
 	writer.addByteAck(uint64(request.Size))
-	writer.extentId = reply.FileID
-	writer.extentOffset = uint64(reply.Offset)
+	if writer.storeMode == proto.TinyExtentMode {
+		writer.extentId = reply.FileID
+		writer.extentOffset = uint64(reply.Offset)
+	}
 	writer.updateSizeLock.Unlock()
 	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng && !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
