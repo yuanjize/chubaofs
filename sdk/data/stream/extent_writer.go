@@ -67,9 +67,6 @@ type ExtentWriter struct {
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
-	if extentId <= 0 {
-		return nil, fmt.Errorf("inode(%v),dp(%v),unavalid extentId(%v)", inode, dp.PartitionID, extentId)
-	}
 	writer = new(ExtentWriter)
 	writer.requestQueue = list.New()
 	writer.handleCh = make(chan bool, 8)

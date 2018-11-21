@@ -399,12 +399,11 @@ func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *Ext
 		}
 		break
 	}
-	if extentId <= 0 {
+	if useExtent == true && extentId <= 0 {
 		log.LogErrorf(errors.Annotatef(err, "allocateNewExtentWriter").Error())
 		return nil, errors.Annotatef(err, "allocateNewExtentWriter")
 	}
 	stream.currentPartitionId = dp.PartitionID
-	stream.currentExtentId = extentId
 	err = nil
 
 	return writer, nil
