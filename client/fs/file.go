@@ -78,11 +78,12 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	}
 
 	inode.fillAttr(a)
-	if writeSize := f.super.ec.GetWriteSize(ino); writeSize > a.Size {
+	writeSize := f.super.ec.GetWriteSize(ino)
+	if writeSize > a.Size {
 		a.Size = writeSize
 	}
 
-	log.LogDebugf("TRACE Attr: inode(%v) attr(%v)", inode, a)
+	log.LogDebugf("TRACE Attr: inode(%v) attr(%v) writeSize(%v)", inode, a, writeSize)
 	return nil
 }
 

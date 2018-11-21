@@ -75,7 +75,7 @@ func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (
 	stream = new(StreamWriter)
 	stream.appendExtentKey = appendExtentKey
 	stream.Inode = inode
-	stream.setHasWriteSize(start)
+	//stream.setHasWriteSize(start)
 	stream.requestCh = make(chan interface{}, 1000)
 	stream.exitCh = make(chan bool, 10)
 	stream.excludePartition = make([]uint32, 0)
@@ -378,7 +378,6 @@ func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *Ext
 		dp       *wrapper.DataPartition
 		extentId uint64
 	)
-	err = fmt.Errorf("cannot alloct new extent after maxrery")
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if dp, err = gDataWrapper.GetWriteDataPartition(stream.excludePartition); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
@@ -400,8 +399,9 @@ func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *Ext
 		break
 	}
 	if useExtent == true && extentId <= 0 {
-		log.LogErrorf(errors.Annotatef(err, "allocateNewExtentWriter").Error())
-		return nil, errors.Annotatef(err, "allocateNewExtentWriter")
+		err = fmt.Errorf("cannot alloct new extent after maxrery")
+		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
+		return nil, err
 	}
 	stream.currentPartitionId = dp.PartitionID
 	err = nil
