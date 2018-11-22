@@ -53,7 +53,7 @@ func NewInode(info *proto.InodeInfo) *Inode {
 func (s *Super) InodeGet(ino uint64) (*Inode, error) {
 	inode := s.ic.Get(ino)
 	if inode != nil {
-		//log.LogDebugf("InodeCache hit: inode(%v)", inode)
+		//log.LogDebugf("InodeGet: InodeCache hit, inode(%v)", inode)
 		return inode, nil
 	}
 
@@ -68,6 +68,7 @@ func (s *Super) InodeGet(ino uint64) (*Inode, error) {
 	}
 	inode = NewInode(info)
 	s.ic.Put(inode)
+	//log.LogDebugf("InodeGet: inode(%v)", inode)
 	return inode, nil
 }
 

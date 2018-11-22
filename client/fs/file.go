@@ -71,6 +71,10 @@ func NewFile(s *Super, i *Inode) *File {
 
 func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	ino := f.inode.ino
+	// Must do GetWriteSize before InodeGet just incase: Attr is invoked
+	// right after Write where AppendExtentKey is not finished; and stream
+	// writer is closed and reopened so that GetWriteSize is untrusted.
+	writeSize := f.super.ec.GetWriteSize(ino)
 	inode, err := f.super.InodeGet(ino)
 	if err != nil {
 		log.LogErrorf("Attr: ino(%v) err(%v)", ino, err)
@@ -78,7 +82,6 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	}
 
 	inode.fillAttr(a)
-	writeSize := f.super.ec.GetWriteSize(ino)
 	if writeSize > a.Size {
 		a.Size = writeSize
 	}
