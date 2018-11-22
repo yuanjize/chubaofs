@@ -22,6 +22,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/data/wrapper"
+	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"net"
 	"strings"
@@ -74,7 +75,7 @@ func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (
 	stream = new(StreamWriter)
 	stream.appendExtentKey = appendExtentKey
 	stream.Inode = inode
-	stream.setHasWriteSize(start)
+	//stream.setHasWriteSize(start)
 	stream.requestCh = make(chan interface{}, 1000)
 	stream.exitCh = make(chan bool, 10)
 	stream.excludePartition = make([]uint32, 0)
@@ -102,8 +103,8 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 }
 
 //stream init,alloc a extent ,select dp and extent
-func (stream *StreamWriter) init() (err error) {
-	if stream.currentWriter != nil && stream.currentWriter.isFullExtent() {
+func (stream *StreamWriter) init(useExtent bool) (err error) {
+	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
 		if err = stream.flushCurrExtentWriter(); err != nil {
 			return errors.Annotatef(err, "WriteInit")
 		}
@@ -113,7 +114,7 @@ func (stream *StreamWriter) init() (err error) {
 		return
 	}
 	var writer *ExtentWriter
-	writer, err = stream.allocateNewExtentWriter()
+	writer, err = stream.allocateNewExtentWriter(useExtent)
 	if err != nil {
 		err = errors.Annotatef(err, "WriteInit AllocNewExtentFailed")
 		return err
@@ -192,7 +193,11 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 
 	var initRetry int = 0
 	for total < size {
-		if err = stream.init(); err != nil {
+		var useExtent = true
+		if offset+total == 0 && size-total <= util.BlockSize {
+			useExtent = false
+		}
+		if err = stream.init(useExtent); err != nil {
 			if initRetry++; initRetry > MaxStreamInitRetry {
 				return total, err
 			}
@@ -253,7 +258,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 		return err
 	}
-	if writer.isFullExtent() {
+	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
 		writer.close()
 		writer.getConnect().Close()
 		if err = stream.updateToMetaNode(); err != nil {
@@ -348,7 +353,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 	var writer *ExtentWriter
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = nil
-		if writer, err = stream.allocateNewExtentWriter(); err != nil { //allocate new extent
+		if writer, err = stream.allocateNewExtentWriter(true); err != nil { //allocate new extent
 			err = errors.Annotatef(err, "RecoverExtent Failed")
 			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
@@ -368,22 +373,23 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 
 }
 
-func (stream *StreamWriter) allocateNewExtentWriter() (writer *ExtentWriter, err error) {
+func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *ExtentWriter, err error) {
 	var (
 		dp       *wrapper.DataPartition
 		extentId uint64
 	)
-	err = fmt.Errorf("cannot alloct new extent after maxrery")
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if dp, err = gDataWrapper.GetWriteDataPartition(stream.excludePartition); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"failed on getWriteDataPartion,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
 			continue
 		}
-		if extentId, err = stream.createExtent(dp); err != nil {
-			log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
-				"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
-			continue
+		if useExtent == true {
+			if extentId, err = stream.createExtent(dp); err != nil {
+				log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
+					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
+				continue
+			}
 		}
 		if writer, err = NewExtentWriter(stream.Inode, dp, extentId); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
@@ -392,12 +398,12 @@ func (stream *StreamWriter) allocateNewExtentWriter() (writer *ExtentWriter, err
 		}
 		break
 	}
-	if extentId <= 0 {
-		log.LogErrorf(errors.Annotatef(err, "allocateNewExtentWriter").Error())
-		return nil, errors.Annotatef(err, "allocateNewExtentWriter")
+	if useExtent == true && extentId <= 0 {
+		err = fmt.Errorf("cannot alloct new extent after maxrery")
+		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
+		return nil, err
 	}
 	stream.currentPartitionId = dp.PartitionID
-	stream.currentExtentId = extentId
 	err = nil
 
 	return writer, nil

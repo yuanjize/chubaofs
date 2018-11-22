@@ -57,7 +57,7 @@ const (
 const (
 	ReadFlag         = 1
 	WriteFlag        = 2
-	MaxActiveExtents = 50000
+	MaxActiveExtents = 10000
 )
 
 const (

@@ -86,7 +86,7 @@ func NewMetaPartitionView(partitionID, start, end uint64, status int8) (mpView *
 func (m *Master) getDataPartitions(w http.ResponseWriter, r *http.Request) {
 	var (
 		body []byte
-		code int
+		code = http.StatusBadRequest
 		name string
 		vol  *Vol
 		ok   bool
@@ -97,11 +97,11 @@ func (m *Master) getDataPartitions(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, ok = m.cluster.vols[name]; !ok {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
 		goto errDeal
 	}
 
 	if body, err = vol.getDataPartitionsView(m.cluster.getLiveDataNodesRate()); err != nil {
-		code = http.StatusMethodNotAllowed
 		goto errDeal
 	}
 	w.Write(body)
@@ -115,7 +115,7 @@ errDeal:
 func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		body []byte
-		code int
+		code = http.StatusBadRequest
 		err  error
 		name string
 		vol  *Vol
@@ -125,10 +125,10 @@ func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
 		goto errDeal
 	}
 	if body, err = json.Marshal(m.getVolView(vol)); err != nil {
-		code = http.StatusMethodNotAllowed
 		goto errDeal
 	}
 	w.Write(body)
@@ -142,7 +142,7 @@ errDeal:
 func (m *Master) getVolStatInfo(w http.ResponseWriter, r *http.Request) {
 	var (
 		body []byte
-		code int
+		code = http.StatusBadRequest
 		err  error
 		name string
 		vol  *Vol
@@ -153,10 +153,10 @@ func (m *Master) getVolStatInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, ok = m.cluster.vols[name]; !ok {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
 		goto errDeal
 	}
 	if body, err = json.Marshal(volStat(vol)); err != nil {
-		code = http.StatusMethodNotAllowed
 		goto errDeal
 	}
 	w.Write(body)
@@ -220,7 +220,7 @@ func getMetaPartitionView(mp *MetaPartition) (mpView *MetaPartitionView) {
 func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 	var (
 		body        []byte
-		code        int
+		code        = http.StatusBadRequest
 		err         error
 		name        string
 		partitionID uint64
@@ -233,14 +233,15 @@ func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, ok = m.cluster.vols[name]; !ok {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
 		goto errDeal
 	}
 	if mp, ok = vol.MetaPartitions[partitionID]; !ok {
 		err = errors.Annotatef(MetaPartitionNotFound, "%v not found", partitionID)
+		code = http.StatusNotFound
 		goto errDeal
 	}
 	if body, err = mp.toJson(); err != nil {
-		code = http.StatusMethodNotAllowed
 		goto errDeal
 	}
 	w.Write(body)

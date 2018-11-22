@@ -62,12 +62,11 @@ type ExtentWriter struct {
 	flushSignleCh    chan bool
 	hasExitRecvThead int32
 	updateSizeLock   sync.Mutex
+	extentOffset     uint64
+	storeMode        int
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
-	if extentId <= 0 {
-		return nil, fmt.Errorf("inode(%v),dp(%v),unavalid extentId(%v)", inode, dp.PartitionID, extentId)
-	}
 	writer = new(ExtentWriter)
 	writer.requestQueue = list.New()
 	writer.handleCh = make(chan bool, 8)
@@ -75,6 +74,7 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 	writer.dp = dp
 	writer.inode = inode
 	writer.flushSignleCh = make(chan bool, 1)
+	writer.storeMode = proto.NormalExtentMode
 	var connect *net.TCPConn
 	conn, err := net.DialTimeout("tcp", dp.Hosts[0], time.Second)
 	if err == nil {
@@ -129,6 +129,10 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 	for total < size {
 		if writer.currentPacket == nil {
 			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset)
+			if kernelOffset == 0 {
+				writer.currentPacket.StoreMode = uint8(proto.TinyExtentMode)
+				writer.storeMode = proto.TinyExtentMode
+			}
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		if writer.IsFullCurrentPacket() || canWrite == 0 {
@@ -207,8 +211,8 @@ func (writer *ExtentWriter) isAllFlushed() bool {
 }
 
 func (writer *ExtentWriter) toString() string {
-	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v handleCh(%v) requestQueueLen(%v) }",
-		writer.inode, writer.dp.PartitionID, writer.extentId,
+	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
+		writer.inode, writer.dp.PartitionID, writer.extentId, writer.extentOffset,
 		len(writer.handleCh), writer.getQueueListLen())
 }
 
@@ -308,6 +312,10 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 	}
 	writer.removeRquest(e)
 	writer.addByteAck(uint64(request.Size))
+	if writer.storeMode == proto.TinyExtentMode {
+		writer.extentId = reply.FileID
+		writer.extentOffset = uint64(reply.Offset)
+	}
 	writer.updateSizeLock.Unlock()
 	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng && !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
@@ -332,6 +340,10 @@ func (writer *ExtentWriter) toKey() (k proto.ExtentKey) {
 	k.PartitionId = writer.dp.PartitionID
 	k.Size = uint32(writer.getByteAck())
 	k.ExtentId = writer.extentId
+	if writer.extentOffset >= 4*util.GB {
+		log.LogErrorf("toKey: extent offset larger than 4G, extent(%v) extentOffset(%v)", writer.toString(), writer.extentOffset)
+	}
+	k.ExtentOffset = uint32(writer.extentOffset)
 	if atomic.LoadInt64(&writer.forbidUpdate) == ForBidUpdateMetaNode {
 		k.Size = 0
 	}
@@ -359,6 +371,7 @@ func (writer *ExtentWriter) receive() {
 			reply.Opcode = request.Opcode
 			reply.Offset = request.Offset
 			reply.Size = request.Size
+			reply.StoreMode = request.StoreMode
 			err := reply.ReadFromConn(writer.getConnect(), proto.ReadDeadlineTime)
 			if err != nil {
 				writer.getConnect().Close()
