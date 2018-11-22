@@ -433,6 +433,7 @@ func (m *metaManager) opMetaExtentsAdd(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	log.LogDebugf("[opMetaExtentsAdd] receive request: %v", req)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -462,6 +463,7 @@ func (m *metaManager) opMetaExtentsList(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	log.LogDebugf("[opMetaExtentsList] receive request: %v", req)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
