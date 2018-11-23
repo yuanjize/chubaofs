@@ -83,7 +83,7 @@ func (k *ExtentKey) UnmarshalBinary(buf *bytes.Buffer) (err error) {
 }
 
 func (k *ExtentKey) GetExtentKey() (m string) {
-	return fmt.Sprintf("%v_%v", k.PartitionId, k.ExtentId)
+	return fmt.Sprintf("%v_%v_%v", k.PartitionId, k.ExtentId,k.ExtentOffset)
 }
 
 func (k *ExtentKey) UnMarshal(m string) (err error) {
