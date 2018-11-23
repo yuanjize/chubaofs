@@ -51,6 +51,7 @@ const (
 
 const (
 	NetType = "tcp"
+	MinFixTinyExtents=10
 )
 
 //pack cmd response

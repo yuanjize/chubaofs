@@ -330,7 +330,7 @@ func (dp *dataPartition) LaunchRepair(fixExtentType uint8) {
 		return
 	}
 	if dp.extentStore.GetUnAvaliExtentLen() == 0 {
-		dp.extentStore.MoveAvaliExtentToUnavali(1)
+		dp.extentStore.MoveAvaliExtentToUnavali(MinFixTinyExtents)
 	}
 	dp.extentFileRepair(fixExtentType)
 }

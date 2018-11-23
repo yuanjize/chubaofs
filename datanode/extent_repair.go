@@ -98,7 +98,7 @@ func (dp *dataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix
 
 func (dp *dataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
 	unavaliTinyExtents = make([]uint64, 0)
-	fixTinyExtents := 3
+	fixTinyExtents := MinFixTinyExtents
 	if dp.isFirstFixTinyExtents {
 		fixTinyExtents = storage.TinyExtentCount
 		dp.isFirstFixTinyExtents = false
