@@ -3,7 +3,6 @@ package datanode
 import (
 	"encoding/json"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
