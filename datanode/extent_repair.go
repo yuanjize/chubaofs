@@ -406,7 +406,7 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	needFixSize := remoteExtentInfo.Size - localExtentInfo.Size
 
 	// Create streamRead packet, it offset is local extentInfoSize, size is needFixSize
-	request := NewExtentRepairReadPacket(dp.ID(), remoteExtentInfo.FileId, int(localExtentInfo.Size), int(needFixSize))
+	request := NewStreamReadPacket(dp.ID(), remoteExtentInfo.FileId, int(localExtentInfo.Size), int(needFixSize))
 	var conn *net.TCPConn
 
 	// Get a connection to leader host
