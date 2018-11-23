@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/juju/errors"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/data/wrapper"
+	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"net"
@@ -105,12 +105,12 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
 	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
-		storeMode:=stream.currentWriter.storeMode
+		storeMode := stream.currentWriter.storeMode
 		if err = stream.flushCurrExtentWriter(); err != nil {
 			return errors.Annotatef(err, "Flush error WriteInit")
 		}
-		if storeMode==proto.TinyExtentMode{
-			useNormalExtent=true
+		if storeMode == proto.TinyExtentMode {
+			useNormalExtent = true
 		}
 	}
 

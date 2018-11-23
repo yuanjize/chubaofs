@@ -74,7 +74,7 @@ func (sk *StreamKey) Put(k ExtentKey) {
 	extentsLen := len(sk.Extents)
 	for i := 0; i < extentsLen; i++ {
 		ek := sk.Extents[i]
-		if ek.PartitionId == k.PartitionId && ek.ExtentId == k.ExtentId{
+		if ek.PartitionId == k.PartitionId && ek.ExtentId == k.ExtentId {
 			if k.Size > ek.Size {
 				sk.Extents[i].Size = k.Size
 				return

@@ -151,7 +151,7 @@ func (p *Packet) IsEqualStreamReadReply(q *Packet) bool {
 }
 
 func (p *Packet) fill(data []byte, size int) (canWrite int) {
-	if p.Size+uint32(size)>util.BlockSize{
+	if p.Size+uint32(size) > util.BlockSize {
 		return
 	}
 	blockSpace := util.BlockSize

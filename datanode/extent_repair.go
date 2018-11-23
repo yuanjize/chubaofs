@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"fmt"
-	"github.com/juju/errors"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/storage"
+	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
 	"hash/crc32"
 )
@@ -325,8 +325,6 @@ func (dp *dataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err er
 
 	return
 }
-
-
 
 // DoStreamExtentFixRepair executed on follower node of data partition.
 // It receive from leader notifyRepair command extent file repair.

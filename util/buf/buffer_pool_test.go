@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/tiglabs/containerfs/storage"
-	"github.com/tiglabs/containerfs/util/pool"
+	"github.com/tiglabs/containerfs/third_party/pool"
 	"hash/crc32"
 	"math/rand"
 	"testing"
