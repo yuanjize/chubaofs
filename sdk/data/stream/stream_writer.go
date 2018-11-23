@@ -105,10 +105,11 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
 	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
+		storeMode:=stream.currentWriter.storeMode
 		if err = stream.flushCurrExtentWriter(); err != nil {
 			return errors.Annotatef(err, "Flush error WriteInit")
 		}
-		if stream.currentWriter.storeMode == proto.TinyExtentMode{
+		if storeMode==proto.TinyExtentMode{
 			useNormalExtent=true
 		}
 	}
