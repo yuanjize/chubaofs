@@ -103,10 +103,13 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 }
 
 //stream init,alloc a extent ,select dp and extent
-func (stream *StreamWriter) init(useExtent bool) (err error) {
+func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
 	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
 		if err = stream.flushCurrExtentWriter(); err != nil {
-			return errors.Annotatef(err, "WriteInit")
+			return errors.Annotatef(err, "Flush error WriteInit")
+		}
+		if stream.currentWriter.storeMode == proto.TinyExtentMode{
+			useNormalExtent=true
 		}
 	}
 
@@ -114,7 +117,7 @@ func (stream *StreamWriter) init(useExtent bool) (err error) {
 		return
 	}
 	var writer *ExtentWriter
-	writer, err = stream.allocateNewExtentWriter(useExtent)
+	writer, err = stream.allocateNewExtentWriter(useNormalExtent)
 	if err != nil {
 		err = errors.Annotatef(err, "WriteInit AllocNewExtentFailed")
 		return err
@@ -371,7 +374,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 
 }
 
-func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *ExtentWriter, err error) {
+func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (writer *ExtentWriter, err error) {
 	var (
 		dp       *wrapper.DataPartition
 		extentId uint64
@@ -382,7 +385,7 @@ func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *Ext
 				"failed on getWriteDataPartion,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
 			continue
 		}
-		if useExtent == true {
+		if useNormalExtent == true {
 			if extentId, err = stream.createExtent(dp); err != nil {
 				log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
 					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
@@ -396,7 +399,7 @@ func (stream *StreamWriter) allocateNewExtentWriter(useExtent bool) (writer *Ext
 		}
 		break
 	}
-	if useExtent == true && extentId <= 0 {
+	if useNormalExtent == true && extentId <= 0 {
 		err = fmt.Errorf("cannot alloct new extent after maxrery")
 		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
 		return nil, err
