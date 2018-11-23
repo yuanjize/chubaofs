@@ -107,23 +107,27 @@ func (f *File) Forget() {
 
 func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (handle fs.Handle, err error) {
 	ino := f.inode.ino
+	log.LogDebugf("Open enter: ino(%v) req(%v)", ino, req)
 	start := time.Now()
+
+	f.super.ec.OpenForWrite(ino, 0)
+
 	err = f.super.mw.Open_ll(ino)
 	if err != nil {
 		f.super.ic.Delete(ino)
+		f.super.ec.CloseForWrite(ino)
 		log.LogErrorf("Open: ino(%v) req(%v) err(%v)", ino, req, ParseError(err))
 		return nil, ParseError(err)
 	}
 
 	//FIXME: let open return inode info
-	inode, err := f.super.InodeGet(ino)
-	if err != nil {
-		f.super.ic.Delete(ino)
-		log.LogErrorf("Open: ino(%v) req(%v) err(%v)", ino, req, ParseError(err))
-		return nil, ParseError(err)
-	}
-
-	f.super.ec.OpenForWrite(ino, inode.size)
+	//	inode, err := f.super.InodeGet(ino)
+	//	if err != nil {
+	//		f.super.ic.Delete(ino)
+	//		f.super.ec.CloseForWrite(ino)
+	//		log.LogErrorf("Open: ino(%v) req(%v) err(%v)", ino, req, ParseError(err))
+	//		return nil, ParseError(err)
+	//	}
 
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Open: ino(%v) flags(%v) (%v)ns", ino, req.Flags, elapsed.Nanoseconds())

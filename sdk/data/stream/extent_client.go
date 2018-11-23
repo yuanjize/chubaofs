@@ -135,6 +135,7 @@ func (client *ExtentClient) OpenForWrite(inode, start uint64) {
 	_, ok = client.writers[inode]
 	client.writerLock.RUnlock()
 	if ok {
+		log.LogDebugf("OpenForWrite: already opened, ino(%v) start(%v)", inode, start)
 		return
 	}
 
@@ -143,6 +144,7 @@ func (client *ExtentClient) OpenForWrite(inode, start uint64) {
 	if !ok {
 		writer := NewStreamWriter(inode, start, client.appendExtentKey)
 		client.writers[inode] = writer
+		log.LogDebugf("OpenForWrite: newly opened, ino(%v) start(%v)", inode, start)
 	}
 	client.writerLock.Unlock()
 
@@ -226,7 +228,7 @@ func (client *ExtentClient) CloseForWrite(inode uint64) (err error) {
 	delete(client.writers, inode)
 	client.writerLock.Unlock()
 	atomic.StoreInt32(&streamWriter.hasClosed, HasClosed)
-
+	log.LogDebugf("CloseForWrite: writer deleted, ino(inode)")
 	return
 }
 
