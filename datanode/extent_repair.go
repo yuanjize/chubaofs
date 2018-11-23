@@ -431,13 +431,13 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		localExtentInfo, err = store.GetWatermark(remoteExtentInfo.FileId, false)
 		if err != nil {
 			err = errors.Annotatef(err, "streamRepairExtent GetWatermark error")
-			log.LogError("action[streamRepairExtent] err(%v).", err)
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return err
 		}
 		if localExtentInfo.Size > currFixOffset {
 			err = errors.Annotatef(err, "streamRepairExtent unavali fix localSize(%v) "+
 				"remoteSize(%v) want fixOffset(%v) data error", localExtentInfo.Size, remoteExtentInfo.Size, currFixOffset)
-			log.LogError("action[streamRepairExtent] err(%v).", err)
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return err
 		}
 
@@ -445,20 +445,20 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		// Read 64k stream repair packet
 		if err = reply.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
 			err = errors.Annotatef(err, "streamRepairExtent receive data error")
-			log.LogError("action[streamRepairExtent] err(%v).", err)
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return
 		}
 
 		if reply.ResultCode != proto.OpOk {
 			err = errors.Annotatef(err, "streamRepairExtent receive opcode error(%v) ", string(reply.Data[:reply.Size]))
-			log.LogError("action[streamRepairExtent] err(%v).", err)
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return
 		}
 
 		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID || reply.FileID != request.FileID {
 			err = errors.Annotatef(err, "streamRepairExtent receive unavalid "+
 				"request(%v) reply(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId())
-			log.LogError("action[streamRepairExtent] err(%v).", err)
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return
 		}
 
