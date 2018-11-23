@@ -39,26 +39,26 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 	startTime := time.Now().UnixNano()
 	log.LogInfof("action[extentFileRepair] partition(%v) start.",
 		dp.partitionId)
-	tinyExtents := make([]uint64, 0)
+	unavaliTinyExtents := make([]uint64, 0)
 	if fixExtentsType == proto.TinyExtentMode {
-		tinyExtents = dp.getUnavaliTinyExtents()
-		if len(tinyExtents) == 0 {
+		unavaliTinyExtents = dp.getUnavaliTinyExtents()
+		if len(unavaliTinyExtents) == 0 {
 			return
 		}
 	}
 	// Get all data partition group member about file metas
-	allMembers, err := dp.getAllMemberExtentMetas(fixExtentsType, tinyExtents)
+	allMembers, err := dp.getAllMemberExtentMetas(fixExtentsType, unavaliTinyExtents)
 	if err != nil {
 		log.LogErrorf("action[extentFileRepair] partition(%v) err(%v).",
 			dp.partitionId, err)
 		log.LogErrorf(errors.ErrorStack(err))
-		dp.putTinyExtentToUnavliCh(fixExtentsType, tinyExtents)
+		dp.putTinyExtentToUnavliCh(fixExtentsType, unavaliTinyExtents)
 		return
 	}
 	noNeedFix, needFix := dp.generatorExtentRepairTasks(allMembers) //generator file repair task
 	err = dp.NotifyExtentRepair(allMembers)                         //notify host to fix it
 	if err != nil {
-		dp.putTinyExtentToUnavliCh(fixExtentsType, tinyExtents)
+		dp.putAllTinyExtentsToStore(fixExtentsType, noNeedFix, needFix)
 		log.LogErrorf("action[extentFileRepair] partition(%v) err(%v).",
 			dp.partitionId, err)
 		log.LogError(errors.ErrorStack(err))
@@ -97,8 +97,8 @@ func (dp *dataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix
 	}
 }
 
-func (dp *dataPartition) getUnavaliTinyExtents() (tinyExtents []uint64) {
-	tinyExtents = make([]uint64, 0)
+func (dp *dataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
+	unavaliTinyExtents = make([]uint64, 0)
 	fixTinyExtents := 3
 	if dp.isFirstFixTinyExtents {
 		fixTinyExtents = storage.TinyExtentCount
@@ -109,7 +109,7 @@ func (dp *dataPartition) getUnavaliTinyExtents() (tinyExtents []uint64) {
 		if err != nil {
 			return
 		}
-		tinyExtents = append(tinyExtents, extentId)
+		unavaliTinyExtents = append(unavaliTinyExtents, extentId)
 	}
 	return
 }
@@ -327,45 +327,7 @@ func (dp *dataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err er
 	return
 }
 
-/*notify follower to repair dataPartition extentStore*/
-func (dp *dataPartition) NotifyRaftFollowerRepair(members *MembersFileMetas) (err error) {
-	var wg sync.WaitGroup
 
-	for i := 0; i < len(dp.replicaHosts); i++ {
-		replicaAddr := dp.replicaHosts[i]
-		replicaAddrParts := strings.Split(replicaAddr, ":")
-		if strings.TrimSpace(replicaAddrParts[0]) == LocalIP {
-			continue //local is leader not need send notify repair
-		}
-		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			p := NewNotifyExtentRepair(dp.partitionId)
-			var conn *net.TCPConn
-			target := dp.replicaHosts[index]
-			conn, err = gConnPool.Get(target)
-			if err != nil {
-				return
-			}
-			p.Data, err = json.Marshal(members)
-			p.Size = uint32(len(p.Data))
-			err = p.WriteToConn(conn)
-			if err != nil {
-				gConnPool.Put(conn, true)
-				return
-			}
-
-			if err = p.ReadFromConn(conn, proto.NoReadDeadlineTime); err != nil {
-				gConnPool.Put(conn, true)
-				return
-			}
-			gConnPool.Put(conn, true)
-		}(i)
-	}
-	wg.Wait()
-
-	return
-}
 
 // DoStreamExtentFixRepair executed on follower node of data partition.
 // It receive from leader notifyRepair command extent file repair.
