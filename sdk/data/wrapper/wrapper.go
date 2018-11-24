@@ -26,13 +26,14 @@ import (
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
+	"github.com/tiglabs/containerfs/util/ump"
 )
 
 const (
 	DataPartitionViewUrl        = "/client/dataPartitions"
 	GetClusterInfoURL           = "/admin/getIp"
 	ActionGetDataPartitionView  = "ActionGetDataPartitionView"
-	MinWritableDataPartitionNum = 10
+	MinWritableDataPartitionNum = 5
 )
 
 var (
@@ -148,6 +149,10 @@ func (w *Wrapper) updateDataPartition() error {
 				localLeaderPartitionGroups = append(localLeaderPartitionGroups, dp)
 			}
 		}
+	}
+	if len(rwPartitionGroups) <= MinWritableDataPartitionNum {
+		ump.Alarm(w.UmpWarningKey(), "master return readAndWrite datapartition so slow,then donnot trust it")
+		return nil
 	}
 	w.rwPartition = rwPartitionGroups
 	w.localLeaderPartitions = localLeaderPartitionGroups
