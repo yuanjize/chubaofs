@@ -25,6 +25,8 @@ import (
 	"github.com/tiglabs/containerfs/util/ump"
 	"runtime"
 	"sync/atomic"
+	"strings"
+	"io"
 )
 
 type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error
@@ -109,7 +111,9 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 		prefix := fmt.Sprintf("inodewrite %v_%v_%v", inode, offset, len(data))
 		err = errors.Annotatef(err, prefix)
 		log.LogError(errors.ErrorStack(err))
-		ump.Alarm(gDataWrapper.UmpWarningKey(), err.Error())
+		if !strings.Contains(err.Error(), io.EOF.Error()) {
+			ump.Alarm(gDataWrapper.UmpWarningKey(), err.Error())
+		}
 	}
 	writeRequestPool.Put(request)
 	return
