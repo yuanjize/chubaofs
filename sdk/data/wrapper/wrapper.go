@@ -130,6 +130,10 @@ func (w *Wrapper) updateDataPartition() error {
 			rwPartitionGroups = append(rwPartitionGroups, dp)
 		}
 	}
+	if len(rwPartitionGroups) <= MinWritableDataPartitionNum {
+		ump.Alarm(w.UmpWarningKey(), "master return readAndWrite datapartition so slow,then donnot trust it")
+		return nil
+	}
 	for _, dp := range view.DataPartitions {
 		w.replaceOrInsertPartition(dp)
 	}
@@ -149,10 +153,6 @@ func (w *Wrapper) updateDataPartition() error {
 				localLeaderPartitionGroups = append(localLeaderPartitionGroups, dp)
 			}
 		}
-	}
-	if len(rwPartitionGroups) <= MinWritableDataPartitionNum {
-		ump.Alarm(w.UmpWarningKey(), "master return readAndWrite datapartition so slow,then donnot trust it")
-		return nil
 	}
 	w.rwPartition = rwPartitionGroups
 	w.localLeaderPartitions = localLeaderPartitionGroups
