@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-export GOPATH=/home/guowl/work/baud
+export GOPATH=/home/guowl/cbfs
 go build
