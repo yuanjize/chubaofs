@@ -259,7 +259,7 @@ func (s *ExtentStore) loadExtentFromDisk(extentId uint64, loadHeader bool) (e Ex
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)
 	if err = e.RestoreFromFS(loadHeader); err != nil {
-		err = fmt.Errorf("restore from file system: %v", err)
+		err = fmt.Errorf("restore from file %v loadHeader %v system: %v",name, loadHeader,err)
 		return
 	}
 	if loadHeader {
