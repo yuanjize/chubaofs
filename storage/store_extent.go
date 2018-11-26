@@ -47,7 +47,7 @@ const (
 	ExtMetaDeleteIdxSize   = 8
 	ExtMetaFileSize        = ExtMetaBaseIdSize + ExtMetaDeleteIdxSize
 	TinyExtentCount        = 128
-	TinyExtentStartId      = 5000000
+	TinyExtentStartId      = 50000000
 	MinExtentId            = 2
 )
 
