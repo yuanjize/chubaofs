@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"hash/crc32"
@@ -12,11 +13,11 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"encoding/json"
 )
 
 var (
 	fileCnt    = flag.Int("count", 10000000, "create file count")
+	para       = flag.Int("para", 300, "parallel processes")
 	rootPath   = flag.String("root", "/mnt/intest", "rootPath")
 	fileType   = flag.Bool("isdir", false, "create is dir")
 	prefix     = flag.String("prefix", "1", "default prefix")
@@ -38,7 +39,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	var wg sync.WaitGroup
 	start := time.Now().Unix()
-	for i := 0; i < 300; i++ {
+	for i := 0; i < *para; i++ {
 		wg.Add(1)
 		go create(&wg)
 	}
@@ -99,7 +100,7 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 			return verifyInfo, fmt.Errorf("write: err(%v) len(%v) writeCount(%v)", err, len(data), writeCount)
 		}
 		allData = append(allData, data...)
-		offset+=int64(n)
+		offset += int64(n)
 	}
 	crc := crc32.ChecksumIEEE(allData)
 	crcBuf := make([]byte, 4)
