@@ -25,7 +25,7 @@ var (
 )
 
 type BufferPool struct {
-	pools [3]*sync.Pool
+	pools [4]*sync.Pool
 }
 
 func NewBufferPool() (bufferP *BufferPool) {
@@ -39,6 +39,9 @@ func NewBufferPool() (bufferP *BufferPool) {
 	bufferP.pools[2] = &sync.Pool{New: func() interface{} {
 		return make([]byte, util.ReadBlockSize)
 	}}
+	bufferP.pools[3] = &sync.Pool{New: func() interface{} {
+		return make([]byte, util.TinySizeLimit)
+	}}
 
 	return bufferP
 }
@@ -50,6 +53,8 @@ func (bufferP *BufferPool) Get(size int) (data []byte, err error) {
 		return bufferP.pools[1].Get().([]byte), nil
 	} else if size == util.ReadBlockSize {
 		return bufferP.pools[2].Get().([]byte), nil
+	} else if size == util.TinySizeLimit {
+		return bufferP.pools[3].Get().([]byte), nil
 	}
 	return nil, fmt.Errorf("can only support 45 or 65536 bytes")
 }
@@ -59,7 +64,7 @@ func (bufferP *BufferPool) Put(data []byte) {
 		return
 	}
 	size := len(data)
-	if size != util.BlockSize && size != util.PacketHeaderSize && size != util.ReadBlockSize {
+	if size != util.BlockSize && size != util.PacketHeaderSize && size != util.ReadBlockSize && size != util.TinySizeLimit {
 		return
 	}
 	if size == util.PacketHeaderSize {
@@ -68,6 +73,8 @@ func (bufferP *BufferPool) Put(data []byte) {
 		bufferP.pools[1].Put(data)
 	} else if size == util.ReadBlockSize {
 		bufferP.pools[2].Put(data)
+	} else if size == util.TinySizeLimit {
+		bufferP.pools[3].Put(data)
 	}
 
 	return
