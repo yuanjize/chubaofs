@@ -221,12 +221,9 @@ func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 }
 
 func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
-	var ok bool
-	if e, ok = s.cache.Get(extentId); !ok {
-		if e, err = s.loadExtentFromDisk(extentId, false); err != nil {
-			err = fmt.Errorf("load extent from disk: %v", err)
-			return
-		}
+	if e, err = s.loadExtentFromDisk(extentId, false); err != nil {
+		err = fmt.Errorf("load extent from disk: %v", err)
+		return nil,err
 	}
 	return
 }
@@ -438,7 +435,7 @@ func (s *ExtentStore) Cleanup() {
 				continue
 			}
 			if extent.Size()==0 && !extent.IsMarkDelete(){
-				s.MarkDelete(uint64(extentInfo.FileId), 0, 0)
+				s.DeleteDirtyExtent(extent.ID())
 			}
 		}
 	}
@@ -669,8 +666,11 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 		return nil
 	}
 
-	if extent, err = s.getExtent(extentId); err != nil {
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return nil
+	}
+	if extent.Size()!=0 {
+		return
 	}
 
 	extentInfo.FromExtent(extent)
