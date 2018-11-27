@@ -232,7 +232,7 @@ func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas
 		}
 		for index := 1; index < len(allMembers); index++ {
 			follower := allMembers[index]
-			if _, ok := follower.files[fileId]; !ok && leaderFile.Deleted==true {
+			if _, ok := follower.files[fileId]; !ok && leaderFile.Deleted==false {
 				addFile := &storage.FileInfo{Source: leaderAddr, FileId: fileId, Size: leaderFile.Size, Inode: leaderFile.Inode}
 				follower.NeedAddExtentsTasks = append(follower.NeedAddExtentsTasks, addFile)
 				log.LogInfof("action[generatorAddExtentsTasks] partition(%v) addFile(%v).", dp.partitionId, addFile)
