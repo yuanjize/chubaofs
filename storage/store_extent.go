@@ -83,7 +83,7 @@ var (
 	GetEmptyExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 30*60 && !info.Deleted && info.Size == 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && !info.Deleted && info.Size == 0
 		}
 	}
 )
