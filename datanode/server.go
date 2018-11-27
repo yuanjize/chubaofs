@@ -363,7 +363,7 @@ func (s *DataNode) isDiskErr(errMsg string) bool {
 		strings.Contains(errMsg, storage.ErrorNoAvaliFile.Error()) || strings.Contains(errMsg, storage.ErrorObjNotFound.Error()) ||
 		strings.Contains(errMsg, io.EOF.Error()) || strings.Contains(errMsg, storage.ErrSyscallNoSpace.Error()) ||
 		strings.Contains(errMsg, storage.ErrorHasDelete.Error()) || strings.Contains(errMsg, ErrPartitionNotExist.Error()) ||
-		strings.Contains(errMsg, storage.ErrObjectSmaller.Error()) ||
+		strings.Contains(errMsg, storage.ErrObjectSmaller.Error()) || strings.Contains(errMsg, storage.ErrorExtentHasExsit.Error()) ||
 		strings.Contains(errMsg, storage.ErrPkgCrcMismatch.Error()) || strings.Contains(errMsg, ErrStoreTypeMismatch.Error()) ||
 		strings.Contains(errMsg, storage.ErrorNoUnAvaliFile.Error()) || strings.Contains(errMsg, ErrChunkOffsetMismatch.Error()) ||
 		strings.Contains(errMsg, storage.ErrExtentNameFormat.Error()) || strings.Contains(errMsg, storage.ErrorAgain.Error()) ||

@@ -23,10 +23,10 @@ import (
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
 	"github.com/tiglabs/containerfs/util/ump"
-	"runtime"
-	"sync/atomic"
-	"strings"
 	"io"
+	"runtime"
+	"strings"
+	"sync/atomic"
 )
 
 type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error

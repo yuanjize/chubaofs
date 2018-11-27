@@ -399,10 +399,10 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
 			continue
 		}
-		err=nil
+		err = nil
 		break
 	}
-	if useNormalExtent == true && extentId <= 0 || err!=nil{
+	if useNormalExtent == true && extentId <= 0 || err != nil {
 		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
 		return nil, err
 	}

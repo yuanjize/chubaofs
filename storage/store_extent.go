@@ -62,7 +62,7 @@ var (
 	GetStableExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 10*60 && info.Deleted==false && info.Size > 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 10*60 && info.Deleted == false && info.Size > 0
 		}
 	}
 
@@ -83,7 +83,7 @@ var (
 	GetEmptyExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && info.Deleted==false && info.Size == 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && info.Deleted == false && info.Size == 0
 		}
 	}
 )
@@ -178,10 +178,9 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	if s.IsExistExtent(extentId) {
-		if !overwrite {
-			err = errors.New("extent already exist")
-			return err
-		}
+		log.LogWarnf("partitionId %v extentId %v has already exsit", s.dataDir, extent)
+		err = ErrorExtentHasExsit
+		return err
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		err = extent.InitToFS(inode, false)
@@ -220,7 +219,7 @@ func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
 	if e, err = s.loadExtentFromDisk(extentId, false); err != nil {
 		err = fmt.Errorf("load extent from disk: %v", err)
-		return nil,err
+		return nil, err
 	}
 	return
 }
@@ -229,8 +228,8 @@ func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error)
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
 		if e, err = s.loadExtentFromDisk(extentId, true); err != nil {
-			err = fmt.Errorf("load dataPartition %v extent %v from disk: %v", s.dataDir,extentId,err)
-			return nil,err
+			err = fmt.Errorf("load dataPartition %v extent %v from disk: %v", s.dataDir, extentId, err)
+			return nil, err
 		}
 	}
 	return
@@ -253,7 +252,7 @@ func (s *ExtentStore) loadExtentFromDisk(extentId uint64, loadHeader bool) (e Ex
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)
 	if err = e.RestoreFromFS(loadHeader); err != nil {
-		err = fmt.Errorf("restore from file %v loadHeader %v system: %v",name, loadHeader,err)
+		err = fmt.Errorf("restore from file %v loadHeader %v system: %v", name, loadHeader, err)
 		return
 	}
 	if loadHeader {
@@ -313,7 +312,7 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	var (
 		extentInfo *FileInfo
 		has        bool
-		extent    Extent
+		extent     Extent
 	)
 	s.extentInfoMux.RLock()
 	extentInfo, has = s.extentInfoMap[extentId]
@@ -402,7 +401,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 		return
 	}
 	extentInfo.FromExtent(extent)
-	extentInfo.Deleted=true
+	extentInfo.Deleted = true
 
 	s.cache.Del(extent.ID())
 
@@ -429,11 +428,11 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			extent,err:=s.getExtentWithHeader(extentInfo.FileId)
-			if err!=nil {
+			extent, err := s.getExtentWithHeader(extentInfo.FileId)
+			if err != nil {
 				continue
 			}
-			if extent.Size()==0 && !extent.IsMarkDelete(){
+			if extent.Size() == 0 && !extent.IsMarkDelete() {
 				s.DeleteDirtyExtent(extent.ID())
 			}
 		}
@@ -668,7 +667,7 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return nil
 	}
-	if extent.Size()!=0 {
+	if extent.Size() != 0 {
 		return
 	}
 
