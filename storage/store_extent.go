@@ -180,16 +180,12 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	if s.IsExistExtent(extentId) {
 		if !overwrite {
 			err = errors.New("extent already exist")
-			return
+			return err
 		}
-		if extent, err = s.getExtentWithHeader(extentId); err != nil {
-			return
-		}
-		extent.InitToFS(extentId, true)
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		if err = extent.InitToFS(inode, false); err != nil {
-			return
+			return err
 		}
 	}
 	s.cache.Put(extent)

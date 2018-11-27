@@ -175,7 +175,7 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 	}
 
 	if e.file, err = os.OpenFile(e.filePath, opt, 0666); err != nil {
-		return
+		return err
 	}
 
 	defer func() {
@@ -190,27 +190,27 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 		return
 	}
 	if err = e.file.Truncate(util.BlockHeaderSize); err != nil {
-		return
+		return err
 	}
 	binary.BigEndian.PutUint64(e.header[:8], ino)
 	if _, err = e.file.WriteAt(e.header[:8], 0); err != nil {
-		return
+		return err
 	}
 	emptyCrc := crc32.ChecksumIEEE(make([]byte, util.BlockSize))
 	for blockNo := 0; blockNo < util.BlockCount; blockNo++ {
 		if err = e.updateBlockCrc(blockNo, emptyCrc); err != nil {
-			return
+			return err
 		}
 	}
 	if err = e.file.Sync(); err != nil {
-		return
+		return err
 	}
 
 	var (
 		fileInfo os.FileInfo
 	)
 	if fileInfo, err = e.file.Stat(); err != nil {
-		return
+		return err
 	}
 	e.modifyTime = fileInfo.ModTime()
 	e.dataSize = 0
