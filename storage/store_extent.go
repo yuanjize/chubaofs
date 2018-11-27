@@ -698,7 +698,7 @@ func (s *ExtentStore) initTinyExtent() (err error) {
 	var extentId uint64
 	for extentId = TinyExtentStartId; extentId < TinyExtentStartId+TinyExtentCount; extentId++ {
 		err = s.Create(extentId, 0, false)
-		if err != nil && !strings.Contains(err.Error(), "extent already exist") {
+		if err != nil && !strings.Contains(err.Error(), ErrorExtentHasExsit.Error()) {
 			return
 		}
 		err = nil
