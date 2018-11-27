@@ -380,6 +380,7 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 		dp       *wrapper.DataPartition
 		extentId uint64
 	)
+	err = fmt.Errorf("cannot alloct new extent after maxrery")
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if dp, err = gDataWrapper.GetWriteDataPartition(stream.excludePartition); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
@@ -398,10 +399,10 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
 			continue
 		}
+		err=nil
 		break
 	}
-	if useNormalExtent == true && extentId <= 0 {
-		err = fmt.Errorf("cannot alloct new extent after maxrery")
+	if useNormalExtent == true && extentId <= 0 || err!=nil{
 		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
 		return nil, err
 	}
