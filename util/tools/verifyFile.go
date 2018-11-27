@@ -129,7 +129,7 @@ func readVerify(verifyInfo []*VerifyInfo) {
 			v.ReadContents = string(data)
 			v.ReadCrc = uint32(actualCrc)
 			mesg, _ := json.Marshal(v)
-			fmt.Println(mesg)
+			fmt.Println(string(mesg))
 			panic(string(mesg))
 		}
 	}
