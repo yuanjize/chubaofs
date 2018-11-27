@@ -99,6 +99,7 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 			return verifyInfo, fmt.Errorf("write: err(%v) len(%v) writeCount(%v)", err, len(data), writeCount)
 		}
 		allData = append(allData, data...)
+		offset+=int64(n)
 	}
 	crc := crc32.ChecksumIEEE(allData)
 	crcBuf := make([]byte, 4)
