@@ -33,7 +33,7 @@ type Packet struct {
 	orgData      []byte
 }
 
-func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kernelOffset int, useNormalExtent bool) (p *Packet) {
+func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kernelOffset int) (p *Packet) {
 	p = new(Packet)
 	p.PartitionID = dp.PartitionID
 	p.Magic = proto.ProtoMagic
@@ -47,11 +47,7 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.ReqID = proto.GetReqID()
 	p.Opcode = proto.OpWrite
 	p.kernelOffset = kernelOffset
-	if useNormalExtent {
-		p.Data, _ = proto.Buffers.Get(util.BlockSize)
-	} else {
-		p.Data, _ = proto.Buffers.Get(util.TinySizeLimit)
-	}
+	p.Data, _ = proto.Buffers.Get(util.BlockSize)
 
 	return
 }
@@ -154,10 +150,11 @@ func (p *Packet) IsEqualStreamReadReply(q *Packet) bool {
 	return false
 }
 
-func (p *Packet) fill(data []byte, size, blockSpace int) (canWrite int) {
-	if p.Size+uint32(size) > uint32(blockSpace) {
+func (p *Packet) fill(data []byte, size int) (canWrite int) {
+	if p.Size+uint32(size) > util.BlockSize {
 		return
 	}
+	blockSpace := util.BlockSize
 	remain := int(blockSpace) - int(p.Size)
 	canWrite = util.Min(remain, size)
 	if canWrite <= 0 {

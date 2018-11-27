@@ -104,10 +104,13 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
-	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() ||
-		(stream.currentWriter.storeMode == proto.TinyExtentMode && useNormalExtent == true)) {
+	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
+		storeMode := stream.currentWriter.storeMode
 		if err = stream.flushCurrExtentWriter(); err != nil {
 			return errors.Annotatef(err, "Flush error WriteInit")
+		}
+		if storeMode == proto.TinyExtentMode {
+			useNormalExtent = true
 		}
 	}
 
@@ -194,18 +197,17 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 
 	var initRetry int = 0
 	for total < size {
-		var useNormalExtent = true
-		if offset+size <= util.TinySizeLimit {
-			useNormalExtent = false
+		var useExtent = true
+		if offset+total == 0 && size-total <= util.BlockSize {
+			useExtent = false
 		}
-		//log.LogDebugf("StreamWriter write: ino(%v) offset(%v) size(%v) total(%v)", stream.Inode, offset, size, total)
-		if err = stream.init(useNormalExtent); err != nil {
+		if err = stream.init(useExtent); err != nil {
 			if initRetry++; initRetry > MaxStreamInitRetry {
 				return total, err
 			}
 			continue
 		}
-		write, err = stream.currentWriter.write(data[total:size], offset, size-total, useNormalExtent)
+		write, err = stream.currentWriter.write(data[total:size], offset, size-total)
 		if err == nil {
 			write = size - total
 			total += write
@@ -327,13 +329,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 	for _, p := range retryPackets {
 		log.LogInfof("recover packet (%v) kernelOffset(%v) to extent(%v)",
 			p.GetUniqueLogId(), p.kernelOffset, writer.toString())
-		var useNormalExtent bool
-		if p.StoreMode == proto.NormalExtentMode {
-			useNormalExtent = true
-		} else {
-			useNormalExtent = false
-		}
-		_, err = writer.write(p.Data, p.kernelOffset, int(p.Size), useNormalExtent)
+		_, err = writer.write(p.Data, p.kernelOffset, int(p.Size))
 		if err != nil {
 			err = errors.Annotatef(err, "pkg(%v) RecoverExtent write failed", p.GetUniqueLogId())
 			log.LogErrorf("stream(%v) err(%v)", stream.toStringWithWriter(writer), err.Error())

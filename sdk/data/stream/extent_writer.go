@@ -113,9 +113,8 @@ func (writer *ExtentWriter) flushWait() {
 }
 
 //user call write func
-func (writer *ExtentWriter) write(data []byte, kernelOffset, size int, useNormalExtent bool) (total int, err error) {
+func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total int, err error) {
 	var canWrite int
-	var blockSpace int
 	defer func() {
 		if err != nil {
 			writer.getConnect().Close()
@@ -123,30 +122,20 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int, useNormal
 			err = errors.Annotatef(err, "writer(%v) write failed", writer.toString())
 		}
 	}()
-
-	if useNormalExtent && writer.offset+util.BlockSize*10 >= util.ExtentSize {
+	if writer.offset+util.BlockSize*10 >= util.ExtentSize {
 		err = FullExtentErr
 		return 0, err
 	}
-
-	if useNormalExtent {
-		blockSpace = util.BlockSize
-	} else {
-		blockSpace = util.TinySizeLimit
-	}
-
 	for total < size {
 		if writer.currentPacket == nil {
-			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset, useNormalExtent)
-			if !useNormalExtent {
+			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset)
+			if kernelOffset == 0 {
 				writer.currentPacket.StoreMode = uint8(proto.TinyExtentMode)
 				writer.storeMode = proto.TinyExtentMode
-			} else {
-				writer.storeMode = proto.NormalExtentMode
 			}
 		}
-		canWrite = writer.currentPacket.fill(data[total:size], size-total, blockSpace) //fill this packet
-		if (useNormalExtent && writer.IsFullCurrentPacket()) || canWrite == 0 {
+		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
+		if writer.IsFullCurrentPacket() || canWrite == 0 {
 			err = writer.sendCurrPacket()
 			if err != nil { //if failed,recover it
 				return total, err
