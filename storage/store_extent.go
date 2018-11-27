@@ -184,7 +184,8 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 		}
 	} else {
 		extent = NewExtentInCore(name, extentId)
-		if err = extent.InitToFS(inode, false); err != nil {
+		err = extent.InitToFS(inode, false)
+		if err != nil {
 			return err
 		}
 	}
@@ -312,6 +313,7 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	var (
 		extentInfo *FileInfo
 		has        bool
+		extent    Extent
 	)
 	s.extentInfoMux.RLock()
 	extentInfo, has = s.extentInfoMap[extentId]
@@ -320,7 +322,7 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 		err = fmt.Errorf("extent %v not exist", extentId)
 		return
 	}
-	extent, err := s.getExtentWithHeader(extentId)
+	extent, err = s.getExtentWithHeader(extentId)
 	if err != nil {
 		return err
 	}
@@ -331,10 +333,10 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 		return ErrorHasDelete
 	}
 	if err = extent.Write(data, offset, size, crc); err != nil {
-		return
+		return err
 	}
 	extentInfo.FromExtent(extent)
-	return
+	return nil
 }
 
 func (s *ExtentStore) checkOffsetAndSize(extentId uint64, offset, size int64) error {
