@@ -424,7 +424,6 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 }
 
 func (s *ExtentStore) Cleanup() {
-
 	extentInfoSlice, err := s.GetAllWatermark(GetEmptyExtentFilter())
 	if err != nil {
 		return
@@ -434,7 +433,13 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			s.MarkDelete(uint64(extentInfo.FileId), 0, 0)
+			extent,err:=s.getExtentWithHeader(extentInfo.FileId)
+			if err!=nil {
+				continue
+			}
+			if extent.Size()==0 && !extent.IsMarkDelete(){
+				s.MarkDelete(uint64(extentInfo.FileId), 0, 0)
+			}
 		}
 	}
 }
