@@ -233,7 +233,7 @@ func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error)
 	if e, ok = s.cache.Get(extentId); !ok {
 		if e, err = s.loadExtentFromDisk(extentId, true); err != nil {
 			err = fmt.Errorf("load dataPartition %v extent %v from disk: %v", s.dataDir,extentId,err)
-			return
+			return nil,err
 		}
 	}
 	return
