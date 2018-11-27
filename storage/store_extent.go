@@ -62,7 +62,7 @@ var (
 	GetStableExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 5*60 && !info.Deleted && info.Size > 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 5*60 && info.Deleted==false && info.Size > 0
 		}
 	}
 
@@ -83,7 +83,7 @@ var (
 	GetEmptyExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && !info.Deleted && info.Size == 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && info.Deleted==false && info.Size == 0
 		}
 	}
 )
@@ -404,6 +404,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 		return
 	}
 	extentInfo.FromExtent(extent)
+	extentInfo.Deleted=true
 
 	s.cache.Del(extent.ID())
 
