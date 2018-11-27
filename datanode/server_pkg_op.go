@@ -100,6 +100,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 func (s *DataNode) handleCreateFile(pkg *Packet) {
 	var err error
 	defer func() {
+		log.LogInfof("createFile %v ERROR %v ", pkg.GetUniqueLogId(), err)
 		if err != nil {
 			err = errors.Annotatef(err, "Request[%v] CreateFile Error", pkg.GetUniqueLogId())
 			pkg.PackErrorBody(LogCreateFile, err.Error())
@@ -107,11 +108,13 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 			pkg.PackOkReply()
 		}
 	}()
-	log.LogInfof("createF")
+	log.LogInfof("createFile %v", pkg.GetUniqueLogId())
 	if pkg.DataPartition.Status() == proto.ReadOnly {
 		err = storage.ErrorPartitionReadOnly
+		log.LogInfof("createFile %v ERROR %v ", pkg.GetUniqueLogId(), err)
 		return
 	}
+	log.LogInfof("createFile %v", pkg.GetUniqueLogId())
 	if pkg.DataPartition.Available() <= 0 {
 		err = storage.ErrSyscallNoSpace
 		return
@@ -119,8 +122,10 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 	var ino uint64
 	if len(pkg.Data) >= 8 && pkg.Size >= 8 {
 		ino = binary.BigEndian.Uint64(pkg.Data)
+		log.LogInfof("createFile %v ERROR %v ", pkg.GetUniqueLogId(), err)
 	}
 	err = pkg.DataPartition.GetExtentStore().Create(pkg.FileID, ino, false)
+	log.LogInfof("createFile %v ERROR %v ", pkg.GetUniqueLogId(), err)
 	return
 }
 

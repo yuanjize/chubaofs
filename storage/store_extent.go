@@ -176,8 +176,11 @@ func (s *ExtentStore) NextExtentId() (extentId uint64) {
 func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err error) {
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
+	defer func() {
+		log.LogInfof("createFile name  %v error %v", name, err)
+	}()
 	if s.IsExistExtent(extentId) {
-		log.LogWarnf("partitionId %v extentId %v has already exsit", s.dataDir, extent)
+		log.LogInfof("partitionId %v extentId %v has already exsit,overwrite %v", s.dataDir, extent, overwrite)
 		if !overwrite {
 			err = ErrorExtentHasExsit
 			return err
@@ -186,6 +189,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		err = extent.InitToFS(inode, false)
+		log.LogInfof("partitionId %v extentId  %v err %v", s.dataDir, extent, err)
 		if err != nil {
 			return err
 		}
