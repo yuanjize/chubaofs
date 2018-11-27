@@ -107,6 +107,7 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 			pkg.PackOkReply()
 		}
 	}()
+	log.LogInfof("createF")
 	if pkg.DataPartition.Status() == proto.ReadOnly {
 		err = storage.ErrorPartitionReadOnly
 		return

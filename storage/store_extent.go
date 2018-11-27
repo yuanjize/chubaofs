@@ -177,11 +177,11 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	if s.IsExistExtent(extentId) {
+		log.LogWarnf("partitionId %v extentId %v has already exsit", s.dataDir, extent)
 		if !overwrite {
 			err = ErrorExtentHasExsit
 			return err
 		}
-		log.LogWarnf("partitionId %v extentId %v has already exsit", s.dataDir, extent)
 		return err
 	} else {
 		extent = NewExtentInCore(name, extentId)
