@@ -189,7 +189,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		err = extent.InitToFS(inode, false)
-		log.LogInfof("partitionId %v extentId  %v err %v", s.dataDir, extent, err)
+		log.LogInfof("partitionId %v extentId  %v err %v", s.dataDir, extent.ID(), err)
 		if err != nil {
 			return err
 		}
