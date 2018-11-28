@@ -458,15 +458,15 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			log.LogWarnf("start delete empty extent %v_%v ", s.partitionId, extentInfo.FileId)
+			log.LogWarnf("start delete empty extent %v", s.getExtentKey(extentInfo.FileId))
 			extent, err := s.getExtentWithHeader(extentInfo.FileId)
 			if err != nil {
-				log.LogWarnf("delete empty extent %v_%v error %v", s.partitionId, extent.ID(), err.Error())
+				log.LogWarnf("delete empty extent %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 				continue
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
 				err = s.DeleteDirtyExtent(extent.ID())
-				log.LogWarnf("delete empty extent %v_%v error %v", s.partitionId, extent.ID(), err.Error())
+				log.LogWarnf("delete empty extent %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 			}
 		}
 	}
@@ -568,7 +568,7 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 	extentInfo, has = s.extentInfoMap[extentId]
 	s.extentInfoMux.RUnlock()
 	if !has {
-		err = fmt.Errorf("extent %v not exist", extentId)
+		err = fmt.Errorf("extent %v not exist", s.getExtentKey(extentId))
 		return
 	}
 	if reload {
