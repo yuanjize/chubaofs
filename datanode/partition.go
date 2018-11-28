@@ -177,7 +177,7 @@ func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int)
 		partitionStatus: proto.ReadWrite,
 		runtimeMetrics:  NewDataPartitionMetrics(),
 	}
-	partition.extentStore, err = storage.NewExtentStore(partition.path, size)
+	partition.extentStore, err = storage.NewExtentStore(partition.path, partitionId, size)
 	if err != nil {
 		return
 	}

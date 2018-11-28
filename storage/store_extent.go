@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/tiglabs/containerfs/proto"
+	"github.com/tiglabs/containerfs/sdk/meta"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"strings"
@@ -102,15 +103,17 @@ type ExtentStore struct {
 	avaliTinyExtentCh   chan uint64
 	unavaliTinyExtentCh chan uint64
 	blockSize           int
+	partitionId         uint32
 }
 
 func CheckAndCreateSubdir(name string) (err error) {
 	return os.MkdirAll(name, 0755)
 }
 
-func NewExtentStore(dataDir string, storeSize int) (s *ExtentStore, err error) {
+func NewExtentStore(dataDir string, partitionId uint32, storeSize int) (s *ExtentStore, err error) {
 	s = new(ExtentStore)
 	s.dataDir = dataDir
+	s.partitionId = partitionId
 	if err = CheckAndCreateSubdir(dataDir); err != nil {
 		return nil, fmt.Errorf("NewExtentStore [%v] err[%v]", dataDir, err)
 	}
@@ -424,8 +427,25 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 	return
 }
 
+func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode uint64, extentId uint32) (avali bool) {
+	extents, err := mw.GetExtents(inode)
+	if err != nil {
+		return true
+	}
+	if len(extents) == 0 {
+		return true
+	}
+	for _, e := range extents {
+		if e.PartitionId == s.partitionId && e.PartitionId == extentId {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *ExtentStore) Cleanup() {
-	extentInfoSlice := s.GetAllWatermark(GetEmptyExtentFilter())
+	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter())
 	if len(extentInfoSlice) == 0 {
 		return
 	}
@@ -434,15 +454,15 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			log.LogWarnf("start delete empty extent %v_%v ",s.dataDir,extentInfo.FileId)
+			log.LogWarnf("start delete empty extent %v_%v ", s.dataDir, extentInfo.FileId)
 			extent, err := s.getExtentWithHeader(extentInfo.FileId)
 			if err != nil {
-				log.LogWarnf("delete empty extent %v_%v error %v",s.dataDir,extent.ID(),err.Error())
+				log.LogWarnf("delete empty extent %v_%v error %v", s.dataDir, extent.ID(), err.Error())
 				continue
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
-				err=s.DeleteDirtyExtent(extent.ID())
-				log.LogWarnf("delete empty extent %v_%v error %v",s.dataDir,extent.ID(),err.Error())
+				err = s.DeleteDirtyExtent(extent.ID())
+				log.LogWarnf("delete empty extent %v_%v error %v", s.dataDir, extent.ID(), err.Error())
 			}
 		}
 	}
@@ -568,7 +588,7 @@ func (s *ExtentStore) GetWatermarkForWrite(extentId uint64) (watermark int64, er
 
 	return
 }
-func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo) {
+func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
 	s.extentInfoMux.RLock()
@@ -677,7 +697,7 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 		return
 	}
 	if extent.Size() != 0 {
-		return fmt.Errorf("size %v donnot zeor ",extent.Size())
+		return fmt.Errorf("size %v donnot zeor ", extent.Size())
 	}
 
 	extentInfo.FromExtent(extent)
