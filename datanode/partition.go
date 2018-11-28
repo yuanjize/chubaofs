@@ -250,7 +250,7 @@ func (dp *dataPartition) ChangeStatus(status int) {
 
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
-	metricTicker := time.NewTicker(2 * time.Second)
+	metricTicker := time.NewTicker(5 * time.Second)
 	cleanUpTicker := time.NewTicker(time.Second * 5)
 	var index int
 	for {
@@ -258,6 +258,9 @@ func (dp *dataPartition) statusUpdateScheduler() {
 		case <-ticker.C:
 			dp.statusUpdate()
 			index++
+			if index >= math.MaxUint32 {
+				index = 0
+			}
 			if index%2 == 0 {
 				dp.LaunchRepair(proto.TinyExtentMode)
 			} else {
@@ -267,6 +270,8 @@ func (dp *dataPartition) statusUpdateScheduler() {
 			dp.extentStore.Cleanup()
 		case <-dp.stopC:
 			ticker.Stop()
+			cleanUpTicker.Stop()
+			metricTicker.Stop()
 			return
 		case <-metricTicker.C:
 			dp.runtimeMetrics.recomputLatency()
