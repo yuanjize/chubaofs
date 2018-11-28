@@ -466,7 +466,12 @@ func (s *ExtentStore) Cleanup() {
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
 				err = s.DeleteDirtyExtent(extent.ID())
-				log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+				if err!=nil {
+					log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+				}else {
+					log.LogWarnf("delete empty  %v success", s.getExtentKey(extentInfo.FileId))
+
+				}
 			}
 		}
 	}
