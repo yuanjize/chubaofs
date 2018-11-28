@@ -202,6 +202,26 @@ errDeal:
 	return
 }
 
+func (m *Master) deleteDataPartition(w http.ResponseWriter, r *http.Request) {
+	var (
+		partitionID uint64
+		err         error
+	)
+	if partitionID, err = parseDataPartitionID(r); err != nil {
+		goto errDeal
+	}
+	if err = m.cluster.deleteDataPartition(partitionID); err != nil {
+		goto errDeal
+	}
+	io.WriteString(w, fmt.Sprintf("delete partition[%v] success", partitionID))
+
+	return
+errDeal:
+	logMsg := getReturnMessage("deleteDataPartition", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) createDataPartition(w http.ResponseWriter, r *http.Request) {
 	var (
 		rstMsg                     string

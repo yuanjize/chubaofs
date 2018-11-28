@@ -280,6 +280,22 @@ errDeal:
 	return err
 }
 
+func (c *Cluster) deleteDataPartition(partitionID uint64) (err error) {
+	var dp *DataPartition
+	if dp, err = c.getDataPartitionByID(partitionID); err != nil {
+		goto errDeal
+	}
+	if err = c.syncDeleteDataPartition(dp.VolName, dp); err != nil {
+		goto errDeal
+	}
+	return
+errDeal:
+	err = fmt.Errorf("action[deleteDataPartition],clusterID[%v] paritionId:%v err:%v ", c.Name, partitionID, err.Error())
+	log.LogError(errors.ErrorStack(err))
+	Warn(c.Name, err.Error())
+	return err
+}
+
 func (c *Cluster) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err error) {
 	vols := c.copyVols()
 	for _, vol := range vols {
@@ -531,7 +547,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
