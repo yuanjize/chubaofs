@@ -133,6 +133,7 @@ func (stream *StreamReader) updateLocalReader(newStreamKey *proto.StreamKey) (er
 
 func (stream *StreamReader) read(data []byte, offset int, size int) (canRead int, err error) {
 	var keyCanRead int
+	log.LogDebugf("recive kernel ino(%v) offset(%v) size(%v)",stream.inode,offset,size)
 	keyCanRead, err = stream.initCheck(offset, size)
 	if keyCanRead <= 0 || (err != nil && err != io.EOF) {
 		return
@@ -188,10 +189,14 @@ func (stream *StreamReader) GetReader(offset, size int) (readers []*ExtentReader
 	readersOffsets = make([]int, 0)
 	readersSize = make([]int, 0)
 	startIndex := stream.predictExtent(offset, size)
+	orgOffset:=offset
+	orgSize:=size
 	for _, r := range stream.readers[startIndex:] {
 		if size <= 0 {
 			break
 		}
+		log.LogDebugf("reader (%v) orgOffset(%v) orgSize(%v) Offset(%v) " +
+			"Size(%v)",r.toString(),orgOffset,orgSize,offset,size)
 		if int(atomic.LoadUint64(&r.startInodeOffset)) > offset || int(atomic.LoadUint64(&r.endInodeOffset)) <= offset {
 			continue
 		}
@@ -204,11 +209,17 @@ func (stream *StreamReader) GetReader(offset, size int) (readers []*ExtentReader
 			currReaderSize = size
 			offset += currReaderSize
 			size -= currReaderSize
+			log.LogDebugf("reader (%v) can be select orgOffset(%v) orgSize(%v) Offset(%v) " +
+				"Size(%v) SelectCurrReaderOffset(%v) SelectCurrReaderSize(%v)",r.toString(),orgOffset,orgSize,offset,size,
+					currReaderOffset,currReaderSize)
 		} else {
 			currReaderOffset = offset - int(atomic.LoadUint64(&r.startInodeOffset))
 			currReaderSize = int(r.key.Size) - currReaderOffset
 			offset = int(atomic.LoadUint64(&r.endInodeOffset))
 			size = size - currReaderSize
+			log.LogDebugf("reader (%v) can be select orgOffset(%v) orgSize(%v) Offset(%v) " +
+				"Size(%v) SelectCurrReaderOffset(%v) SelectCurrReaderSize(%v)",r.toString(),orgOffset,orgSize,offset,size,
+				currReaderOffset,currReaderSize)
 		}
 		if currReaderSize == 0 {
 			continue
