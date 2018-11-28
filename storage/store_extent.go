@@ -176,6 +176,10 @@ func (s *ExtentStore) NextExtentId() (extentId uint64) {
 	return atomic.AddUint64(&s.baseExtentId, 1)
 }
 
+func (s *ExtentStore) getExtentKey(extent uint64) string {
+	return fmt.Sprintf("extent %v_%v", s.partitionId, extent)
+}
+
 func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err error) {
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
@@ -183,7 +187,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 		log.LogInfof("createFile name  %v error %v", name, err)
 	}()
 	if s.IsExistExtent(extentId) {
-		log.LogInfof("partitionId %v extentId %v has already exsit,overwrite %v", s.dataDir, extent, overwrite)
+		log.LogInfof("extentId %v has already exsit,overwrite %v", s.getExtentKey(extentId), overwrite)
 		if !overwrite {
 			err = ErrorExtentHasExsit
 			return err
@@ -192,7 +196,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		err = extent.InitToFS(inode, false)
-		log.LogInfof("partitionId %v extentId  %v err %v hasExsit %v", s.dataDir, extent.ID(), err, extent.Exist())
+		log.LogInfof("extentId  %v err %v hasExsit %v", s.getExtentKey(extentId), err, extent.Exist())
 		if err != nil {
 			return err
 		}
@@ -237,7 +241,7 @@ func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error)
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
 		if e, err = s.loadExtentFromDisk(extentId, true); err != nil {
-			err = fmt.Errorf("load dataPartition %v extent %v from disk: %v", s.dataDir, extentId, err)
+			err = fmt.Errorf("load extent %v from disk: %v", s.getExtentKey(extentId), err)
 			return nil, err
 		}
 	}
@@ -454,15 +458,15 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			log.LogWarnf("start delete empty extent %v_%v ", s.dataDir, extentInfo.FileId)
+			log.LogWarnf("start delete empty extent %v_%v ", s.partitionId, extentInfo.FileId)
 			extent, err := s.getExtentWithHeader(extentInfo.FileId)
 			if err != nil {
-				log.LogWarnf("delete empty extent %v_%v error %v", s.dataDir, extent.ID(), err.Error())
+				log.LogWarnf("delete empty extent %v_%v error %v", s.partitionId, extent.ID(), err.Error())
 				continue
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
 				err = s.DeleteDirtyExtent(extent.ID())
-				log.LogWarnf("delete empty extent %v_%v error %v", s.dataDir, extent.ID(), err.Error())
+				log.LogWarnf("delete empty extent %v_%v error %v", s.partitionId, extent.ID(), err.Error())
 			}
 		}
 	}
