@@ -281,13 +281,20 @@ errDeal:
 }
 
 func (c *Cluster) deleteDataPartition(partitionID uint64) (err error) {
-	var dp *DataPartition
+	var (
+		vol *Vol
+		dp  *DataPartition
+	)
 	if dp, err = c.getDataPartitionByID(partitionID); err != nil {
+		goto errDeal
+	}
+	if vol, err = c.getVol(dp.VolName); err != nil {
 		goto errDeal
 	}
 	if err = c.syncDeleteDataPartition(dp.VolName, dp); err != nil {
 		goto errDeal
 	}
+	vol.deleteDataPartitionsFromCache(dp)
 	log.LogWarnf("action[deleteDataPartition],clusterID[%v] vol[%v] paritionId[%v] delete success ", c.Name, dp.VolName, partitionID)
 	return
 errDeal:

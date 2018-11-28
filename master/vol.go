@@ -289,6 +289,12 @@ func (vol *Vol) deleteDataPartitionsFromStore(c *Cluster) {
 
 }
 
+func (vol *Vol) deleteDataPartitionsFromCache(dp *DataPartition) {
+	vol.dataPartitions.RLock()
+	defer vol.dataPartitions.RUnlock()
+	vol.dataPartitions.deleteDataPartition(dp)
+}
+
 func (vol *Vol) getDeleteMetaTasks() (tasks []*proto.AdminTask) {
 	vol.mpsLock.RLock()
 	defer vol.mpsLock.RUnlock()
