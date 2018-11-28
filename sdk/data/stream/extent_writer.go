@@ -336,6 +336,8 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 func (writer *ExtentWriter) toKey() (k proto.ExtentKey) {
 	writer.updateSizeLock.Lock()
 	defer writer.updateSizeLock.Unlock()
+	writer.requestLock.Lock()
+	defer writer.requestLock.Unlock()
 	k = proto.ExtentKey{}
 	k.PartitionId = writer.dp.PartitionID
 	k.Size = uint32(writer.getByteAck())
