@@ -290,8 +290,6 @@ func (vol *Vol) deleteDataPartitionsFromStore(c *Cluster) {
 }
 
 func (vol *Vol) deleteDataPartitionsFromCache(dp *DataPartition) {
-	vol.dataPartitions.RLock()
-	defer vol.dataPartitions.RUnlock()
 	vol.dataPartitions.deleteDataPartition(dp)
 }
 
