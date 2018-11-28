@@ -187,7 +187,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 		log.LogInfof("createFile name  %v error %v", name, err)
 	}()
 	if s.IsExistExtent(extentId) {
-		log.LogInfof("extentId %v has already exsit,overwrite %v", s.getExtentKey(extentId), overwrite)
+		log.LogInfof("%v has already exsit,overwrite %v", s.getExtentKey(extentId), overwrite)
 		if !overwrite {
 			err = ErrorExtentHasExsit
 			return err
@@ -196,7 +196,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		err = extent.InitToFS(inode, false)
-		log.LogInfof("extentId  %v err %v hasExsit %v", s.getExtentKey(extentId), err, extent.Exist())
+		log.LogInfof("%v err %v hasExsit %v", s.getExtentKey(extentId), err, extent.Exist())
 		if err != nil {
 			return err
 		}
@@ -241,7 +241,7 @@ func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error)
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
 		if e, err = s.loadExtentFromDisk(extentId, true); err != nil {
-			err = fmt.Errorf("load extent %v from disk: %v", s.getExtentKey(extentId), err)
+			err = fmt.Errorf("load  %v from disk: %v", s.getExtentKey(extentId), err)
 			return nil, err
 		}
 	}
@@ -458,15 +458,15 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			log.LogWarnf("start delete empty extent %v", s.getExtentKey(extentInfo.FileId))
+			log.LogWarnf("start delete empty  %v", s.getExtentKey(extentInfo.FileId))
 			extent, err := s.getExtentWithHeader(extentInfo.FileId)
 			if err != nil {
-				log.LogWarnf("delete empty extent %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+				log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 				continue
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
 				err = s.DeleteDirtyExtent(extent.ID())
-				log.LogWarnf("delete empty extent %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+				log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 			}
 		}
 	}
