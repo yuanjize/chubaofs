@@ -391,12 +391,14 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 			if extentId, err = stream.createExtent(dp); err != nil {
 				log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
 					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
+				stream.excludePartition=append(stream.excludePartition,dp.PartitionID)
 				continue
 			}
 		}
 		if writer, err = NewExtentWriter(stream.Inode, dp, extentId); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
+			stream.excludePartition=append(stream.excludePartition,dp.PartitionID)
 			continue
 		}
 		err = nil
