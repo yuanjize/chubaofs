@@ -288,6 +288,7 @@ func (c *Cluster) deleteDataPartition(partitionID uint64) (err error) {
 	if err = c.syncDeleteDataPartition(dp.VolName, dp); err != nil {
 		goto errDeal
 	}
+	log.LogWarnf("action[deleteDataPartition],clusterID[%v] vol[%v] paritionId[%v] delete success ", c.Name, dp.VolName, partitionID)
 	return
 errDeal:
 	err = fmt.Errorf("action[deleteDataPartition],clusterID[%v] paritionId:%v err:%v ", c.Name, partitionID, err.Error())
