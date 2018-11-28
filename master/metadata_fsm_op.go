@@ -350,6 +350,8 @@ func (c *Cluster) handleApply(cmd *Metadata) (err error) {
 		c.applyAddDataPartition(cmd)
 	case OpSyncUpdateDataPartition:
 		c.applyUpdateDataPartition(cmd)
+	case OpSyncDeleteDataPartition:
+		c.applyDeleteDataPartition(cmd)
 	case OpSyncDeleteMetaNode:
 		c.applyDeleteMetaNode(cmd)
 	case OpSyncDeleteDataNode:
@@ -546,6 +548,22 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		dp.IsFreeze = dpv.IsFreeze
 		vol.dataPartitions.putDataPartitionByRaft(dp)
+	}
+}
+
+func (c *Cluster) applyDeleteDataPartition(cmd *Metadata) {
+	log.LogInfof("action[applyDeleteDataPartition] cmd:%v", cmd.K)
+	keys := strings.Split(cmd.K, KeySeparator)
+	if keys[1] == DataPartitionAcronym {
+		dpv := &DataPartitionValue{}
+		json.Unmarshal(cmd.V, dpv)
+		vol, _ := c.getVol(keys[2])
+		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
+		if err != nil {
+			log.LogError(fmt.Sprintf("action[applyDeleteDataPartition] failed,err:%v", err))
+			return
+		}
+		vol.dataPartitions.deleteDataPartition(dp)
 	}
 }
 

@@ -62,6 +62,21 @@ func (dpMap *DataPartitionMap) putDataPartition(dp *DataPartition) {
 	dpMap.dataPartitions = append(dpMap.dataPartitions, dp)
 }
 
+func (dpMap *DataPartitionMap) deleteDataPartition(dp *DataPartition) {
+	dpMap.Lock()
+	defer dpMap.Unlock()
+	delete(dpMap.dataPartitionMap, dp.PartitionID)
+	dps := make([]*DataPartition, 0)
+	for index, p := range dpMap.dataPartitions {
+		if p.PartitionID == dp.PartitionID {
+			dps = append(dps, dpMap.dataPartitions[:index]...)
+			dps = append(dps, dpMap.dataPartitions[index+1:]...)
+			dpMap.dataPartitions = dps
+			break
+		}
+	}
+}
+
 func (dpMap *DataPartitionMap) putDataPartitionByRaft(dp *DataPartition) {
 	dpMap.Lock()
 	defer dpMap.Unlock()

@@ -30,6 +30,7 @@ const (
 	AdminLoadDataPartition    = "/dataPartition/load"
 	AdminCreateDataPartition  = "/dataPartition/create"
 	AdminDataPartitionOffline = "/dataPartition/offline"
+	AdminDataPartitionDelete  = "/dataPartition/delete"
 	AdminDeleteVol            = "/vol/delete"
 	AdminUpdateVol            = "/vol/update"
 	AdminCreateVol            = "/admin/createVol"
@@ -81,6 +82,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminCreateDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminLoadDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminDataPartitionOffline, m.handlerWithInterceptor())
+	http.Handle(AdminDataPartitionDelete, m.handlerWithInterceptor())
 	http.Handle(AdminCreateVol, m.handlerWithInterceptor())
 	http.Handle(AdminDeleteVol, m.handlerWithInterceptor())
 	http.Handle(AdminUpdateVol, m.handlerWithInterceptor())
@@ -151,6 +153,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.loadDataPartition(w, r)
 	case AdminDataPartitionOffline:
 		m.dataPartitionOffline(w, r)
+	case AdminDataPartitionDelete:
+		m.deleteDataPartition(w, r)
 	case AdminCreateVol:
 		m.createVol(w, r)
 	case AdminDeleteVol:
