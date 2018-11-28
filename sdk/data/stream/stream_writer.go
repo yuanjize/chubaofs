@@ -329,7 +329,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 	for _, p := range retryPackets {
 		log.LogInfof("recover packet (%v) kernelOffset(%v) to extent(%v)",
 			p.GetUniqueLogId(), p.kernelOffset, writer.toString())
-		_, err = writer.write(p.Data, p.kernelOffset, int(p.Size))
+		_, err = writer.write(p.Data[:p.Size], p.kernelOffset, int(p.Size))
 		if err != nil {
 			err = errors.Annotatef(err, "pkg(%v) RecoverExtent write failed", p.GetUniqueLogId())
 			log.LogErrorf("stream(%v) err(%v)", stream.toStringWithWriter(writer), err.Error())
