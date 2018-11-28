@@ -116,6 +116,9 @@ type Extent interface {
 	// HeaderChecksum returns crc checksum value of extent header data
 	// include inode data and block crc.
 	HeaderChecksum() (crc uint32)
+
+	//file has exsit on disk
+	Exist() (exsit bool)
 }
 
 // FSExtent is an implementation of Extent for local regular extent file data management.
@@ -166,15 +169,27 @@ func (e *fsExtent) ID() uint64 {
 	return e.extentId
 }
 
+func (e *fsExtent) Exist() (exsit bool) {
+	_, err := os.Stat(e.filePath)
+	if err != nil {
+		if os.IsExist(err) {
+			return true
+		}
+		return false
+	}
+	return true
+}
+
 // InitToFS init extent data info filesystem. If entry file exist and overwrite is true,
 // this operation will clear all data of exist entry file and initialize extent header data.
 func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
-
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	opt := ExtentOpenOpt
 	if overwrite {
 		opt = ExtentOpenOptOverwrite
 	}
-	log.LogInfof("start CreateFile %v", e.filePath)
+	log.LogInfof("start CreateFile %v hasExsit %v", e.filePath, e.Exist())
 	if e.file, err = os.OpenFile(e.filePath, opt, 0666); err != nil {
 		log.LogWarnf("CreateFile %v error %v", e.filePath, err)
 		return err
@@ -222,7 +237,7 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 	}
 	e.modifyTime = fileInfo.ModTime()
 	e.dataSize = 0
-	log.LogInfof("end CreateFile %v", e.filePath)
+	log.LogInfof("end CreateFile %v hasExsit %v", e.filePath, e.Exist())
 	// go e.pendingCollapseFile()
 	return
 }
