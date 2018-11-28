@@ -95,10 +95,10 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 		data := []byte(RandStringBytesMaskImpr(n))
 		v.WriteContents = string(data)
 		v.WriteCrc = crc32.ChecksumIEEE(data)
-		verifyInfo = append(verifyInfo, v)
 		if writeCount, err := fp.WriteAt(data, offset); err != nil || writeCount != len(data) {
-			return verifyInfo, fmt.Errorf("write: err(%v) len(%v) writeCount(%v)", err, len(data), writeCount)
+			return nil, fmt.Errorf("write: err(%v) len(%v) writeCount(%v)", err, len(data), writeCount)
 		}
+		verifyInfo = append(verifyInfo, v)
 		allData = append(allData, data...)
 		offset += int64(n)
 	}
@@ -106,12 +106,12 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 	crcBuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(crcBuf, crc)
 	if _, err := fp.Write(crcBuf); err != nil {
-		return verifyInfo, err
+		return nil, err
 	}
 
 	err = syscall.Fsync(int(fp.Fd()))
 	if err != nil {
-		return verifyInfo, err
+		return nil, err
 	}
 	return verifyInfo, fp.Close()
 }
@@ -189,8 +189,8 @@ func create(wg *sync.WaitGroup) {
 			err = read(filename)
 			if err != nil {
 				err = fmt.Errorf("filename %v read %v error", filename, err)
+				fmt.Println(err.Error())
 				readVerify(verifys)
-				panic(err.Error())
 			}
 		}
 
