@@ -148,7 +148,7 @@ func (reader *ExtentReader) streamReadDataFromHost(offset, expectReadSize int, d
 			ReadConnectPool.Put(connect, NoCloseConnect)
 		}
 	}()
-	log.LogDebugf("reader %v send request %v to %v", reader.toString(), request.GetUniqueLogId(), host)
+	//log.LogDebugf("reader %v send request %v to %v", reader.toString(), request.GetUniqueLogId(), host)
 	if err = request.WriteToConn(connect); err != nil {
 		err = errors.Annotatef(err, reader.toString()+"streamReadDataFromHost host(%v) error request(%v)",
 			host, request.GetUniqueLogId())
