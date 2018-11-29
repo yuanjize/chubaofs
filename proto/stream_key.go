@@ -64,7 +64,7 @@ func (sk *StreamKey) Put(k ExtentKey) {
 	}
 	lastIndex := len(sk.Extents) - 1
 	lastKey := sk.Extents[lastIndex]
-	if lastKey.GetExtentKey()==k.GetExtentKey() {
+	if lastKey.GetExtentKey() == k.GetExtentKey() {
 		if k.Size > lastKey.Size {
 			sk.Extents[lastIndex].Size = k.Size
 			return
@@ -74,7 +74,7 @@ func (sk *StreamKey) Put(k ExtentKey) {
 	extentsLen := len(sk.Extents)
 	for i := 0; i < extentsLen; i++ {
 		ek := sk.Extents[i]
-		if ek.GetExtentKey()==k.GetExtentKey(){
+		if ek.GetExtentKey() == k.GetExtentKey() {
 			if k.Size > ek.Size {
 				sk.Extents[i].Size = k.Size
 				return

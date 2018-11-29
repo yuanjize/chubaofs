@@ -263,7 +263,7 @@ func (stream *StreamWriter) flushData() (err error) {
 }
 
 func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
-	for i:=0;i<MaxSelectDataPartionForWrite;i++{
+	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = stream.flushData()
 		if err == nil || err == syscall.ENOENT {
 			stream.errCount = 0
@@ -271,12 +271,11 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			return
 		}
 		if err = stream.recoverExtent(); err == nil {
-			if err = stream.flushData();err==nil{
+			if err = stream.flushData(); err == nil {
 				return
 			}
 		}
 	}
-
 
 	return err
 }
