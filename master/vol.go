@@ -242,17 +242,17 @@ func (vol *Vol) getTotalUsedSpace() uint64 {
 func (vol *Vol) checkStatus(c *Cluster) {
 	vol.Lock()
 	defer vol.Unlock()
-	if vol.Status == VolNormal {
+	if vol.Status == VolMarkDelete {
+		metaTasks := vol.getDeleteMetaTasks()
+		dataTasks := vol.getDeleteDataTasks()
+		if len(metaTasks) == 0 && len(dataTasks) == 0 {
+			vol.deleteVolFromStore(c)
+		}
+		c.putMetaNodeTasks(metaTasks)
+		c.putDataNodeTasks(dataTasks)
 		return
 	}
-	metaTasks := vol.getDeleteMetaTasks()
-	dataTasks := vol.getDeleteDataTasks()
-	if len(metaTasks) == 0 && len(dataTasks) == 0 {
-		vol.deleteVolFromStore(c)
-	}
-	c.putMetaNodeTasks(metaTasks)
-	c.putDataNodeTasks(dataTasks)
-	return
+
 }
 
 func (vol *Vol) deleteVolFromStore(c *Cluster) {
