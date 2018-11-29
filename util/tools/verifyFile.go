@@ -125,10 +125,10 @@ func readVerify(verifyInfo []*VerifyInfo) {
 
 	for _, v := range verifyInfo {
 		data := make([]byte, v.Size)
-		_,err:=fp.ReadAt(data, v.Offset)
-		if err!=nil {
+		_, err := fp.ReadAt(data, v.Offset)
+		if err != nil {
 			mesg, _ := json.Marshal(v)
-			a:=string(mesg)+err.Error()
+			a := string(mesg) + err.Error()
 			panic(string(a))
 		}
 		actualCrc := crc32.ChecksumIEEE(data)

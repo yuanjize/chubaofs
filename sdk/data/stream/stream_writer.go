@@ -232,21 +232,7 @@ func (stream *StreamWriter) close() (err error) {
 	return
 }
 
-func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
-	var status error
-	defer func() {
-		if err == nil || status == syscall.ENOENT {
-			stream.errCount = 0
-			err = nil
-			return
-		}
-		stream.errCount++
-		if stream.errCount < MaxSelectDataPartionForWrite {
-			if err = stream.recoverExtent(); err == nil {
-				err = stream.flushCurrExtentWriter()
-			}
-		}
-	}()
+func (stream *StreamWriter) flushData() (err error) {
 	writer := stream.getCurrentWriter()
 	if writer == nil {
 		err = nil
@@ -269,6 +255,25 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		}
 		stream.setCurrentWriter(nil)
 	}
+	return
+}
+
+func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
+	var status error
+	defer func() {
+		if err == nil || status == syscall.ENOENT {
+			stream.errCount = 0
+			err = nil
+			return
+		}
+		stream.errCount++
+		if stream.errCount < MaxSelectDataPartionForWrite {
+			if err = stream.recoverExtent(); err == nil {
+				err = stream.flushData()
+			}
+		}
+	}()
+	err = stream.flushData()
 
 	return err
 }
@@ -362,8 +367,8 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 		}
 		if err = stream.writeRecoverPackets(writer, retryPackets); err == nil {
 			stream.excludePartition = make([]uint32, 0)
-			stream.setCurrentWriter(writer)
-			return stream.flushCurrExtentWriter()
+			stream.updateToMetaNode()
+			return err
 		} else {
 			writer.forbirdUpdateToMetanode()
 			writer.notifyExit()
