@@ -366,6 +366,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 		}
 		if err = stream.writeRecoverPackets(writer, retryPackets); err == nil {
 			stream.excludePartition = make([]uint32, 0)
+			stream.setCurrentWriter(writer)
 			stream.updateToMetaNode()
 			return err
 		} else {
