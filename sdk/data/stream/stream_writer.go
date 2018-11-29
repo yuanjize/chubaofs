@@ -221,7 +221,7 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		if err = stream.recoverExtent(); err != nil {
 			return
 		} else {
-			write = size - total //if recover success ,then write is allLength
+			write = size - total //note:if recover success ,then write is allLength
 		}
 		total += write
 	}
