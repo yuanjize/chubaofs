@@ -120,7 +120,7 @@ func (partition *DataPartition) canOffLine(offlineAddr string) (err error) {
 func (partition *DataPartition) removeOfflineAddr(liveReplicas []*DataReplica, offlineAddr string) (otherLiveReplicas []*DataReplica) {
 	otherLiveReplicas = make([]*DataReplica, 0)
 	for i := 0; i < len(liveReplicas); i++ {
-		replica := partition.Replicas[i]
+		replica := liveReplicas[i]
 		if replica.Addr != offlineAddr {
 			otherLiveReplicas = append(otherLiveReplicas, replica)
 		}
