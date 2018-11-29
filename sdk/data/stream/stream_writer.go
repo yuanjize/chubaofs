@@ -195,7 +195,9 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		log.LogError(errors.ErrorStack(err))
 	}()
 
-	var initRetry int = 0
+	var (
+		initRetry int = 0
+	)
 	for total < size {
 		var useExtent = true
 		if offset+total == 0 && size-total <= util.BlockSize {
@@ -218,6 +220,8 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		}
 		if err = stream.recoverExtent(); err != nil {
 			return
+		} else {
+			write = size - total //if recover success ,then write is allLength
 		}
 		total += write
 	}
