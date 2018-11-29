@@ -157,6 +157,7 @@ func (f *File) Release(ctx context.Context, req *fuse.ReleaseRequest) (err error
 }
 
 func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) (err error) {
+	log.LogDebugf("recive read request inode(%v) offset(%v) size(%v),req(%v)",f.inode.ino,req.Offset,req.Size,req)
 	if f.getReadStream() == nil {
 		stream, err := f.super.ec.OpenForRead(f.inode.ino)
 		if err != nil {
