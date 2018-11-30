@@ -251,7 +251,6 @@ func (dp *dataPartition) ChangeStatus(status int) {
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
-	cleanUpTicker := time.NewTicker(time.Second * 5)
 	var index int
 	for {
 		select {
@@ -266,11 +265,9 @@ func (dp *dataPartition) statusUpdateScheduler() {
 			} else {
 				dp.LaunchRepair(proto.NormalExtentMode)
 			}
-		case <-cleanUpTicker.C:
 			dp.extentStore.Cleanup()
 		case <-dp.stopC:
 			ticker.Stop()
-			cleanUpTicker.Stop()
 			metricTicker.Stop()
 			return
 		case <-metricTicker.C:
