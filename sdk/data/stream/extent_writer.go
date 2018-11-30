@@ -161,6 +161,7 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	}
 	writer.pushRequestToQueue(writer.currentPacket)
 	packet := writer.currentPacket
+	writer.currentPacket = nil
 	orgOffset := writer.offset
 	writer.offset += packet.getPacketLength()
 	err = packet.writeTo(writer.connect) //if send packet,then signal recive goroutine for recive from connect
