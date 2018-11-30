@@ -317,6 +317,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
+	writer.markDirty()
 	writer.updateSizeLock.Unlock()
 	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng && !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
