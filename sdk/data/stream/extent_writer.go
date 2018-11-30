@@ -54,7 +54,8 @@ type ExtentWriter struct {
 	byteAck          uint64 //DataNode Has Ack Bytes
 	offset           int
 	connect          *net.TCPConn
-	handleCh         chan bool //a Chan for signal recive goroutine recive packet from connect
+	handleCh         chan struct{} //a Chan for signal recive goroutine recive packet from connect
+	ExitCh           chan struct{}
 	recoverCnt       int       //if failed,then recover contine,this is recover count
 	forbidUpdate     int64
 	requestLock      sync.Mutex
@@ -70,11 +71,11 @@ type ExtentWriter struct {
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
 	writer = new(ExtentWriter)
 	writer.requestQueue = list.New()
-	writer.handleCh = make(chan bool, 8)
+	writer.handleCh = make(chan struct{}, 8)
+	writer.ExitCh = make(chan struct{}, 1)
 	writer.extentId = extentId
 	writer.dp = dp
 	writer.inode = inode
-	writer.flushSignleCh = make(chan bool, 1)
 	writer.storeMode = proto.NormalExtentMode
 	var connect *net.TCPConn
 	conn, err := net.DialTimeout("tcp", dp.Hosts[0], time.Second)
@@ -118,7 +119,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 	defer func() {
 		if err != nil {
 			writer.getConnect().Close()
-			writer.cleanHandleCh()
+			writer.notifyExit()
 			err = errors.Annotatef(err, "writer(%v) write failed", writer.toString())
 		}
 	}()
@@ -170,7 +171,7 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 		writer.toString(), packet.GetUniqueLogId(), orgOffset, packet.getPacketLength(),
 		writer.offset, packet.Crc)
 	if err == nil {
-		writer.handleCh <- ContinueReceive
+		writer.handleCh <- struct{}{}
 		return
 	} else {
 		writer.notifyExit()
@@ -186,7 +187,8 @@ func (writer *ExtentWriter) notifyExit() {
 	if atomic.LoadInt32(&writer.hasExitRecvThead) == HasExitRecvThread {
 		return
 	}
-	writer.handleCh <- NotReceive
+	atomic.StoreInt32(&writer.hasExitRecvThead, HasExitRecvThread)
+	close(writer.ExitCh)
 }
 
 func (writer *ExtentWriter) cleanHandleCh() {
@@ -220,10 +222,7 @@ func (writer *ExtentWriter) toString() string {
 
 func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
 	if writer.isAllFlushed() && writer.isFullExtent() {
-		if atomic.LoadInt32(&writer.hasExitRecvThead) == HasExitRecvThread {
-			return
-		}
-		writer.handleCh <- NotReceive
+		writer.notifyExit()
 	}
 	return
 }
@@ -262,25 +261,11 @@ func (writer *ExtentWriter) flush() (err error) {
 
 func (writer *ExtentWriter) close() (err error) {
 	if writer.isAllFlushed() {
-		if atomic.LoadInt32(&writer.hasExitRecvThead) == HasExitRecvThread {
-			return
-		}
-		select {
-		case writer.handleCh <- NotReceive:
-		default:
-			break
-		}
+		writer.notifyExit()
 	} else {
 		err = writer.flush()
 		if err == nil && writer.isAllFlushed() {
-			if atomic.LoadInt32(&writer.hasExitRecvThead) == HasExitRecvThread {
-				return
-			}
-			select {
-			case writer.handleCh <- NotReceive:
-			default:
-				break
-			}
+			writer.notifyExit()
 		}
 	}
 	return
@@ -318,8 +303,6 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
-	writer.markDirty()
-	writer.updateSizeLock.Unlock()
 	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
 		select {
 		case writer.flushSignleCh <- true:
@@ -328,6 +311,8 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 			break
 		}
 	}
+	writer.markDirty()
+	writer.updateSizeLock.Unlock()
 	log.LogDebugf("recive inode(%v) kerneloffset(%v) to extent(%v) pkg(%v) recive(%v)",
 		writer.inode, request.kernelOffset, writer.toString(), request.GetUniqueLogId(), reply.GetUniqueLogId())
 	proto.Buffers.Put(request.Data)
@@ -361,11 +346,7 @@ func (writer *ExtentWriter) receive() {
 	}()
 	for {
 		select {
-		case code := <-writer.handleCh:
-			if code == NotReceive {
-				writer.getConnect().Close()
-				return
-			}
+		case <-writer.handleCh:
 			e := writer.getFrontRequest()
 			if e == nil {
 				continue
@@ -386,6 +367,9 @@ func (writer *ExtentWriter) receive() {
 				log.LogWarn(err.Error())
 				continue
 			}
+		case <-writer.ExitCh:
+			writer.getConnect().Close()
+			return
 		}
 	}
 }
