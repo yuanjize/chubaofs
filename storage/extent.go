@@ -189,15 +189,12 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 	if overwrite {
 		opt = ExtentOpenOptOverwrite
 	}
-	log.LogInfof("start CreateFile %v hasExsit %v", e.filePath, e.Exist())
 	if e.file, err = os.OpenFile(e.filePath, opt, 0666); err != nil {
-		log.LogWarnf("CreateFile %v error %v", e.filePath, err)
 		return err
 	}
 
 	defer func() {
 		if err != nil {
-			log.LogWarnf("CreateFile %v error %v", e.filePath, err)
 			e.file.Close()
 			os.Remove(e.filePath)
 		}
@@ -208,23 +205,19 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 		return
 	}
 	if err = e.file.Truncate(util.BlockHeaderSize); err != nil {
-		log.LogWarnf("CreateFile %v truncate CRC header error %v", e.filePath, err)
 		return err
 	}
 	binary.BigEndian.PutUint64(e.header[:8], ino)
 	if _, err = e.file.WriteAt(e.header[:8], 0); err != nil {
-		log.LogWarnf("CreateFile %v Write inode error %v", e.filePath, err)
 		return err
 	}
 	emptyCrc := crc32.ChecksumIEEE(make([]byte, util.BlockSize))
 	for blockNo := 0; blockNo < util.BlockCount; blockNo++ {
 		if err = e.updateBlockCrc(blockNo, emptyCrc); err != nil {
-			log.LogWarnf("CreateFile %v write Crc error %v", e.filePath, err)
 			return err
 		}
 	}
 	if err = e.file.Sync(); err != nil {
-		log.LogWarnf("CreateFile %v syncDisk error %v", e.filePath, err)
 		return err
 	}
 
@@ -232,13 +225,10 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 		fileInfo os.FileInfo
 	)
 	if fileInfo, err = e.file.Stat(); err != nil {
-		log.LogWarnf("CreateFile %v stat error %v", e.filePath, err)
 		return err
 	}
 	e.modifyTime = fileInfo.ModTime()
 	e.dataSize = 0
-	log.LogInfof("end CreateFile %v hasExsit %v", e.filePath, e.Exist())
-	// go e.pendingCollapseFile()
 	return
 }
 
