@@ -141,6 +141,9 @@ func (d *Disk) addWriteErr() {
 func (d *Disk) startScheduleTasks() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
+		defer func() {
+			ticker.Stop()
+		}()
 		for {
 			select {
 			case <-ticker.C:

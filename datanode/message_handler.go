@@ -166,7 +166,7 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	}
 	msgH.connectLock.RUnlock()
 	msgH.connectLock.Lock()
-	msgH.connectMap=make(map[string]*net.TCPConn,0)
+	msgH.connectMap = make(map[string]*net.TCPConn, 0)
 	msgH.connectLock.Unlock()
 	msgH.listMux.Unlock()
 }

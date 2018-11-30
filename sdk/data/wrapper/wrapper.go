@@ -102,6 +102,7 @@ func (w *Wrapper) updateClusterInfo() error {
 
 func (w *Wrapper) update() {
 	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
