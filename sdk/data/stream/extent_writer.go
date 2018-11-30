@@ -64,6 +64,7 @@ type ExtentWriter struct {
 	updateSizeLock   sync.Mutex
 	extentOffset     uint64
 	storeMode        int
+	dirty            int32
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
@@ -468,4 +469,17 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 
 func (writer *ExtentWriter) getPacket() (p *Packet) {
 	return writer.currentPacket
+}
+
+func (writer *ExtentWriter) markDirty() {
+	atomic.StoreInt32(&writer.dirty, 1)
+}
+
+func (writer *ExtentWriter) clearDirty() {
+	atomic.StoreInt32(&writer.dirty, 0)
+}
+
+func (writer *ExtentWriter) isDirty() bool {
+	dirty := atomic.LoadInt32(&writer.dirty)
+	return dirty == 1
 }
