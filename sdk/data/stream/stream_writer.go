@@ -249,7 +249,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 		return err
 	}
-	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
+	if (writer.storeMode == proto.TinyExtentMode || writer.isFullExtent()) {
 		writer.notifyRecvThreadExit()
 		if err = stream.updateToMetaNode(); err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
@@ -295,7 +295,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 		}
 
 		if writer.isDirty() == false {
-			log.LogDebugf("updateToMetaNode: ino(%v) current extent writer not dirty", stream.Inode)
+			log.LogDebugf("updateToMetaNode: ino(%v) writeer(%v) current extent writer not dirty", stream.Inode, writer.toString())
 			return
 		}
 
