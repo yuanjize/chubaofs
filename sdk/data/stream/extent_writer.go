@@ -233,9 +233,6 @@ func (writer *ExtentWriter) flush() (err error) {
 	defer func() {
 		writer.checkIsStopReciveGoRoutine()
 		log.LogDebugf(writer.toString()+" Flush DataNode cost(%v)ns err(%v)", time.Now().UnixNano()-start, err)
-		if err == nil {
-			return
-		}
 	}()
 	if writer.isAllFlushed() {
 		err = nil
