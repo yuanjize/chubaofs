@@ -160,7 +160,7 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
 	for _, extentInfo := range extentInfoSlice {
-		if extentInfo.Size == 0 {
+		if extentInfo.Size == 0 || time.Now().Unix()-extentInfo.ModTime.Unix() < 5*60 {
 			continue
 		}
 		file := &proto.File{
