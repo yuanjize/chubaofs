@@ -119,7 +119,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 	defer func() {
 		if err != nil {
 			writer.getConnect().Close()
-			writer.notifyExit()
+			writer.notifyRecvThreadExit()
 			err = errors.Annotatef(err, "writer(%v) write failed", writer.toString())
 		}
 	}()
@@ -161,7 +161,6 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	}
 	writer.pushRequestToQueue(writer.currentPacket)
 	packet := writer.currentPacket
-	writer.currentPacket = nil
 	orgOffset := writer.offset
 	writer.offset += packet.getPacketLength()
 	err = packet.writeTo(writer.connect) //if send packet,then signal recive goroutine for recive from connect
@@ -174,19 +173,20 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 		writer.handleCh <- struct{}{}
 		return
 	} else {
-		writer.notifyExit()
+		writer.notifyRecvThreadExit()
 	}
+	writer.currentPacket = nil
 	err = errors.Annotatef(err, prefix+"sendCurrentPacket Failed")
 	log.LogWarn(err.Error())
 
 	return err
 }
 
-func (writer *ExtentWriter) notifyExit() {
-	writer.cleanHandleCh()
+func (writer *ExtentWriter) notifyRecvThreadExit() {
 	if atomic.LoadInt32(&writer.hasExitRecvThead) == HasExitRecvThread {
 		return
 	}
+	writer.cleanHandleCh()
 	atomic.StoreInt32(&writer.hasExitRecvThead, HasExitRecvThread)
 	close(writer.ExitCh)
 }
@@ -222,7 +222,7 @@ func (writer *ExtentWriter) toString() string {
 
 func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
 	if writer.isAllFlushed() && writer.isFullExtent() {
-		writer.notifyExit()
+		writer.notifyRecvThreadExit()
 	}
 	return
 }
@@ -232,7 +232,7 @@ func (writer *ExtentWriter) flush() (err error) {
 	err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
 	defer func() {
 		writer.checkIsStopReciveGoRoutine()
-		log.LogDebugf(writer.toString()+" Flush DataNode cost(%v)ns", time.Now().UnixNano()-start)
+		log.LogDebugf(writer.toString()+" Flush DataNode cost(%v)ns err(%v)", time.Now().UnixNano()-start, err)
 		if err == nil {
 			return
 		}
@@ -261,11 +261,11 @@ func (writer *ExtentWriter) flush() (err error) {
 
 func (writer *ExtentWriter) close() (err error) {
 	if writer.isAllFlushed() {
-		writer.notifyExit()
+		writer.notifyRecvThreadExit()
 	} else {
 		err = writer.flush()
 		if err == nil && writer.isAllFlushed() {
-			writer.notifyExit()
+			writer.notifyRecvThreadExit()
 		}
 	}
 	return

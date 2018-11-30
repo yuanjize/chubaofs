@@ -172,7 +172,7 @@ func (stream *StreamWriter) handleRequest(request interface{}) {
 		request.err = stream.flushCurrExtentWriter()
 		if request.err == nil {
 			request.err = stream.close()
-			stream.flushCurrExtentWriter()
+			request.err = stream.flushCurrExtentWriter()
 		}
 		request.done <- struct{}{}
 		stream.exit()
@@ -250,8 +250,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		return err
 	}
 	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
-		writer.close()
-		writer.getConnect().Close()
+		writer.notifyRecvThreadExit()
 		if err = stream.updateToMetaNode(); err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 			return err
@@ -336,7 +335,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 
 func (stream *StreamWriter) recoverExtent() (err error) {
 	stream.excludePartition = append(stream.excludePartition, stream.currentWriter.dp.PartitionID) //exclude current PartionId
-	stream.currentWriter.notifyExit()
+	stream.currentWriter.notifyRecvThreadExit()
 	retryPackets := stream.currentWriter.getNeedRetrySendPackets() //get need retry recover packets
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if err = stream.updateToMetaNode(); err == nil {
@@ -361,7 +360,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			return err
 		} else {
 			writer.forbirdUpdateToMetanode()
-			writer.notifyExit()
+			writer.notifyRecvThreadExit()
 		}
 	}
 
