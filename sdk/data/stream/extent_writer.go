@@ -211,7 +211,7 @@ func (writer *ExtentWriter) isFullExtent() bool {
 func (writer *ExtentWriter) isAllFlushed() bool {
 	writer.updateSizeLock.Lock()
 	defer writer.updateSizeLock.Unlock()
-	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil)
+	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil || len(writer.handleCh) != 0)
 }
 
 func (writer *ExtentWriter) toString() string {
