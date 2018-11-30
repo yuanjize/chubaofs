@@ -100,10 +100,8 @@ func (writer *ExtentWriter) flushWait() {
 	defer func() {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
 		ticker.Stop()
+		close(writer.flushSignleCh)
 	}()
-	if !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) || atomic.LoadInt32(&writer.isflushIng) == ExtentHasFlushed {
-		return
-	}
 	for {
 		select {
 		case <-writer.flushSignleCh:
@@ -209,6 +207,8 @@ func (writer *ExtentWriter) isFullExtent() bool {
 
 //check allPacket has Ack
 func (writer *ExtentWriter) isAllFlushed() bool {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil)
 }
 
@@ -312,16 +312,15 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		writer.updateSizeLock.Unlock()
 		return fmt.Errorf("forbid update extent key (%v) to metanode", writer.toString())
 	}
-	writer.removeRquest(e)
 	writer.addByteAck(uint64(request.Size))
+	writer.removeRquest(e)
 	if writer.storeMode == proto.TinyExtentMode {
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
 	writer.markDirty()
 	writer.updateSizeLock.Unlock()
-	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng && !(writer.getQueueListLen() > 0 || writer.currentPacket != nil) {
-		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
+	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
 		select {
 		case writer.flushSignleCh <- true:
 			break

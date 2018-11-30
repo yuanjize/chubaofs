@@ -173,6 +173,7 @@ func (stream *StreamWriter) handleRequest(request interface{}) {
 		request.err = stream.flushCurrExtentWriter()
 		if request.err == nil {
 			request.err = stream.close()
+			stream.flushCurrExtentWriter()
 		}
 		request.done <- struct{}{}
 		stream.exit()
