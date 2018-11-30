@@ -160,7 +160,7 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 		s.leaderPutTinyExtentToStore(request)
 	}
 	msgH.sentList = list.New()
-	msgH.connectLock.RUnlock()
+	msgH.connectLock.RLock()
 	for _, conn := range msgH.connectMap {
 		conn.Close()
 	}
