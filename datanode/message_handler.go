@@ -160,9 +160,14 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 		s.leaderPutTinyExtentToStore(request)
 	}
 	msgH.sentList = list.New()
+	msgH.connectLock.RUnlock()
 	for _, conn := range msgH.connectMap {
 		conn.Close()
 	}
+	msgH.connectLock.RUnlock()
+	msgH.connectLock.Lock()
+	msgH.connectMap=make(map[string]*net.TCPConn,0)
+	msgH.connectLock.Unlock()
 	msgH.listMux.Unlock()
 }
 

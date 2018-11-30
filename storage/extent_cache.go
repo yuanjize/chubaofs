@@ -56,6 +56,7 @@ type lruExtentCache struct {
 	extentMap   map[uint64]*extentMapItem
 	extentList  *list.List
 	tinyExtents map[uint64]Extent
+	tinyLock    sync.RWMutex
 	lock        sync.RWMutex
 	capacity    int
 }
@@ -73,7 +74,9 @@ func NewExtentCache(capacity int) ExtentCache {
 // Put extent object into cache.
 func (cache *lruExtentCache) Put(extent Extent) {
 	if IsTinyExtent(extent.ID()) {
+		cache.tinyLock.Lock()
 		cache.tinyExtents[extent.ID()] = extent
+		cache.tinyLock.Unlock()
 		return
 	}
 	cache.lock.Lock()
@@ -89,7 +92,9 @@ func (cache *lruExtentCache) Put(extent Extent) {
 // Get extent from cache with specified extent identity (extentId).
 func (cache *lruExtentCache) Get(extentId uint64) (extent Extent, ok bool) {
 	if IsTinyExtent(extentId) {
+		cache.tinyLock.RLock()
 		extent, ok = cache.tinyExtents[extentId]
+		cache.tinyLock.RUnlock()
 		return
 	}
 	cache.lock.Lock()
