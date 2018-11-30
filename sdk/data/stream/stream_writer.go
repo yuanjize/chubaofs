@@ -250,11 +250,13 @@ func (stream *StreamWriter) flushData() (err error) {
 		return err
 	}
 	if (writer.storeMode == proto.TinyExtentMode || writer.isFullExtent()) {
-		writer.notifyRecvThreadExit()
+		writer.close()
+		writer.getConnect().Close()
 		if err = stream.updateToMetaNode(); err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 			return err
 		}
+		stream.currentWriter.notifyRecvThreadExit()
 		stream.setCurrentWriter(nil)
 	}
 	return
