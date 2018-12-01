@@ -91,13 +91,20 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 
 //when backEndlush func called,and sdk must wait
 func (writer *ExtentWriter) waitFlushSignle() {
-	writer.flushSignleCh = make(chan bool, 1)
+	writer.updateSizeLock.Lock()
+	if writer.checkWriterIsAllFlushed() {
+		writer.updateSizeLock.Unlock()
+		return
+	}
 	ticker := time.NewTicker(time.Second)
-	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
 	defer func() {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
 		ticker.Stop()
 	}()
+	writer.flushSignleCh = make(chan bool, 1)
+	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
+	writer.updateSizeLock.Unlock()
+
 	for {
 		select {
 		case <-writer.flushSignleCh:
@@ -229,14 +236,12 @@ func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
 }
 
 func (writer *ExtentWriter) flushWait() (err error) {
-	writer.updateSizeLock.Lock()
-	defer writer.updateSizeLock.Unlock()
-	if writer.checkWriterIsAllFlushed() {
+	if writer.isAllFlushed() {
 		err = nil
 		return nil
 	}
 	writer.waitFlushSignle()
-	if !writer.checkWriterIsAllFlushed() {
+	if !writer.isAllFlushed() {
 		err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
 		return err
 	}
