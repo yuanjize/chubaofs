@@ -324,6 +324,9 @@ func (c *Cluster) handleApply(cmd *Metadata) (err error) {
 	if cmd == nil {
 		return fmt.Errorf("metadata can't be null")
 	}
+	if c == nil || c.fsm == nil {
+		return fmt.Errorf("cluster has not init")
+	}
 	curIndex := c.fsm.applied
 	if curIndex > 0 && curIndex%c.retainLogs == 0 {
 		c.partition.Truncate(curIndex)
@@ -495,7 +498,11 @@ func (c *Cluster) applyAddMetaPartition(cmd *Metadata) {
 		mp.Peers = mpv.Peers
 		mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
 		mp.Unlock()
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		vol.AddMetaPartitionByRaft(mp)
 	}
 }
@@ -509,7 +516,11 @@ func (c *Cluster) applyUpdateMetaPartition(cmd *Metadata) {
 			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
 			return
 		}
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		mp, err := vol.getMetaPartition(mpv.PartitionID)
 		if err != nil {
 			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
@@ -525,7 +536,11 @@ func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		dp.IsFreeze = dpv.IsFreeze
@@ -539,7 +554,11 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		if _, err := vol.getDataPartitionByID(dpv.PartitionID); err != nil {
 			log.LogError(fmt.Sprintf("action[applyUpdateDataPartition] failed,err:%v", err))
 			return
@@ -557,7 +576,11 @@ func (c *Cluster) applyDeleteDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
 		if err != nil {
 			log.LogError(fmt.Sprintf("action[applyDeleteDataPartition] failed,err:%v", err))
@@ -710,7 +733,8 @@ func (c *Cluster) loadMetaPartitions() (err error) {
 		vol, err1 := c.getVol(volName)
 		if err1 != nil {
 			// if vol not found,record log and continue
-			err = fmt.Errorf("action[loadMetaPartitions] err:%v", err1.Error())
+			//err = fmt.Errorf("action[loadMetaPartitions] err:%v", err1.Error())
+			log.LogErrorf("action[loadMetaPartitions] err:%v", err1.Error())
 			continue
 		}
 		mpv := &MetaPartitionValue{}
@@ -746,7 +770,8 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		vol, err1 := c.getVol(volName)
 		if err1 != nil {
 			// if vol not found,record log and continue
-			err = fmt.Errorf("action[loadDataPartitions] err:%v", err1.Error())
+			//err = fmt.Errorf("action[loadDataPartitions] err:%v", err1.Error())
+			log.LogErrorf("action[loadDataPartitions] err:%v", err1.Error())
 			continue
 		}
 		dpv := &DataPartitionValue{}

@@ -360,7 +360,7 @@ func (m *Master) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	if err = m.cluster.markDeleteVol(name); err != nil {
 		goto errDeal
 	}
-	msg = fmt.Sprintf("delete vol[%v] successed\n", name)
+	msg = fmt.Sprintf("delete vol[%v] successed,from[%v]", name,r.RemoteAddr)
 	log.LogWarn(msg)
 	io.WriteString(w, msg)
 	return
