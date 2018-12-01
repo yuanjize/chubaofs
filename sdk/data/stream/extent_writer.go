@@ -97,13 +97,13 @@ func (writer *ExtentWriter) waitFlushSignle() {
 		return
 	}
 	ticker := time.NewTicker(time.Second)
+	writer.flushSignleCh = make(chan bool, 1)
+	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
+	writer.updateSizeLock.Unlock()
 	defer func() {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
 		ticker.Stop()
 	}()
-	writer.flushSignleCh = make(chan bool, 1)
-	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
-	writer.updateSizeLock.Unlock()
 
 	for {
 		select {
@@ -236,10 +236,6 @@ func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
 }
 
 func (writer *ExtentWriter) flushWait() (err error) {
-	if writer.isAllFlushed() {
-		err = nil
-		return nil
-	}
 	writer.waitFlushSignle()
 	if !writer.isAllFlushed() {
 		err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
@@ -255,10 +251,6 @@ func (writer *ExtentWriter) flush() (err error) {
 		writer.checkIsStopReciveGoRoutine()
 		log.LogDebugf(writer.toString()+" Flush DataNode cost(%v)ns err(%v)", time.Now().UnixNano()-start, err)
 	}()
-	if writer.isAllFlushed() {
-		err = nil
-		return nil
-	}
 	if writer.getPacket() != nil {
 		if err = writer.sendCurrPacket(); err != nil {
 			return err
