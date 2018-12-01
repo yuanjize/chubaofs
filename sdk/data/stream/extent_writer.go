@@ -240,6 +240,7 @@ func (writer *ExtentWriter) flushWait() (err error) {
 		err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
 		return err
 	}
+	return nil
 }
 
 func (writer *ExtentWriter) flush() (err error) {
