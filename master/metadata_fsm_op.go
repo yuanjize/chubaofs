@@ -324,6 +324,9 @@ func (c *Cluster) handleApply(cmd *Metadata) (err error) {
 	if cmd == nil {
 		return fmt.Errorf("metadata can't be null")
 	}
+	if c == nil || c.fsm == nil {
+		return fmt.Errorf("cluster has not init")
+	}
 	curIndex := c.fsm.applied
 	if curIndex > 0 && curIndex%c.retainLogs == 0 {
 		c.partition.Truncate(curIndex)
