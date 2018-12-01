@@ -53,7 +53,6 @@ type ExtentWriter struct {
 	connect          *net.TCPConn
 	handleCh         chan struct{} //a Chan for signal recive goroutine recive packet from connect
 	ExitCh           chan struct{}
-	recoverCnt       int       //if failed,then recover contine,this is recover count
 	forbidUpdate     int64
 	requestLock      sync.Mutex
 	isflushIng       int32
@@ -91,7 +90,7 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 }
 
 //when backEndlush func called,and sdk must wait
-func (writer *ExtentWriter) flushWait() {
+func (writer *ExtentWriter) waitFlushSignle() {
 	writer.flushSignleCh = make(chan bool, 1)
 	ticker := time.NewTicker(time.Second)
 	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
@@ -211,6 +210,11 @@ func (writer *ExtentWriter) isAllFlushed() bool {
 	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil || len(writer.handleCh) != 0)
 }
 
+//check allPacket has Ack
+func (writer *ExtentWriter) checkWriterIsAllFlushed() bool {
+	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil || len(writer.handleCh) != 0)
+}
+
 func (writer *ExtentWriter) toString() string {
 	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
 		writer.inode, writer.dp.PartitionID, writer.extentId, writer.extentOffset,
@@ -222,6 +226,20 @@ func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
 		writer.notifyRecvThreadExit()
 	}
 	return
+}
+
+func (writer *ExtentWriter) flushWait() (err error) {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
+	if writer.checkWriterIsAllFlushed() {
+		err = nil
+		return nil
+	}
+	writer.waitFlushSignle()
+	if !writer.checkWriterIsAllFlushed() {
+		err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
+		return err
+	}
 }
 
 func (writer *ExtentWriter) flush() (err error) {
@@ -240,17 +258,7 @@ func (writer *ExtentWriter) flush() (err error) {
 			return err
 		}
 	}
-	if writer.isAllFlushed() {
-		err = nil
-		return nil
-	}
-	writer.flushWait()
-	if !writer.isAllFlushed() {
-		err = errors.Annotatef(FlushErr, "cannot backEndlush writer")
-		return err
-	}
-
-	return nil
+	return writer.flushWait()
 }
 
 func (writer *ExtentWriter) close() (err error) {
