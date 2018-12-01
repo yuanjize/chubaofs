@@ -66,6 +66,7 @@ type ExtentWriter struct {
 	extentOffset     uint64
 	storeMode        int
 	dirty            int32
+	cond             *sync.Cond
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
@@ -95,7 +96,8 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 
 //when backEndlush func called,and sdk must wait
 func (writer *ExtentWriter) flushWait() {
-	writer.flushSignleCh = make(chan bool, 1)
+	//writer.flushSignleCh = make(chan bool, 1)
+	writer.cond = sync.NewCond(&sync.RWMutex{})
 	ticker := time.NewTicker(time.Second)
 	atomic.StoreInt32(&writer.isflushIng, ExtentFlushIng)
 	defer func() {
@@ -103,14 +105,17 @@ func (writer *ExtentWriter) flushWait() {
 		ticker.Stop()
 		close(writer.flushSignleCh)
 	}()
-	for {
+	go func() {
 		select {
-		case <-writer.flushSignleCh:
-			return
 		case <-ticker.C:
-			return
+			writer.cond.Signal()
 		}
+	}()
+	writer.cond.L.Lock()
+	for atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
+		writer.cond.Wait()
 	}
+	writer.cond.L.Unlock()
 }
 
 //user call write func
@@ -301,15 +306,12 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
-	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
-		select {
-		case writer.flushSignleCh <- true:
-			break
-		default:
-			break
-		}
-	}
 	writer.markDirty()
+	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
+		writer.cond.L.Lock()
+		writer.cond.Signal()
+		writer.cond.L.Unlock()
+	}
 	writer.updateSizeLock.Unlock()
 	log.LogDebugf("recive inode(%v) kerneloffset(%v) to extent(%v) pkg(%v) recive(%v)",
 		writer.inode, request.kernelOffset, writer.toString(), request.GetUniqueLogId(), reply.GetUniqueLogId())
