@@ -495,7 +495,11 @@ func (c *Cluster) applyAddMetaPartition(cmd *Metadata) {
 		mp.Peers = mpv.Peers
 		mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
 		mp.Unlock()
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		vol.AddMetaPartitionByRaft(mp)
 	}
 }
@@ -509,7 +513,11 @@ func (c *Cluster) applyUpdateMetaPartition(cmd *Metadata) {
 			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
 			return
 		}
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		mp, err := vol.getMetaPartition(mpv.PartitionID)
 		if err != nil {
 			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
@@ -525,7 +533,11 @@ func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		dp.IsFreeze = dpv.IsFreeze
@@ -539,7 +551,11 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		if _, err := vol.getDataPartitionByID(dpv.PartitionID); err != nil {
 			log.LogError(fmt.Sprintf("action[applyUpdateDataPartition] failed,err:%v", err))
 			return
@@ -557,7 +573,11 @@ func (c *Cluster) applyDeleteDataPartition(cmd *Metadata) {
 	if keys[1] == DataPartitionAcronym {
 		dpv := &DataPartitionValue{}
 		json.Unmarshal(cmd.V, dpv)
-		vol, _ := c.getVol(keys[2])
+		vol, err := c.getVol(keys[2])
+		if err != nil {
+			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
+			return
+		}
 		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
 		if err != nil {
 			log.LogError(fmt.Sprintf("action[applyDeleteDataPartition] failed,err:%v", err))
