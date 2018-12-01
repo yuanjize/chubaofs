@@ -29,7 +29,6 @@ import (
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/buf"
-	"github.com/tiglabs/containerfs/util/log"
 )
 
 const (
