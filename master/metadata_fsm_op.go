@@ -733,7 +733,8 @@ func (c *Cluster) loadMetaPartitions() (err error) {
 		vol, err1 := c.getVol(volName)
 		if err1 != nil {
 			// if vol not found,record log and continue
-			err = fmt.Errorf("action[loadMetaPartitions] err:%v", err1.Error())
+			//err = fmt.Errorf("action[loadMetaPartitions] err:%v", err1.Error())
+			log.LogErrorf("action[loadMetaPartitions] err:%v", err1.Error())
 			continue
 		}
 		mpv := &MetaPartitionValue{}
@@ -769,7 +770,8 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		vol, err1 := c.getVol(volName)
 		if err1 != nil {
 			// if vol not found,record log and continue
-			err = fmt.Errorf("action[loadDataPartitions] err:%v", err1.Error())
+			//err = fmt.Errorf("action[loadDataPartitions] err:%v", err1.Error())
+			log.LogErrorf("action[loadDataPartitions] err:%v", err1.Error())
 			continue
 		}
 		dpv := &DataPartitionValue{}
