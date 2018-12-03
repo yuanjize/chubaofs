@@ -268,10 +268,12 @@ func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMe
 				isFix = false
 			}
 		}
-		if isFix {
-			noNeedFix = append(noNeedFix, fileId)
-		} else {
-			needFix = append(needFix, fileId)
+		if storage.IsTinyExtent(fileId) {
+			if isFix {
+				noNeedFix = append(noNeedFix, fileId)
+			} else {
+				needFix = append(needFix, fileId)
+			}
 		}
 	}
 	return
