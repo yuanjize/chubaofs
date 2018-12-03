@@ -92,6 +92,8 @@ type Extent interface {
 	// Write data to extent.
 	Write(data []byte, offset, size int64, crc uint32) (err error)
 
+	WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error)
+
 	// Read data from extent.
 	Read(data []byte, offset, size int64) (crc uint32, err error)
 
@@ -317,7 +319,22 @@ func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err e
 	if watermark%PageSize != 0 {
 		watermark = watermark + (PageSize - watermark%PageSize)
 	}
-	e.dataSize=watermark
+	e.dataSize = watermark
+
+	return
+}
+
+func (e *fsExtent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
+	if !IsTinyExtent(e.extentId) {
+		return fmt.Errorf("extent %v not tinyExtent", e.extentId)
+	}
+	if offset+size >= math.MaxUint32 {
+		return ErrorExtentHasFull
+	}
+	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
+		return
+	}
+	e.dataSize = offset + size
 
 	return
 }

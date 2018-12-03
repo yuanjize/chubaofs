@@ -433,7 +433,12 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 			return errors.Annotatef(err, "streamRepairExtent receive data error")
 		}
 		// Write it to local extent file
-		if err = store.Write(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(reply.Size), reply.Data, reply.Crc); err != nil {
+		if storage.IsTinyExtent(uint64(localExtentInfo.FileId)) {
+			err = store.WriteTinyRecover(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(reply.Size), reply.Data, reply.Crc)
+		} else {
+			err = store.Write(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(reply.Size), reply.Data, reply.Crc)
+		}
+		if err != nil {
 			err = errors.Annotatef(err, "streamRepairExtent repair data error")
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return

@@ -349,6 +349,39 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	return nil
 }
 
+func (s *ExtentStore) WriteTinyRecover(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
+	var (
+		extentInfo *FileInfo
+		has        bool
+		extent     Extent
+	)
+	if !IsTinyExtent(extentId) {
+		return fmt.Errorf("extent %v not tinyExtent", extentId)
+	}
+	s.extentInfoMux.RLock()
+	extentInfo, has = s.extentInfoMap[extentId]
+	s.extentInfoMux.RUnlock()
+	if !has {
+		err = fmt.Errorf("extent %v not exist", extentId)
+		return
+	}
+	extent, err = s.getExtentWithHeader(extentId)
+	if err != nil {
+		return err
+	}
+	if err = s.checkOffsetAndSize(extentId, offset, size); err != nil {
+		return err
+	}
+	if extent.IsMarkDelete() {
+		return ErrorHasDelete
+	}
+	if err = extent.WriteTinyRecover(data, offset, size, crc); err != nil {
+		return err
+	}
+	extentInfo.FromExtent(extent)
+	return nil
+}
+
 func (s *ExtentStore) checkOffsetAndSize(extentId uint64, offset, size int64) error {
 	if IsTinyExtent(extentId) {
 		return nil

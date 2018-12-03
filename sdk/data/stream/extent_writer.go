@@ -30,11 +30,11 @@ import (
 )
 
 const (
-	ForBidUpdateExtentKey  = -1
-	ForBidUpdateMetaNode   = -2
-	ExtentFlushIng         = 1
-	ExtentHasFlushed       = 2
-	HasExitRecvThread      = -1
+	ForBidUpdateExtentKey = -1
+	ForBidUpdateMetaNode  = -2
+	ExtentFlushIng        = 1
+	ExtentHasFlushed      = 2
+	HasExitRecvThread     = -1
 )
 
 var (
