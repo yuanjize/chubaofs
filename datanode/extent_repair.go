@@ -68,6 +68,10 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 	}
 	finishTime := time.Now().UnixNano()
 	dp.putAllTinyExtentsToStore(fixExtentsType, noNeedFix, needFix)
+	if dp.extentStore.GetAvaliExtentLen()+dp.extentStore.GetUnAvaliExtentLen() > storage.TinyExtentCount {
+		log.LogWarnf("action[extentFileRepair] partition(%v) AvaliTinyExtents(%v) UnavaliTinyExtents(%v) finish cost[%vms].",
+			dp.partitionId, dp.extentStore.GetAvaliExtentLen(), dp.extentStore.GetUnAvaliExtentLen(), (finishTime-startTime)/int64(time.Millisecond))
+	}
 	log.LogInfof("action[extentFileRepair] partition(%v) AvaliTinyExtents(%v) UnavaliTinyExtents(%v) finish cost[%vms].",
 		dp.partitionId, dp.extentStore.GetAvaliExtentLen(), dp.extentStore.GetUnAvaliExtentLen(), (finishTime-startTime)/int64(time.Millisecond))
 
