@@ -281,7 +281,10 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			if err = stream.flushData(); err == nil {
 				return
 			}
+			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v",stream.toString(),err.Error())
+			continue
 		}
+		log.LogWarnf("FlushCurrentExtent %v failed,err %v",stream.toString(),err.Error())
 	}
 
 	return err
