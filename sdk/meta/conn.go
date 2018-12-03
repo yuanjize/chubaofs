@@ -86,7 +86,7 @@ func (mw *MetaWrapper) sendToMetaPartition(mp *MetaPartition, req *proto.Packet)
 	if err == nil && !resp.ShallRetry() {
 		goto out
 	}
-	log.LogWarnf("sendToMetaPartition: leader failed mp(%v) mc(%v) err(%v) op(%v) result(%v)", mp, mc, err, op, resp.GetResultMesg())
+	log.LogWarnf("sendToMetaPartition: leader failed ReqID(%v) mp(%v) mc(%v) err(%v) op(%v) result(%v)", req.ReqID, mp, mc, err, op, resp.GetResultMesg())
 
 retry:
 	start = time.Now()
@@ -101,21 +101,21 @@ retry:
 			if err == nil && !resp.ShallRetry() {
 				goto out
 			}
-			log.LogWarnf("sendToMetaPartition: retry failed mp(%v) mc(%v) err(%v) op(%v) result(%v)", mp, mc, err, op, resp.GetResultMesg())
+			log.LogWarnf("sendToMetaPartition: retry failed ReqID(%v) mp(%v) mc(%v) err(%v) op(%v) result(%v)", req.ReqID, mp, mc, err, op, resp.GetResultMesg())
 		}
 		if time.Since(start) > SendTimeLimit {
-			log.LogWarnf("sendToMetaPartition: retry timeout mp(%v) op(%v) time(%v)", mp, op, time.Since(start))
+			log.LogWarnf("sendToMetaPartition: retry timeout ReqID(%v) mp(%v) op(%v) time(%v)", req.ReqID, mp, op, time.Since(start))
 			break
 		}
-		log.LogWarnf("sendToMetaPartition: mp(%v) op(%v) retry in (%v)", mp, op, SendRetryInterval)
+		log.LogWarnf("sendToMetaPartition: ReqID(%v) mp(%v) op(%v) retry in (%v)", req.ReqID, mp, op, SendRetryInterval)
 		time.Sleep(SendRetryInterval)
 	}
 
 out:
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("sendToMetaPartition faild: mp(%v) op(%v)", mp, req.GetOpMsg()))
+	if err != nil || resp == nil {
+		return nil, errors.New(fmt.Sprintf("sendToMetaPartition faild: ReqID(%v) mp(%v) op(%v) err(%v)", req.ReqID, mp, req.GetOpMsg(), err))
 	}
-	log.LogDebugf("sendToMetaPartition successful: mc(%v) op(%v) result(%v)", mc, req.GetOpMsg(), resp.GetResultMesg())
+	log.LogDebugf("sendToMetaPartition successful: ReqID(%v) mc(%v) op(%v) result(%v)", req.ReqID, mc, req.GetOpMsg(), resp.GetResultMesg())
 	return resp, nil
 }
 
