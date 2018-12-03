@@ -238,7 +238,7 @@ func (stream *StreamWriter) close() (err error) {
 
 func (stream *StreamWriter) flushData() (err error) {
 	writer := stream.getCurrentWriter()
-	if writer == nil && stream.recoverPackages==nil {
+	if writer == nil && stream.recoverPackages == nil {
 		err = nil
 		return nil
 	}
@@ -265,8 +265,8 @@ func (stream *StreamWriter) flushData() (err error) {
 
 func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 	defer func() {
-		if stream.recoverPackages!=nil {
-			err=fmt.Errorf("recovery package maxretry not flush to datanode")
+		if stream.recoverPackages != nil {
+			err = fmt.Errorf("recovery package maxretry not flush to datanode")
 		}
 	}()
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
