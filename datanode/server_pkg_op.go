@@ -341,6 +341,13 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 	var (
 		err error
 	)
+	defer func() {
+		if err!=nil {
+			request.PackErrorBody(ActionStreamRead,err.Error())
+		}else {
+			request.PackOkReply()
+		}
+	}()
 	needReplySize := request.Size
 	offset := request.Offset
 	store := request.DataPartition.GetExtentStore()
