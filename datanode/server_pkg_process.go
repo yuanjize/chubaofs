@@ -184,8 +184,9 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 	request = e.Value.(*Packet)
 	isForceColseConnect := ForceCloseConnect
 	defer func() {
-		msgH.DelListElement(request, isForceColseConnect)
-		s.leaderPutTinyExtentToStore(request)
+		if success := msgH.DelListElement(request, isForceColseConnect); success {
+			s.leaderPutTinyExtentToStore(request)
+		}
 	}()
 	for index := 0; index < len(request.NextAddrs); index++ {
 		_, err := s.receiveFromNext(request, index)
@@ -334,7 +335,7 @@ func (s *DataNode) statsFlow(pkg *Packet, flag int) {
 }
 
 func (s *DataNode) leaderPutTinyExtentToStore(pkg *Packet) {
-	if pkg == nil || pkg.FileID <= 0 || atomic.LoadInt32(&pkg.IsReturn) == HasReturnToStore {
+	if pkg == nil || pkg.FileID <= 0 || atomic.LoadInt32(&pkg.IsReturn) == HasReturnToStore || !storage.IsTinyExtent(pkg.FileID) {
 		return
 	}
 	if pkg.StoreMode != proto.TinyExtentMode || !pkg.isHeadNode() || !pkg.IsWriteOperation() || !pkg.IsTransitPkg() {
