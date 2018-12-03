@@ -439,7 +439,7 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 		requests = append(requests, writer.currentPacket)
 		return
 	}
-	if writer.currentPacket==nil {
+	if writer.currentPacket == nil {
 		return
 	}
 	backPkg = requests[len(requests)-1]
