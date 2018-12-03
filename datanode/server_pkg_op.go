@@ -70,7 +70,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	case proto.OpRead:
 		s.handleRead(pkg)
 	case proto.OpStreamRead:
-		s.handleStreamRead(pkg, c)
+		s.handleStreamRead(pkg, reply, c)
 	case proto.OpMarkDelete:
 		s.handleMarkDelete(pkg)
 	case proto.OpNotifyExtentRepair:
@@ -343,6 +343,8 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 	offset := request.Offset
 	store := request.DataPartition.GetExtentStore()
 	umpKey := fmt.Sprintf("%s_datanode_%s", s.clusterId, "Read")
+	reply := NewStreamReadResponsePacket(request.ReqID, request.PartitionID, request.FileID)
+	reply.StartT = time.Now().UnixNano()
 	for {
 		if needReplySize <= 0 {
 			break
@@ -350,27 +352,28 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 		err = nil
 		currReadSize := uint32(util.Min(int(needReplySize), util.ReadBlockSize))
 		if currReadSize == util.ReadBlockSize {
-			request.Data, _ = proto.Buffers.Get(util.ReadBlockSize)
+			reply.Data, _ = proto.Buffers.Get(util.ReadBlockSize)
 		} else {
-			request.Data = make([]byte, currReadSize)
+			reply.Data = make([]byte, currReadSize)
 		}
 		tpObject := ump.BeforeTP(umpKey)
-		request.Crc, err = store.Read(request.FileID, offset, int64(currReadSize), request.Data)
+		reply.Offset = offset
+		reply.Crc, err = store.Read(reply.FileID, offset, int64(currReadSize), reply.Data)
 		ump.AfterTP(tpObject, err)
 		if err != nil {
-			request.PackErrorBody(ActionStreamRead, err.Error())
-			if err = request.WriteToConn(connect); err != nil {
-				err = fmt.Errorf(request.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
-					request.StartT, err))
+			reply.PackErrorBody(ActionStreamRead, err.Error())
+			if err = reply.WriteToConn(connect); err != nil {
+				err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
+					reply.StartT, err))
 				log.LogErrorf(err.Error())
 			}
 			return
 		}
-		request.Size = currReadSize
-		request.ResultCode = proto.OpOk
-		if err = request.WriteToConn(connect); err != nil {
-			err = fmt.Errorf(request.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
-				request.StartT, err))
+		reply.Size = uint32(currReadSize)
+		reply.ResultCode = proto.OpOk
+		if err = reply.WriteToConn(connect); err != nil {
+			err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
+				reply.StartT, err))
 			log.LogErrorf(err.Error())
 			connect.Close()
 			return
@@ -378,9 +381,10 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 		needReplySize -= currReadSize
 		offset += int64(currReadSize)
 		if currReadSize == util.ReadBlockSize {
-			proto.Buffers.Put(request.Data)
+			proto.Buffers.Put(reply.Data)
 		}
 	}
+	request.ResultCode = reply.ResultCode
 	return
 }
 

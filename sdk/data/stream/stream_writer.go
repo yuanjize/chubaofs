@@ -82,7 +82,7 @@ func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (
 	stream.excludePartition = make([]uint32, 0)
 	stream.hasUpdateKey = make(map[string]int, 0)
 	stream.metaNodeStreamKey = new(proto.StreamKey)
-	stream.recoverPackages=make([]*Packet,0)
+	stream.recoverPackages = make([]*Packet, 0)
 	go stream.server()
 
 	return
@@ -266,7 +266,7 @@ func (stream *StreamWriter) flushData() (err error) {
 
 func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 	defer func() {
-		if len(stream.recoverPackages) !=0 {
+		if len(stream.recoverPackages) != 0 {
 			err = fmt.Errorf("recovery package maxretry not flush to datanode")
 		}
 	}()
@@ -281,10 +281,10 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			if err = stream.flushData(); err == nil {
 				return
 			}
-			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v",stream.toString(),err.Error())
+			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v", stream.toString(), err.Error())
 			continue
 		}
-		log.LogWarnf("FlushCurrentExtent %v failed,err %v",stream.toString(),err.Error())
+		log.LogWarnf("FlushCurrentExtent %v failed,err %v", stream.toString(), err.Error())
 	}
 
 	return err
@@ -348,7 +348,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 func (stream *StreamWriter) recoverExtent() (err error) {
 	stream.excludePartition = append(stream.excludePartition, stream.currentWriter.dp.PartitionID) //exclude current PartionId
 	stream.currentWriter.notifyRecvThreadExit()
-	if len(stream.recoverPackages)==0{
+	if len(stream.recoverPackages) == 0 {
 		stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
 	}
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
@@ -369,7 +369,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 		}
 		if err = stream.writeRecoverPackets(writer, stream.recoverPackages); err == nil {
 			stream.excludePartition = make([]uint32, 0)
-			stream.recoverPackages = make([]*Packet,0)
+			stream.recoverPackages = make([]*Packet, 0)
 			stream.setCurrentWriter(writer)
 			stream.updateToMetaNode()
 			return err
