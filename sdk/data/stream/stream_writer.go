@@ -239,7 +239,7 @@ func (stream *StreamWriter) close() (err error) {
 
 func (stream *StreamWriter) flushData() (err error) {
 	writer := stream.getCurrentWriter()
-	if writer == nil && stream.recoverPackages == nil {
+	if writer == nil && len(stream.recoverPackages) == 0 {
 		err = nil
 		return nil
 	}
