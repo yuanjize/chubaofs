@@ -46,7 +46,9 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 		pkg.Size = orgSize
 		if pkg.IsErrPack() {
 			err = fmt.Errorf("op[%v] error[%v]", pkg.GetOpMsg(), string(pkg.Data[:resultSize]))
-			log.LogErrorf("action[operatePacket] %v", err)
+			logContent := fmt.Sprintf("action[operatePacket] %v.",
+				pkg.ActionMsg(pkg.GetOpMsg(), c.RemoteAddr().String(), start, err))
+			log.LogErrorf(logContent)
 		} else {
 			logContent := fmt.Sprintf("action[operatePacket] %v.",
 				pkg.ActionMsg(pkg.GetOpMsg(), c.RemoteAddr().String(), start, nil))
@@ -70,7 +72,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	case proto.OpRead:
 		s.handleRead(pkg)
 	case proto.OpStreamRead:
-		s.handleStreamRead(pkg, reply, c)
+		s.handleStreamRead(pkg, c)
 	case proto.OpMarkDelete:
 		s.handleMarkDelete(pkg)
 	case proto.OpNotifyExtentRepair:
