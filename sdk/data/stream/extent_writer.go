@@ -435,20 +435,14 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 	for e := writer.requestQueue.Front(); e != nil; e = e.Next() {
 		requests = append(requests, e.Value.(*Packet))
 	}
-	writer.requestQueue = list.New()
-	if writer.currentPacket == nil {
-		return
-	}
 	if len(requests) == 0 {
 		requests = append(requests, writer.currentPacket)
-		writer.currentPacket = nil
 		return
 	}
 	backPkg = requests[len(requests)-1]
 	if writer.currentPacket.ReqID > backPkg.ReqID && writer.currentPacket.kernelOffset > backPkg.kernelOffset {
 		requests = append(requests, writer.currentPacket)
 	}
-	writer.currentPacket = nil
 
 	return
 }

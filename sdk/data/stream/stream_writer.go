@@ -348,9 +348,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 func (stream *StreamWriter) recoverExtent() (err error) {
 	stream.excludePartition = append(stream.excludePartition, stream.currentWriter.dp.PartitionID) //exclude current PartionId
 	stream.currentWriter.notifyRecvThreadExit()
-	if len(stream.recoverPackages) == 0 {
-		stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
-	}
+	stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if err = stream.updateToMetaNode(); err == nil {
 			break

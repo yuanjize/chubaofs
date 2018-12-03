@@ -342,9 +342,9 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 		err error
 	)
 	defer func() {
-		if err!=nil {
-			request.PackErrorBody(ActionStreamRead,err.Error())
-		}else {
+		if err != nil {
+			request.PackErrorBody(ActionStreamRead, err.Error())
+		} else {
 			request.PackOkReply()
 		}
 	}()
