@@ -48,12 +48,12 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 	if err != nil {
 		resp.Status = proto.TaskFail
 		resp.Result = err.Error()
-		return
+		goto end
 	}
 	if err = json.Unmarshal(reqData, req); err != nil {
 		resp.Status = proto.TaskFail
 		resp.Result = err.Error()
-		return
+		goto end
 	}
 	if curMasterAddr != req.MasterAddr {
 		curMasterAddr = req.MasterAddr
@@ -92,9 +92,9 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 		return true
 	})
 	resp.Status = proto.TaskSuccess
+end:
 	adminTask.Request = nil
 	adminTask.Response = resp
-end:
 	m.respondToMaster(adminTask)
 	log.LogDebugf("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
 		req, adminTask, adminTask.Response)
