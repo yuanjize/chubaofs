@@ -70,6 +70,7 @@ type StreamWriter struct {
 	hasClosed               int32
 	metaNodeStreamKey       *proto.StreamKey
 	hasUpdateToMetaNodeSize uint64
+	recoverPackages         []*Packet
 }
 
 func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (stream *StreamWriter) {
@@ -338,13 +339,15 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 func (stream *StreamWriter) recoverExtent() (err error) {
 	stream.excludePartition = append(stream.excludePartition, stream.currentWriter.dp.PartitionID) //exclude current PartionId
 	stream.currentWriter.notifyRecvThreadExit()
-	retryPackets := stream.currentWriter.getNeedRetrySendPackets() //get need retry recover packets
+	if stream.recoverPackages == nil {
+		stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
+	}
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if err = stream.updateToMetaNode(); err == nil {
 			break
 		}
 	}
-	if len(retryPackets) == 0 {
+	if len(stream.recoverPackages) == 0 {
 		return nil
 	}
 	var writer *ExtentWriter
@@ -355,8 +358,9 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
 		}
-		if err = stream.writeRecoverPackets(writer, retryPackets); err == nil {
+		if err = stream.writeRecoverPackets(writer, stream.recoverPackages); err == nil {
 			stream.excludePartition = make([]uint32, 0)
+			stream.recoverPackages = nil
 			stream.setCurrentWriter(writer)
 			stream.updateToMetaNode()
 			return err

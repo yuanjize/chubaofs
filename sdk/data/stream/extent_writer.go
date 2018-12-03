@@ -256,7 +256,8 @@ func (writer *ExtentWriter) flush() (err error) {
 			return err
 		}
 	}
-	return writer.flushWait()
+	err = writer.flushWait()
+	return
 }
 
 func (writer *ExtentWriter) close() (err error) {
