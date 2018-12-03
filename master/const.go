@@ -53,7 +53,6 @@ const (
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
 	MinReadWriteDataPartitions              = 10
-	MaxFileNumberOfDataPartitions           = 10000
 )
 
 const (

@@ -524,9 +524,6 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 		}
 		if dp, err := c.getDataPartitionByID(vr.PartitionID); err == nil {
 			dp.UpdateMetric(vr, dataNode)
-			if vr.ExtentCount > MaxFileNumberOfDataPartitions && !dp.isFreezed() {
-				dp.freeze(c)
-			}
 		}
 	}
 }

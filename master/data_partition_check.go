@@ -22,9 +22,6 @@ import (
 )
 
 func (partition *DataPartition) checkStatus(needLog bool, dpTimeOutSec int64) {
-	if partition.isFreezed() {
-		return
-	}
 	partition.Lock()
 	defer partition.Unlock()
 	liveReplicas := partition.getLiveReplicasByPersistenceHosts(dpTimeOutSec)
