@@ -262,8 +262,14 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 		log.LogErrorf("from master Task[%v] failed,error[%v]", task.ToString(), response.Result)
 	}
 	task.Response = response
-	data, _ := json.Marshal(task)
-	_, err := MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
+	data, err := json.Marshal(task)
+	if err != nil {
+		response.PartitionId = uint64(request.PartitionId)
+		response.Status = proto.TaskFail
+		response.Result = err.Error()
+		log.LogErrorf("from master Task[%v] failed,error[%v]", task.ToString(), response.Result)
+	}
+	_, err = MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
 	if err != nil {
 		err = errors.Annotatef(err, "load dataPartition failed,partitionId[%v]", request.PartitionId)
 		log.LogError(errors.ErrorStack(err))
