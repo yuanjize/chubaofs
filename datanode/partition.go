@@ -316,7 +316,7 @@ func (dp *dataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 		if err != nil {
 			return finfo.Size()
 		}
-		return stat.Blocks * 512
+		return stat.Blocks * DiskSectorSize
 
 	} else {
 		return finfo.Size()

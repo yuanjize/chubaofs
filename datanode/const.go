@@ -69,6 +69,10 @@ const (
 )
 
 const (
+	DiskSectorSize = 512
+)
+
+const (
 	LogStats      = "Stats:"
 	LogCreateFile = "CRF:"
 	LogMarkDel    = "MDEL:"
