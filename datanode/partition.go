@@ -65,6 +65,9 @@ type DataPartition interface {
 	GetExtentStore() *storage.ExtentStore
 	GetExtentCount() int
 
+	GetSnapShot() []*proto.File
+	ReloadSnapshot()
+
 	LaunchRepair(fixExtentType uint8)
 	MergeExtentStoreRepair(metas *MembersFileMetas)
 
@@ -112,6 +115,9 @@ type dataPartition struct {
 	updateReplicationTime   int64
 	updatePartitionSizeTime int64
 	isFirstFixTinyExtents   bool
+
+	snapshot     []*proto.File
+	snapshotLock sync.RWMutex
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
@@ -208,6 +214,23 @@ func (dp *dataPartition) ReplicaHosts() []string {
 	return dp.replicaHosts
 }
 
+func (dp *dataPartition) ReloadSnapshot() {
+	files, err := dp.extentStore.SnapShot()
+	if err != nil {
+		return
+	}
+	dp.snapshotLock.Lock()
+	dp.snapshot = files
+	defer dp.snapshotLock.Unlock()
+}
+
+func (dp *dataPartition) GetSnapShot() (files []*proto.File) {
+	dp.snapshotLock.RLock()
+	defer dp.snapshotLock.RUnlock()
+
+	return dp.snapshot
+}
+
 func (dp *dataPartition) Stop() {
 	if dp.stopC != nil {
 		close(dp.stopC)
@@ -267,6 +290,7 @@ func (dp *dataPartition) statusUpdateScheduler() {
 				dp.LaunchRepair(proto.NormalExtentMode)
 			}
 			dp.extentStore.Cleanup()
+			dp.ReloadSnapshot()
 		case <-dp.stopC:
 			ticker.Stop()
 			metricTicker.Stop()
@@ -446,7 +470,7 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response.PartitionStatus = dp.partitionStatus
 	response.Used = uint64(dp.Used())
 	var err error
-	response.PartitionSnapshot, err = dp.extentStore.SnapShot()
+	response.PartitionSnapshot = dp.GetSnapShot()
 	if err != nil {
 		response.Status = proto.TaskFail
 		response.Result = err.Error()
