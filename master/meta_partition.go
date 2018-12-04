@@ -521,8 +521,6 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 }
 
 func (mp *MetaPartition) updateMetricByRaft(mpv *MetaPartitionValue) {
-	mp.Lock()
-	defer mp.Unlock()
 	mp.Start = mpv.Start
 	mp.End = mpv.End
 	mp.Peers = mpv.Peers
