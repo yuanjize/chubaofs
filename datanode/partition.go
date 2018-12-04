@@ -221,7 +221,7 @@ func (dp *dataPartition) ReloadSnapshot() {
 	}
 	dp.snapshotLock.Lock()
 	dp.snapshot = files
-	defer dp.snapshotLock.Unlock()
+	dp.snapshotLock.Unlock()
 }
 
 func (dp *dataPartition) GetSnapShot() (files []*proto.File) {
