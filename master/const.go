@@ -63,5 +63,4 @@ const (
 const (
 	VolNormal     uint8 = 0
 	VolMarkDelete uint8 = 1
-	VolReadOnly   uint8 = 2
 )

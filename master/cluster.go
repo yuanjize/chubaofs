@@ -295,7 +295,7 @@ func (c *Cluster) deleteDataPartition(partitionID uint64) (err error) {
 		goto errDeal
 	}
 	vol.deleteDataPartitionsFromCache(dp)
-	log.LogWarnf("action[deleteDataPartition],clusterID[%v] vol[%v] paritionId[%v] delete success ", c.Name, dp.VolName, partitionID)
+	log.LogWarnf("action[deleteDataPartition],clusterID[%v] vol[%v] partitionId[%v] delete success ", c.Name, dp.VolName, partitionID)
 	return
 errDeal:
 	err = fmt.Errorf("action[deleteDataPartition],clusterID[%v] paritionId:%v err:%v ", c.Name, partitionID, err.Error())
