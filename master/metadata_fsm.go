@@ -95,6 +95,7 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 	if err = cmd.Unmarshal(command); err != nil {
 		return nil, fmt.Errorf("action[fsmApply],unmarshal data:%v, err:%v", command, err.Error())
 	}
+	log.LogInfof("action[fsmApply],cmd.K[%v],cmd.V[%v]",cmd.K,string(cmd.V))
 	cmdMap := make(map[string][]byte)
 	cmdMap[cmd.K] = cmd.V
 	cmdMap[Applied] = []byte(strconv.FormatUint(uint64(index), 10))
