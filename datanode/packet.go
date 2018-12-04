@@ -35,11 +35,16 @@ var (
 	ErrAddrsNodesMismatch = errors.New("AddrsNodesMismatchErr")
 )
 
+const (
+	HasReturnToStore = 1
+	NoReturnToStore  = -1
+)
+
 type Packet struct {
 	proto.Packet
 	NextConns     []*net.TCPConn
 	NextAddrs     []string
-	IsReturn      bool
+	IsReturn      int32
 	DataPartition DataPartition
 	goals         uint8
 	addrs         []string

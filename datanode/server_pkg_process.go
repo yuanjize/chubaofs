@@ -23,6 +23,7 @@ import (
 	"github.com/tiglabs/containerfs/storage"
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
+	"sync/atomic"
 )
 
 func (s *DataNode) readFromCliAndDeal(msgH *MessageHandler) (err error) {
@@ -124,7 +125,6 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 
 func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 	var err error
-	s.leaderPutTinyExtentToStore(reply)
 	if reply.IsErrPack() {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, fmt.Errorf(string(reply.Data[:reply.Size]))))
@@ -168,7 +168,6 @@ func (s *DataNode) writeToCli(msgH *MessageHandler) {
 		case reply := <-msgH.replyCh:
 			s.doReplyCh(reply, msgH)
 		case <-msgH.exitC:
-			msgH.ClearReqs(s)
 			return
 		}
 	}
@@ -185,8 +184,9 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 	request = e.Value.(*Packet)
 	isForceColseConnect := ForceCloseConnect
 	defer func() {
-		msgH.DelListElement(request, isForceColseConnect)
-		s.leaderPutTinyExtentToStore(request)
+		if success := msgH.DelListElement(request, isForceColseConnect); success {
+			s.leaderPutTinyExtentToStore(request)
+		}
 	}()
 	for index := 0; index < len(request.NextAddrs); index++ {
 		_, err := s.receiveFromNext(request, index)
@@ -335,7 +335,7 @@ func (s *DataNode) statsFlow(pkg *Packet, flag int) {
 }
 
 func (s *DataNode) leaderPutTinyExtentToStore(pkg *Packet) {
-	if pkg == nil || pkg.FileID <= 0 || pkg.IsReturn {
+	if pkg == nil || pkg.FileID <= 0 || atomic.LoadInt32(&pkg.IsReturn) == HasReturnToStore || !storage.IsTinyExtent(pkg.FileID) {
 		return
 	}
 	if pkg.StoreMode != proto.TinyExtentMode || !pkg.isHeadNode() || !pkg.IsWriteOperation() || !pkg.IsTransitPkg() {
@@ -347,5 +347,5 @@ func (s *DataNode) leaderPutTinyExtentToStore(pkg *Packet) {
 	} else {
 		store.PutTinyExtentToAvaliCh(pkg.FileID)
 	}
-	pkg.IsReturn = true
+	atomic.StoreInt32(&pkg.IsReturn, HasReturnToStore)
 }

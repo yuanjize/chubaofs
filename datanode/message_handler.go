@@ -151,13 +151,7 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	}
 	replys := len(msgH.replyCh)
 	for i := 0; i < replys; i++ {
-		reply := <-msgH.replyCh
-		s.leaderPutTinyExtentToStore(reply)
-	}
-	requestLen := len(msgH.requestCh)
-	for i := 0; i < requestLen; i++ {
-		request := <-msgH.requestCh
-		s.leaderPutTinyExtentToStore(request)
+		<-msgH.replyCh
 	}
 	msgH.sentList = list.New()
 	msgH.connectLock.RLock()
@@ -175,7 +169,7 @@ func (msgH *MessageHandler) isUsedCloseFiles(conn *net.TCPConn, target string, e
 	gConnPool.CheckErrorForPutConnect(conn, target, err)
 }
 
-func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) {
+func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) (success bool) {
 	msgH.listMux.Lock()
 	defer msgH.listMux.Unlock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
@@ -183,7 +177,7 @@ func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) {
 		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
 			reply.Offset != request.Offset || reply.Crc != request.Crc || reply.FileID != request.FileID {
 			request.forceDestoryAllConnect()
-			continue
+			break
 		}
 		msgH.sentList.Remove(e)
 		if isForClose {
@@ -192,6 +186,7 @@ func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) {
 		if !request.useConnectMap && !isForClose {
 			request.PutConnectsToPool()
 		}
+		success = true
 		msgH.replyCh <- reply
 	}
 
