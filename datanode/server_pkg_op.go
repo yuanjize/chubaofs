@@ -253,7 +253,7 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 		} else {
 			response = dp.(*dataPartition).Load()
 			response.PartitionId = uint64(request.PartitionId)
-			response.Status=proto.TaskSuccess
+			response.Status = proto.TaskSuccess
 		}
 	} else {
 		response.PartitionId = uint64(request.PartitionId)
