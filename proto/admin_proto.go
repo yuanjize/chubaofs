@@ -69,10 +69,10 @@ type LoadDataPartitionResponse struct {
 }
 
 type File struct {
-	Name      string
-	Crc       uint32
-	Size      uint32
-	Modified  int64
+	Name     string
+	Crc      uint32
+	Size     uint32
+	Modified int64
 }
 
 type LoadMetaPartitionMetricRequest struct {
