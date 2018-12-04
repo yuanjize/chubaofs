@@ -155,7 +155,7 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetEmptyExtentFilter()); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
