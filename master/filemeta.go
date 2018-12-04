@@ -23,7 +23,7 @@ import (
 type FileMetaOnNode struct {
 	Crc      uint32
 	LocAddr  string
-	LocIndex uint8
+	locIndex uint8
 	Size     uint32
 }
 
@@ -37,14 +37,14 @@ func NewFileMetaOnNode(volCrc uint32, volLoc string, volLocIndex int, size uint3
 	fm = new(FileMetaOnNode)
 	fm.Crc = volCrc
 	fm.LocAddr = volLoc
-	fm.LocIndex = uint8(volLocIndex)
+	fm.locIndex = uint8(volLocIndex)
 	fm.Size = size
 	return
 }
 
 func (fm *FileMetaOnNode) ToString() (msg string) {
-	msg = fmt.Sprintf("ExtentOffset[%v] LocAddr[%d] LocIndex[%v] Size[%v]",
-		fm.Crc, fm.LocAddr, fm.LocIndex, fm.Size)
+	msg = fmt.Sprintf("ExtentOffset[%v] LocAddr[%d] locIndex[%v] Size[%v]",
+		fm.Crc, fm.LocAddr, fm.locIndex, fm.Size)
 	return
 }
 

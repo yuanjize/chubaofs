@@ -83,7 +83,7 @@ func (partition *DataPartition) checkChunkFile(fc *FileInCore, liveReplicas []*D
 	}
 	msg := fmt.Sprintf("CheckFileError size not match,cluster[%v],", clusterID)
 	for _, fm := range fms {
-		msg = fmt.Sprintf(msg+"fm[%v]:%v\n", fm.LocIndex, fm.ToString())
+		msg = fmt.Sprintf(msg+"fm[%v]:%v\n", fm.locIndex, fm.ToString())
 	}
 	Warn(clusterID, msg)
 	return

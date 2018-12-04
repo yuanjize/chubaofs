@@ -277,7 +277,7 @@ func (partition *DataPartition) getFileCount() {
 			needDelFiles = append(needDelFiles, fc.Name)
 		}
 		for _, vfNode := range fc.Metas {
-			replica := partition.getReplicaByIndex(vfNode.LocIndex)
+			replica := partition.getReplicaByIndex(vfNode.locIndex)
 			replica.FileCount++
 		}
 
