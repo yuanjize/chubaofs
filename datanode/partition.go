@@ -31,6 +31,7 @@ import (
 	"github.com/tiglabs/containerfs/storage"
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
+	"syscall"
 )
 
 const (
@@ -288,6 +289,41 @@ func (dp *dataPartition) statusUpdate() {
 	dp.partitionStatus = int(math.Min(float64(status), float64(dp.disk.Status)))
 }
 
+func ParseExtentId(filename string) (extentId uint64, isExtent bool) {
+	if isExtent = storage.RegexpExtentFile.MatchString(filename); !isExtent {
+		return
+	}
+	var (
+		err error
+	)
+	if extentId, err = strconv.ParseUint(filename, 10, 64); err != nil {
+		isExtent = false
+		return
+	}
+	isExtent = true
+	return
+}
+
+func (dp *dataPartition) getRealSize(path string, finfo os.FileInfo) (size int64) {
+	name := finfo.Name()
+	extentid, isExtent := ParseExtentId(name)
+	if !isExtent {
+		return finfo.Size()
+	}
+	if storage.IsTinyExtent(extentid) {
+		stat := new(syscall.Stat_t)
+		err := syscall.Stat(fmt.Sprintf("%v/%v", path, finfo.Name()), stat)
+		if err != nil {
+			return finfo.Size()
+		}
+		return stat.Blocks * 512
+
+	} else {
+		return finfo.Size()
+	}
+
+}
+
 func (dp *dataPartition) computeUsage() {
 	var (
 		used  int64
@@ -301,7 +337,7 @@ func (dp *dataPartition) computeUsage() {
 		return
 	}
 	for _, file := range files {
-		used += file.Size()
+		used += dp.getRealSize(dp.path, file)
 	}
 	dp.used = int(used)
 	dp.updatePartitionSizeTime = time.Now().Unix()

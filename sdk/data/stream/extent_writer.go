@@ -436,8 +436,8 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 		requests = append(requests, e.Value.(*Packet))
 	}
 
-	if len(requests)==0{
-		if writer.currentPacket!=nil {
+	if len(requests) == 0 {
+		if writer.currentPacket != nil {
 			requests = append(requests, writer.currentPacket)
 			return
 		}

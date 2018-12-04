@@ -293,7 +293,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		loadErr    error
 	)
 	for _, f := range files {
-		if extentId, isExtent = s.parseExtentId(f.Name()); !isExtent {
+		if extentId, isExtent = s.ParseExtentId(f.Name()); !isExtent {
 			continue
 		}
 		if extentId < MinExtentId {
@@ -646,7 +646,7 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	return
 }
 
-func (s *ExtentStore) parseExtentId(filename string) (extentId uint64, isExtent bool) {
+func (s *ExtentStore) ParseExtentId(filename string) (extentId uint64, isExtent bool) {
 	if isExtent = RegexpExtentFile.MatchString(filename); !isExtent {
 		return
 	}
@@ -667,7 +667,7 @@ func (s *ExtentStore) UsedSize() (size int64) {
 			if fInfo.IsDir() {
 				continue
 			}
-			if _, isExtent := s.parseExtentId(fInfo.Name()); !isExtent {
+			if _, isExtent := s.ParseExtentId(fInfo.Name()); !isExtent {
 				continue
 			}
 			size += fInfo.Size()
