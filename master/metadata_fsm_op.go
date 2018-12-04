@@ -329,9 +329,6 @@ func (c *Cluster) handleApply(cmd *Metadata) (err error) {
 	if curIndex > 0 && curIndex%c.retainLogs == 0 {
 		c.partition.Truncate(curIndex)
 	}
-	if c.partition.IsLeader() {
-		return
-	}
 	switch cmd.Op {
 	case OpSyncAddDataNode:
 		c.applyAddDataNode(cmd)
