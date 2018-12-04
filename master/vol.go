@@ -59,6 +59,8 @@ func (vol *Vol) AddMetaPartition(mp *MetaPartition) {
 }
 
 func (vol *Vol) AddMetaPartitionByRaft(mp *MetaPartition) {
+	vol.mpsLock.Lock()
+	defer vol.mpsLock.Unlock()
 	vol.MetaPartitions[mp.PartitionID] = mp
 }
 
