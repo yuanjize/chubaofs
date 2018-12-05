@@ -110,12 +110,6 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	}
 	if index, err = s.sendToAllReplicates(req, msgH); err == nil {
 		s.operatePacket(req, msgH.inConn)
-	} else {
-		log.LogErrorf("action[doRequestCh] %dp.", req.ActionMsg(ActionSendToNext, req.NextAddrs[index],
-			req.StartT, fmt.Errorf("failed to send to : %v", req.NextAddrs[index])))
-		if req.IsMarkDeleteReq() {
-			s.operatePacket(req, msgH.inConn)
-		}
 	}
 	msgH.handleCh <- single
 
