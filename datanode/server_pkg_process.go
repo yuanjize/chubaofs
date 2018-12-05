@@ -129,7 +129,7 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, fmt.Errorf(string(reply.Data[:reply.Size]))))
 		log.LogErrorf("action[doReplyCh] %v", err)
-		reply.forceDestoryCheckUsedClosedConnect()
+		reply.forceDestoryCheckUsedClosedConnect(err)
 	}
 
 	if err = reply.WriteToConn(msgH.inConn); err != nil {
