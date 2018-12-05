@@ -101,7 +101,7 @@ func (p *Packet) forceDestoryAllConnect() {
 
 func (p *Packet) forceDestoryCheckUsedClosedConnect(err error) {
 	for i := 0; i < len(p.NextConns); i++ {
-		gConnPool.CheckErrorForPutConnect(p.NextConns[i], p.NextAddrs[i], err)
+		gConnPool.CheckErrorForceClose(p.NextConns[i], p.NextAddrs[i], err)
 	}
 }
 

@@ -190,6 +190,27 @@ func (connectPool *ConnectPool) Put(c *net.TCPConn, forceClose bool) {
 	return
 }
 
+func (connectPool *ConnectPool) CheckErrorForceClose(c *net.TCPConn, target string, err error) {
+	if c == nil {
+		return
+	}
+
+	if err != nil {
+		if strings.Contains(err.Error(), "use of closed network connection") {
+			c.CloseWrite()
+			c.CloseRead()
+			c.Close()
+			connectPool.ReleaseAllConnect(target)
+			return
+		} else {
+			c.CloseWrite()
+			c.CloseRead()
+			c.Close()
+			return
+		}
+	}
+}
+
 func (connectPool *ConnectPool) CheckErrorForPutConnect(c *net.TCPConn, target string, err error) {
 	if c == nil {
 		return
@@ -203,6 +224,8 @@ func (connectPool *ConnectPool) CheckErrorForPutConnect(c *net.TCPConn, target s
 			connectPool.ReleaseAllConnect(target)
 			return
 		} else {
+			c.CloseWrite()
+			c.CloseRead()
 			c.Close()
 			return
 		}
