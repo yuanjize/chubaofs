@@ -470,7 +470,7 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response.PartitionStatus = dp.partitionStatus
 	response.Used = uint64(dp.Used())
 	var err error
-	response.PartitionSnapshot, err = dp.extentStore.SnapShot()
+	response.PartitionSnapshot = dp.GetSnapShot()
 	if err != nil {
 		response.Status = proto.TaskFail
 		response.Result = err.Error()
