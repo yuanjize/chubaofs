@@ -97,7 +97,7 @@ func (s *DataNode) handleRequest(msgH *MessageHandler) {
 
 func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	var (
-		err   error
+		err error
 	)
 	if !req.IsTransitPkg() {
 		s.operatePacket(req, msgH.inConn)
@@ -249,6 +249,10 @@ func (s *DataNode) sendToAllReplicates(pkg *Packet, msgH *MessageHandler) (index
 	for index = 0; index < len(pkg.NextConns); index++ {
 		err = msgH.AllocateNextConn(pkg, index)
 		if err != nil {
+			msg := fmt.Sprintf("pkg inconnect(%v) to(%v) err(%v)", msgH.inConn.RemoteAddr().String(),
+				pkg.NextAddrs[index], err.Error())
+			err = errors.Annotatef(fmt.Errorf(msg), "Request(%v) sendToAllReplicates Error", pkg.GetUniqueLogId())
+			pkg.PackErrorBody(ActionSendToNext, err.Error())
 			return
 		}
 		nodes := pkg.Nodes
