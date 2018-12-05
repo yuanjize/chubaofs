@@ -19,8 +19,8 @@ import (
 	"github.com/tiglabs/containerfs/raftstore"
 	"github.com/tiglabs/containerfs/util/log"
 	"strconv"
-	"sync/atomic"
 	"sync"
+	"sync/atomic"
 )
 
 const (

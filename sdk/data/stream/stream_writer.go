@@ -388,7 +388,7 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 	)
 	err = fmt.Errorf("cannot alloct new extent after maxrery")
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
-		extentId=0
+		extentId = 0
 		if dp, err = gDataWrapper.GetWriteDataPartition(stream.excludePartition); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"failed on getWriteDataPartion,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))

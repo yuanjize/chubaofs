@@ -165,11 +165,7 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	msgH.listMux.Unlock()
 }
 
-func (msgH *MessageHandler) isUsedCloseFiles(conn *net.TCPConn, target string, err error) {
-	gConnPool.CheckErrorForPutConnect(conn, target, err)
-}
-
-func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) (success bool) {
+func (msgH *MessageHandler) DelListElement(reply *Packet) (success bool) {
 	msgH.listMux.Lock()
 	defer msgH.listMux.Unlock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
@@ -177,15 +173,10 @@ func (msgH *MessageHandler) DelListElement(reply *Packet, isForClose bool) (succ
 		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
 			reply.Offset != request.Offset || reply.Crc != request.Crc || reply.FileID != request.FileID {
 			request.forceDestoryAllConnect()
+			request.PackErrorBody(ActionReceiveFromNext, fmt.Sprintf("unknow expect reply"))
 			break
 		}
 		msgH.sentList.Remove(e)
-		if isForClose {
-			request.forceDestoryAllConnect()
-		}
-		if !request.useConnectMap && !isForClose {
-			request.PutConnectsToPool()
-		}
 		success = true
 		msgH.replyCh <- reply
 	}

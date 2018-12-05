@@ -129,7 +129,7 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, fmt.Errorf(string(reply.Data[:reply.Size]))))
 		log.LogErrorf("action[doReplyCh] %v", err)
-		reply.forceDestoryAllConnect()
+		reply.forceDestoryCheckUsedClosedConnect()
 	}
 
 	if err = reply.WriteToConn(msgH.inConn); err != nil {
@@ -182,9 +182,8 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		return
 	}
 	request = e.Value.(*Packet)
-	isForceColseConnect := ForceCloseConnect
 	defer func() {
-		if success := msgH.DelListElement(request, isForceColseConnect); success {
+		if successDelete := msgH.DelListElement(request); successDelete {
 			s.leaderPutTinyExtentToStore(request)
 		}
 	}()
@@ -192,13 +191,13 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		_, err := s.receiveFromNext(request, index)
 		if err != nil {
 			request.PackErrorBody(ActionReceiveFromNext, err.Error())
-			msgH.isUsedCloseFiles(request.NextConns[index], request.NextAddrs[index], err)
-			request.forceDestoryAllConnect()
 			return
 		}
 	}
 	request.PackOkReply()
-	isForceColseConnect = NoCloseConnect
+	if !request.useConnectMap {
+		request.PutConnectsToPool()
+	}
 	return
 }
 
@@ -219,7 +218,7 @@ func (s *DataNode) receiveFromNext(request *Packet, index int) (reply *Packet, e
 	reply = NewPacket()
 
 	if err = reply.ReadFromConn(request.NextConns[index], proto.ReadDeadlineTime); err != nil {
-		err = errors.Annotatef(err, "Request(%v) receiveFromNext Error", request.GetUniqueLogId())
+		err = errors.Annotatef(err, "Request(%v) receiveFromNext %v Error", request.GetUniqueLogId(), request.NextConns[index])
 		log.LogErrorf("action[receiveFromNext] %v.", request.ActionMsg(ActionReceiveFromNext, request.NextAddrs[index], request.StartT, err))
 		return
 	}
