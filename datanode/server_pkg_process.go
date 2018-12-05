@@ -90,7 +90,6 @@ func (s *DataNode) handleRequest(msgH *MessageHandler) {
 		case <-msgH.handleCh:
 			s.reciveFromAllReplicates(msgH)
 		case <-msgH.exitC:
-			msgH.ClearReqs(s)
 			return
 		}
 	}
@@ -131,19 +130,31 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 		log.LogErrorf("action[doReplyCh] %v", err)
 		reply.forceDestoryCheckUsedClosedConnect(err)
 	}
-
+	s.cleanup(reply)
 	if err = reply.WriteToConn(msgH.inConn); err != nil {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, err))
 		log.LogErrorf("action[doReplyCh] %v", err)
 		reply.forceDestoryAllConnect()
 		msgH.Stop()
+		return
 	}
 	if !reply.IsMasterCommand() {
 		s.addMetrics(reply)
 		log.LogDebugf("action[doReplyCh] %v", reply.ActionMsg(ActionWriteToCli,
 			msgH.inConn.RemoteAddr().String(), reply.StartT, err))
 		s.statsFlow(reply, OutFlow)
+	}
+
+}
+
+func (s *DataNode)cleanup(pkg *Packet){
+	if !pkg.isHeadNode(){
+		return
+	}
+	s.leaderPutTinyExtentToStore(pkg)
+	if !pkg.useConnectMap{
+		pkg.PutConnectsToPool()
 	}
 }
 
@@ -168,6 +179,7 @@ func (s *DataNode) writeToCli(msgH *MessageHandler) {
 		case reply := <-msgH.replyCh:
 			s.doReplyCh(reply, msgH)
 		case <-msgH.exitC:
+			msgH.ClearReqs(s)
 			return
 		}
 	}
@@ -183,9 +195,7 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 	}
 	request = e.Value.(*Packet)
 	defer func() {
-		if successDelete := msgH.DelListElement(request); successDelete {
-			s.leaderPutTinyExtentToStore(request)
-		}
+		msgH.DelListElement(request)
 	}()
 	for index := 0; index < len(request.NextAddrs); index++ {
 		_, err := s.receiveFromNext(request, index)
@@ -195,9 +205,7 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		}
 	}
 	request.PackOkReply()
-	if !request.useConnectMap {
-		request.PutConnectsToPool()
-	}
+
 	return
 }
 
