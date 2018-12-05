@@ -18,7 +18,6 @@ import (
 type MembersFileMetas struct {
 	TaskType               uint8                        //which type task
 	files                  map[uint64]*storage.FileInfo //storage file on datapartiondisk meta
-	NeedDeleteExtentsTasks []*storage.FileInfo          //generator delete extent file task
 	NeedAddExtentsTasks    []*storage.FileInfo          //generator add extent file task
 	NeedFixExtentSizeTasks []*storage.FileInfo          //generator fixSize file task
 }
@@ -26,7 +25,6 @@ type MembersFileMetas struct {
 func NewMemberFileMetas() (mf *MembersFileMetas) {
 	mf = &MembersFileMetas{
 		files:                  make(map[uint64]*storage.FileInfo),
-		NeedDeleteExtentsTasks: make([]*storage.FileInfo, 0),
 		NeedAddExtentsTasks:    make([]*storage.FileInfo, 0),
 		NeedFixExtentSizeTasks: make([]*storage.FileInfo, 0),
 	}
@@ -199,7 +197,6 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 func (dp *dataPartition) generatorExtentRepairTasks(allMembers []*MembersFileMetas) (noNeedFix []uint64, needFix []uint64) {
 	dp.generatorAddExtentsTasks(allMembers) //add extentTask
 	noNeedFix, needFix = dp.generatorFixExtentSizeTasks(allMembers)
-	dp.generatorDeleteExtentsTasks(allMembers)
 	return
 }
 
@@ -281,23 +278,6 @@ func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMe
 		}
 	}
 	return
-}
-
-/*generator fix extent Size ,if all members  Not the same length*/
-func (dp *dataPartition) generatorDeleteExtentsTasks(allMembers []*MembersFileMetas) {
-	store := dp.extentStore
-	deletes := store.GetDelObjects()
-	leaderAddr := dp.replicaHosts[0]
-	for _, deleteFileId := range deletes {
-		for index := 1; index < len(allMembers); index++ {
-			follower := allMembers[index]
-			if _, ok := follower.files[deleteFileId]; ok {
-				deleteFile := &storage.FileInfo{Source: leaderAddr, FileId: deleteFileId, Size: 0}
-				follower.NeedDeleteExtentsTasks = append(follower.NeedDeleteExtentsTasks, deleteFile)
-				log.LogInfof("action[generatorDeleteExtentsTasks] partition(%v) deleteFile(%v).", dp.partitionId, deleteFile)
-			}
-		}
-	}
 }
 
 /*notify follower to repair dataPartition extentStore*/

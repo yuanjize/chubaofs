@@ -148,12 +148,12 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 
 }
 
-func (s *DataNode)cleanup(pkg *Packet){
-	if !pkg.isHeadNode(){
+func (s *DataNode) cleanup(pkg *Packet) {
+	if !pkg.isHeadNode() {
 		return
 	}
 	s.leaderPutTinyExtentToStore(pkg)
-	if !pkg.useConnectMap{
+	if !pkg.useConnectMap {
 		pkg.PutConnectsToPool()
 	}
 }

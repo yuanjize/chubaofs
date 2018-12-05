@@ -646,7 +646,7 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	return
 }
 
-func (s *ExtentStore) BackEndLoadExtent(){
+func (s *ExtentStore) BackEndLoadExtent() {
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
 	s.extentInfoMux.RLock()
 	for _, extentId := range s.extentInfoMap {
@@ -654,23 +654,23 @@ func (s *ExtentStore) BackEndLoadExtent(){
 	}
 	s.extentInfoMux.RUnlock()
 	for _, extentInfo := range extentInfoSlice {
-		if extentInfo.Size==0{
+		if extentInfo.Size == 0 {
 			continue
 		}
-		if IsTinyExtent(extentInfo.FileId){
+		if IsTinyExtent(extentInfo.FileId) {
 			continue
 		}
-		e,err:=s.getExtentWithHeader(extentInfo.FileId)
-		if err!=nil {
+		e, err := s.getExtentWithHeader(extentInfo.FileId)
+		if err != nil {
 			continue
 		}
 		extentInfo.FromExtent(e)
 		s.extentInfoMux.Lock()
-		s.extentInfoMap[extentInfo.FileId]=extentInfo
+		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
-		time.Sleep(time.Millisecond*10)
+		time.Sleep(time.Millisecond * 10)
 	}
-	log.LogInfof("BackEnd Load datapartition (%v) success",s.dataDir)
+	log.LogInfof("BackEnd Load datapartition (%v) success", s.dataDir)
 	return
 }
 

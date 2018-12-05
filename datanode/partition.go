@@ -489,12 +489,6 @@ func (dp *dataPartition) GetAllExtentsMeta() (files []*storage.FileInfo, err err
 
 func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	store := dp.extentStore
-	for _, deleteExtentId := range metas.NeedDeleteExtentsTasks {
-		if storage.IsTinyExtent(deleteExtentId.FileId) {
-			continue
-		}
-		store.MarkDelete(uint64(deleteExtentId.FileId), 0, 0)
-	}
 	for _, addExtent := range metas.NeedAddExtentsTasks {
 		if storage.IsTinyExtent(addExtent.FileId) {
 			continue
