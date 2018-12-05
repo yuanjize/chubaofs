@@ -98,7 +98,6 @@ func (s *DataNode) handleRequest(msgH *MessageHandler) {
 func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	var (
 		err   error
-		index int
 	)
 	if !req.IsTransitPkg() {
 		s.operatePacket(req, msgH.inConn)
@@ -108,7 +107,7 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 
 		return
 	}
-	if index, err = s.sendToAllReplicates(req, msgH); err == nil {
+	if _, err = s.sendToAllReplicates(req, msgH); err == nil {
 		s.operatePacket(req, msgH.inConn)
 	}
 	msgH.handleCh <- single
