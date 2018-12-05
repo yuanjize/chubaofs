@@ -357,17 +357,23 @@ func (c *Cluster) handleApply(cmd *Metadata) (err error) {
 	case OpSyncPutCluster:
 		c.applyPutCluster(cmd)
 	case OpSyncAllocMetaNodeID:
-		if c.partition != nil && !c.partition.IsLeader(){
-			c.idAlloc.increaseMetaNodeID()
+		id, err := strconv.ParseUint(string(cmd.V), 10, 64)
+		if err != nil {
+			return
 		}
+		c.idAlloc.setMetaNodeID(id)
 	case OpSyncAllocDataPartitionID:
-		if c.partition != nil && !c.partition.IsLeader(){
-			c.idAlloc.increaseDataPartitionID()
+		id, err := strconv.ParseUint(string(cmd.V), 10, 64)
+		if err != nil {
+			return
 		}
+		c.idAlloc.setDataPartitionID(id)
 	case OpSyncAllocMetaPartitionID:
-		if c.partition != nil && !c.partition.IsLeader(){
-			c.idAlloc.increaseMetaPartitionID()
+		id, err := strconv.ParseUint(string(cmd.V), 10, 64)
+		if err != nil {
+			return
 		}
+		c.idAlloc.setMetaPartitionID(id)
 	}
 	return
 }
