@@ -68,6 +68,8 @@ type DataPartition interface {
 	GetSnapShot() []*proto.File
 	ReloadSnapshot()
 
+	ForceLoadHeader()
+
 	LaunchRepair(fixExtentType uint8)
 	MergeExtentStoreRepair(metas *MembersFileMetas)
 
@@ -270,6 +272,10 @@ func (dp *dataPartition) ChangeStatus(status int) {
 	case proto.ReadOnly, proto.ReadWrite, proto.Unavaliable:
 		dp.partitionStatus = status
 	}
+}
+
+func (dp *dataPartition)ForceLoadHeader(){
+	dp.extentStore.BackEndLoadExtent()
 }
 
 func (dp *dataPartition) statusUpdateScheduler() {

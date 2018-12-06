@@ -142,7 +142,6 @@ func NewExtentStore(dataDir string, partitionId uint32, storeSize int) (s *Exten
 	s.closeC = make(chan bool, 1)
 	s.closed = false
 	err = s.initTinyExtent()
-	go s.BackEndLoadExtent()
 	return
 }
 
@@ -668,7 +667,6 @@ func (s *ExtentStore) BackEndLoadExtent() {
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
-		time.Sleep(time.Millisecond * 10)
 	}
 	log.LogInfof("BackEnd Load datapartition (%v) success", s.dataDir)
 	return
