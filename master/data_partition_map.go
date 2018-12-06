@@ -58,8 +58,24 @@ func (dpMap *DataPartitionMap) getDataPartition(ID uint64) (*DataPartition, erro
 func (dpMap *DataPartitionMap) putDataPartition(dp *DataPartition) {
 	dpMap.Lock()
 	defer dpMap.Unlock()
+	_, ok := dpMap.dataPartitionMap[dp.PartitionID]
+	if !ok {
+		dpMap.dataPartitions = append(dpMap.dataPartitions, dp)
+		dpMap.dataPartitionMap[dp.PartitionID] = dp
+		return
+	}
+	//use dp replace old partition in the map and array
 	dpMap.dataPartitionMap[dp.PartitionID] = dp
-	dpMap.dataPartitions = append(dpMap.dataPartitions, dp)
+	dataPartitions := make([]*DataPartition, 0)
+	for index, partition := range dpMap.dataPartitions {
+		if partition.PartitionID == dp.PartitionID {
+			dataPartitions = append(dataPartitions, dpMap.dataPartitions[:index]...)
+			dataPartitions = append(dataPartitions, dp)
+			dataPartitions = append(dataPartitions, dpMap.dataPartitions[index+1:]...)
+			dpMap.dataPartitions = dataPartitions
+			break
+		}
+	}
 }
 
 func (dpMap *DataPartitionMap) deleteDataPartition(dp *DataPartition) {
@@ -75,19 +91,6 @@ func (dpMap *DataPartitionMap) deleteDataPartition(dp *DataPartition) {
 			break
 		}
 	}
-}
-
-func (dpMap *DataPartitionMap) putDataPartitionByRaft(dp *DataPartition) {
-	dpMap.Lock()
-	defer dpMap.Unlock()
-	old, ok := dpMap.dataPartitionMap[dp.PartitionID]
-	if !ok {
-		dpMap.dataPartitions = append(dpMap.dataPartitions, dp)
-		dpMap.dataPartitionMap[dp.PartitionID] = dp
-		return
-	}
-	old = dp
-	dpMap.dataPartitionMap[dp.PartitionID] = old
 }
 
 func (dpMap *DataPartitionMap) setReadWriteDataPartitions(readWrites int, clusterName string) {

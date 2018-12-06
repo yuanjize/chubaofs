@@ -550,7 +550,7 @@ func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
 		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
-		vol.dataPartitions.putDataPartitionByRaft(dp)
+		vol.dataPartitions.putDataPartition(dp)
 	}
 }
 
@@ -571,7 +571,7 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 		}
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
-		vol.dataPartitions.putDataPartitionByRaft(dp)
+		vol.dataPartitions.putDataPartition(dp)
 	}
 }
 
