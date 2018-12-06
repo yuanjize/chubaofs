@@ -53,11 +53,11 @@ const (
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
 	MinReadWriteDataPartitions              = 20
-	EmptyCrcValue                          uint32 = 4045511210
+	EmptyCrcValue                   uint32  = 4045511210
 )
 
 const (
-	OK     = iota
+	OK = iota
 	Failed
 )
 

@@ -187,16 +187,16 @@ func (d *Disk) DetachDataPartition(dp DataPartition) {
 	d.computeUsage()
 }
 
-func (d *Disk)GetDataPartition(partitionId uint32)(partition DataPartition){
+func (d *Disk) GetDataPartition(partitionId uint32) (partition DataPartition) {
 	d.RLock()
 	defer d.RUnlock()
 	return d.partitionMap[partitionId]
 }
 
-func (d *Disk) ForceLoadPartitionHeader(){
-	partitionList:=d.DataPartitionList()
-	for _,partitionId:=range partitionList{
-		partition:=d.GetDataPartition(partitionId)
+func (d *Disk) ForceLoadPartitionHeader() {
+	partitionList := d.DataPartitionList()
+	for _, partitionId := range partitionList {
+		partition := d.GetDataPartition(partitionId)
 		partition.ForceLoadHeader()
 	}
 }

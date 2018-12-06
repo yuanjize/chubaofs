@@ -210,26 +210,28 @@ func (s *DataNode) receiveFromNext(request *Packet, index int) (reply *Packet, e
 
 	// Check local execution result.
 	if request.IsErrPack() {
+		err = fmt.Errorf(ActionReceiveFromNext+" local operator failed (%v)", request.getErr())
 		err = errors.Annotatef(fmt.Errorf(request.getErr()), "Request(%v) receiveFromNext Error", request.GetUniqueLogId())
-		log.LogErrorf("action[receiveFromNext] %v.",
-			request.ActionMsg(ActionReceiveFromNext, LocalProcessAddr, request.StartT, fmt.Errorf(request.getErr())))
+		log.LogErrorf(err.Error())
 		return
 	}
 
 	reply = NewPacket()
 
 	if err = reply.ReadFromConn(request.NextConns[index], proto.ReadDeadlineTime); err != nil {
+		err = fmt.Errorf(ActionReceiveFromNext+"recive From remote (%v) network error (%v) ",
+			request.NextAddrs[index], err)
 		err = errors.Annotatef(err, "Request(%v) receiveFromNext %v Error", request.GetUniqueLogId(), request.NextConns[index])
-		log.LogErrorf("action[receiveFromNext] %v.", request.ActionMsg(ActionReceiveFromNext, request.NextAddrs[index], request.StartT, err))
+		log.LogErrorf(err.Error())
 		return
 	}
 
 	if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
 		reply.Offset != request.Offset || reply.Crc != request.Crc || reply.FileID != request.FileID {
-		err = fmt.Errorf(ActionCheckReplyAvail+" request (%v) reply(%v) %v from localAddr(%v)"+
-			" remoteAddr(%v) requestCrc(%v) replyCrc(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId(), request.NextAddrs[index],
+		err = fmt.Errorf(ActionReceiveFromNext+" request (%v) reply(%v) %v from localAddr(%v)"+
+			" remoteAddr(%v) requestCrc(%v) replyCrc(%v) not match ", request.GetUniqueLogId(), reply.GetUniqueLogId(), request.NextAddrs[index],
 			request.NextConns[index].LocalAddr().String(), request.NextConns[index].RemoteAddr().String(), request.Crc, reply.Crc)
-		log.LogErrorf("action[receiveFromNext] %v.", err.Error())
+		log.LogErrorf(err.Error())
 		return
 	}
 
@@ -237,6 +239,7 @@ func (s *DataNode) receiveFromNext(request *Packet, index int) (reply *Packet, e
 		err = fmt.Errorf(ActionReceiveFromNext+"remote (%v) do failed(%v)",
 			request.NextAddrs[index], string(reply.Data[:reply.Size]))
 		err = errors.Annotatef(err, "Request(%v) receiveFromNext Error", request.GetUniqueLogId())
+		log.LogErrorf(err.Error())
 		return
 	}
 

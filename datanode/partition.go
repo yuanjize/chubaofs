@@ -274,7 +274,7 @@ func (dp *dataPartition) ChangeStatus(status int) {
 	}
 }
 
-func (dp *dataPartition)ForceLoadHeader(){
+func (dp *dataPartition) ForceLoadHeader() {
 	dp.extentStore.BackEndLoadExtent()
 }
 
