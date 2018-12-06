@@ -476,8 +476,8 @@ func (e *fsExtent) Flush() (err error) {
 // HeaderChecksum returns crc checksum value of extent header data
 // include inode data and block crc.
 func (e *fsExtent) HeaderChecksum() (crc uint32) {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	crc = crc32.ChecksumIEEE(e.header)
 	return
 }
