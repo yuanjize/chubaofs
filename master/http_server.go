@@ -142,6 +142,7 @@ func (m *Master) proxy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.LogInfof("URL[%v],remoteAddr[%v]", r.URL, r.RemoteAddr)
 	switch r.URL.Path {
 	case AdminGetCluster:
 		m.getCluster(w, r)
