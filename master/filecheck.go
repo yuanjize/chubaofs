@@ -76,8 +76,11 @@ func (partition *DataPartition) checkChunkFile(fc *FileInCore, liveReplicas []*D
 	if fc.isCheckCrc() == false {
 		return
 	}
-	fms, _ := fc.needCrcRepair(liveReplicas, proto.TinyPartition)
+	fms, needRepair := fc.needCrcRepair(liveReplicas, proto.TinyPartition)
 
+	if !needRepair {
+		return
+	}
 	if isSameSize(fms) {
 		return
 	}
@@ -104,6 +107,9 @@ func (partition *DataPartition) checkExtentFile(fc *FileInCore, liveReplicas []*
 		Warn(clusterID, fmt.Sprintf("partitionid[%v],file[%v],fms[%v],liveAddr[%v]", partition.PartitionID, fc.Name, fc.getFileMetaAddrs(), liveAddrs))
 	}
 	if !needRepair {
+		return
+	}
+	if !isSameSize(fms) {
 		return
 	}
 

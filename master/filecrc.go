@@ -84,15 +84,15 @@ func (fc *FileInCore) needCrcRepair(liveVols []*DataReplica, volType string) (fm
 		return
 	}
 
-	//if !isSameSize(fms) {
-	//	return
-	//}
-
 	if volType == proto.TinyPartition {
 		return
 	}
 	baseCrc = fms[0].Crc
 	for _, fm := range fms {
+		if fm.getFileCrc() == EmptyCrcValue {
+			needRepair = false
+			return
+		}
 		if fm.getFileCrc() != baseCrc {
 			needRepair = true
 			return
