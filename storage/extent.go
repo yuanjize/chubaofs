@@ -345,15 +345,14 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 		return e.WriteTiny(data, offset, size, crc)
 	}
 
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if err = e.checkOffsetAndSize(offset, size); err != nil {
 		return
 	}
 	var (
 		writeSize int
 	)
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
 	if writeSize, err = e.file.WriteAt(data[:size], int64(offset+util.BlockHeaderSize)); err != nil {
 		return
 	}
