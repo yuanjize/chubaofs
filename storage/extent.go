@@ -58,16 +58,6 @@ func (ei *FileInfo) FromExtent(extent Extent) {
 		if !IsTinyExtent(ei.FileId) {
 			ei.Deleted = extent.IsMarkDelete()
 			ei.ModTime = extent.ModTime()
-		}
-	}
-}
-
-func (ei *FileInfo) FromExtentUpdateCrc(extent Extent) {
-	if extent != nil {
-		ei.FileId = extent.ID()
-		ei.Inode = extent.Ino()
-		ei.Size = uint64(extent.Size())
-		if !IsTinyExtent(ei.FileId) {
 			ei.Crc = extent.HeaderChecksum()
 		}
 	}

@@ -443,7 +443,6 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 		return
 	}
 	extentInfo.FromExtent(extent)
-	extentInfo.FromExtentUpdateCrc(extent)
 	extentInfo.Deleted = true
 
 	s.cache.Del(extent.ID())
@@ -476,20 +475,6 @@ func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode u
 	}
 
 	return false
-}
-
-func (s *ExtentStore) ForceUpdateCrc(extentId uint64) {
-	s.extentInfoMux.RLock()
-	extentInfo, has := s.extentInfoMap[extentId]
-	s.extentInfoMux.RUnlock()
-	if !has {
-		return
-	}
-	e, err := s.getExtentWithHeader(extentId)
-	if err != nil {
-		return
-	}
-	extentInfo.FromExtentUpdateCrc(e)
 }
 
 func (s *ExtentStore) Cleanup() {
@@ -625,7 +610,6 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 			return
 		}
 		extentInfo.FromExtent(extent)
-		extentInfo.FromExtentUpdateCrc(extent)
 	}
 	return
 }
@@ -643,10 +627,6 @@ func (s *ExtentStore) GetWatermarkForWrite(extentId uint64) (watermark int64, er
 	return
 }
 
-const (
-	EmptyCrcValue = 4045511210
-)
-
 func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
@@ -659,11 +639,6 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	for _, extentInfo := range extentInfoSlice {
 		if filter != nil && !filter(extentInfo) {
 			continue
-		}
-		if extentInfo.FileId > s.initBaseExtentId && (extentInfo.Crc == EmptyCrcValue || extentInfo.Crc == 0) {
-			if e, extentErr := s.getExtentWithHeader(extentInfo.FileId); extentErr == nil {
-				extentInfo.FromExtentUpdateCrc(e)
-			}
 		}
 		extents = append(extents, extentInfo)
 	}
@@ -689,7 +664,6 @@ func (s *ExtentStore) BackEndLoadExtent() {
 			continue
 		}
 		extentInfo.FromExtent(e)
-		extentInfo.FromExtentUpdateCrc(e)
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
@@ -794,7 +768,6 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	}
 
 	extentInfo.FromExtent(extent)
-	extentInfo.FromExtentUpdateCrc(extent)
 	s.cache.Del(extent.ID())
 
 	s.extentInfoMux.Lock()

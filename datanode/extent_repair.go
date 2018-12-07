@@ -367,9 +367,6 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		log.LogErrorf("action[streamRepairExtent] err[%v].", err)
 		return
 	}
-	defer func() {
-		store.ForceUpdateCrc(remoteExtentInfo.FileId)
-	}()
 	currFixOffset := localExtentInfo.Size
 	for currFixOffset < remoteExtentInfo.Size {
 		// If local extent size has great remoteExtent file size ,then break
