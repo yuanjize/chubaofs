@@ -671,6 +671,7 @@ func (s *ExtentStore) BackEndLoadExtent() {
 			continue
 		}
 		extentInfo.FromExtent(e)
+		extentInfo.FromExtentUpdateCrc(e)
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
