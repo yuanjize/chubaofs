@@ -104,7 +104,6 @@ type ExtentStore struct {
 	unavaliTinyExtentCh chan uint64
 	blockSize           int
 	partitionId         uint32
-	initBaseExtentId    uint64
 }
 
 func CheckAndCreateSubdir(name string) (err error) {
@@ -142,7 +141,6 @@ func NewExtentStore(dataDir string, partitionId uint32, storeSize int) (s *Exten
 	s.storeSize = storeSize
 	s.closeC = make(chan bool, 1)
 	s.closed = false
-	atomic.StoreUint64(&s.initBaseExtentId, atomic.LoadUint64(&s.baseExtentId))
 	err = s.initTinyExtent()
 	return
 }
