@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"fmt"
 )
 
 type VolStatInfo struct {
@@ -119,6 +120,7 @@ func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 		err  error
 		name string
 		vol  *Vol
+		view *VolView
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
@@ -128,7 +130,10 @@ func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusNotFound
 		goto errDeal
 	}
-	if body, err = json.Marshal(m.getVolView(vol)); err != nil {
+	if view, err = m.getVolView(vol); err != nil {
+		goto errDeal
+	}
+	if body, err = json.Marshal(view); err != nil {
 		goto errDeal
 	}
 	w.Write(body)
@@ -167,13 +172,13 @@ errDeal:
 	return
 }
 
-func (m *Master) getVolView(vol *Vol) (view *VolView) {
+func (m *Master) getVolView(vol *Vol) (view *VolView, err error) {
 	view = NewVolView(vol.Name, vol.VolType)
 	setMetaPartitions(vol, view, m.cluster.getLiveMetaNodesRate())
-	setDataPartitions(vol, view, m.cluster.getLiveDataNodesRate())
+	err = setDataPartitions(vol, view, m.cluster.getLiveDataNodesRate())
 	return
 }
-func setDataPartitions(vol *Vol, view *VolView, liveRate float32) {
+func setDataPartitions(vol *Vol, view *VolView, liveRate float32) (err error) {
 	if liveRate < NodesAliveRate {
 		return
 	}
@@ -181,10 +186,12 @@ func setDataPartitions(vol *Vol, view *VolView, liveRate float32) {
 	defer vol.dataPartitions.RUnlock()
 	dpResps := vol.dataPartitions.GetDataPartitionsView(0)
 	if vol.dataPartitions.readWriteDataPartitions == 0 && vol.getTotalUsedSpace() < vol.Capacity {
-		view.DataPartitions = make([]*DataPartitionResponse, 0)
+		err = fmt.Errorf("action[setDataPartitions],vol[%v] no writeable data partitions", vol.Name)
+		log.LogWarn(err.Error())
 	} else {
 		view.DataPartitions = dpResps
 	}
+	return
 }
 func setMetaPartitions(vol *Vol, view *VolView, liveRate float32) {
 	if liveRate < NodesAliveRate {
