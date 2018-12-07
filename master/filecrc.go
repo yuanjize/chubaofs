@@ -89,7 +89,7 @@ func (fc *FileInCore) needCrcRepair(liveVols []*DataReplica, volType string) (fm
 	}
 	baseCrc = fms[0].Crc
 	for _, fm := range fms {
-		if fm.getFileCrc() == EmptyCrcValue {
+		if fm.getFileCrc() == EmptyCrcValue || fm.getFileCrc() == 0 {
 			needRepair = false
 			return
 		}
