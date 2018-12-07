@@ -437,11 +437,11 @@ func (e *fsExtent) ReadTiny(data []byte, offset, size int64) (crc uint32, err er
 func (e *fsExtent) updateBlockCrc(blockNo int, crc uint32) (err error) {
 	startIdx := util.BlockHeaderCrcIndex + blockNo*util.PerBlockCrcSize
 	endIdx := startIdx + util.PerBlockCrcSize
+	binary.BigEndian.PutUint32(e.header[startIdx:endIdx], crc)
 	if _, err = e.file.WriteAt(e.header[startIdx:endIdx], int64(startIdx)); err != nil {
 		return
 	}
 	e.modifyTime = time.Now()
-	binary.BigEndian.PutUint32(e.header[startIdx:endIdx], crc)
 
 	return
 }
