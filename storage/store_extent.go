@@ -104,6 +104,7 @@ type ExtentStore struct {
 	unavaliTinyExtentCh chan uint64
 	blockSize           int
 	partitionId         uint32
+	initBaseExtentId    uint64
 }
 
 func CheckAndCreateSubdir(name string) (err error) {
@@ -141,6 +142,7 @@ func NewExtentStore(dataDir string, partitionId uint32, storeSize int) (s *Exten
 	s.storeSize = storeSize
 	s.closeC = make(chan bool, 1)
 	s.closed = false
+	atomic.StoreUint64(&s.initBaseExtentId, atomic.LoadUint64(&s.baseExtentId))
 	err = s.initTinyExtent()
 	return
 }
@@ -151,11 +153,11 @@ func (s *ExtentStore) DeleteStore() (err error) {
 	return
 }
 
-func (s *ExtentStore) SnapShot(reloadCrc bool) (files []*proto.File, err error) {
+func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter(), reloadCrc); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
@@ -629,7 +631,7 @@ const (
 	EmptyCrcValue = 4045511210
 )
 
-func (s *ExtentStore) GetAllWatermark(filter ExtentFilter, reloadCrc bool) (extents []*FileInfo, err error) {
+func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
 	s.extentInfoMux.RLock()
@@ -642,7 +644,7 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter, reloadCrc bool) (exte
 		if filter != nil && !filter(extentInfo) {
 			continue
 		}
-		if reloadCrc && (extentInfo.Crc == EmptyCrcValue || extentInfo.Crc == 0) {
+		if extentInfo.FileId > s.initBaseExtentId && (extentInfo.Crc == EmptyCrcValue || extentInfo.Crc == 0) {
 			if e, extentErr := s.getExtentWithHeader(extentInfo.FileId); extentErr == nil {
 				extentInfo.FromExtentUpdateCrc(e)
 			}
@@ -675,7 +677,7 @@ func (s *ExtentStore) BackEndLoadExtent() {
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
-		time.Sleep(time.Millisecond*2)
+		time.Sleep(time.Millisecond * 2)
 	}
 	log.LogInfof("BackEnd Load datapartition (%v) success", s.dataDir)
 	return
