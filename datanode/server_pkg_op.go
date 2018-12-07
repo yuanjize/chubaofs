@@ -431,12 +431,12 @@ func (s *DataNode) handleExtentStoreGetAllWatermark(pkg *Packet) {
 	)
 	store := pkg.DataPartition.GetExtentStore()
 	if pkg.StoreMode == proto.NormalExtentMode {
-		fInfoList, err = store.GetAllWatermark(storage.GetStableExtentFilter(), false)
+		fInfoList, err = store.GetAllWatermark(storage.GetStableExtentFilter())
 	} else {
 		extents := make([]uint64, 0)
 		err = json.Unmarshal(pkg.Data, &extents)
 		if err == nil {
-			fInfoList, err = store.GetAllWatermark(storage.GetStableTinyExtentFilter(extents), false)
+			fInfoList, err = store.GetAllWatermark(storage.GetStableTinyExtentFilter(extents))
 		}
 	}
 	if err != nil {

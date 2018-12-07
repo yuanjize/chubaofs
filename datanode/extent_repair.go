@@ -124,9 +124,9 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 	files := make([]*storage.FileInfo, 0)
 	// get local extent file metas
 	if fixExtentMode == proto.NormalExtentMode {
-		extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter(), false)
+		extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
 	} else {
-		extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableTinyExtentFilter(needFixExtents), false)
+		extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableTinyExtentFilter(needFixExtents))
 	}
 	if err != nil {
 		err = errors.Annotatef(err, "getAllMemberExtentMetas extent dataPartition(%v) GetAllWaterMark", dp.partitionId)

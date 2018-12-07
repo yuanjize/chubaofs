@@ -478,7 +478,7 @@ func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode u
 }
 
 func (s *ExtentStore) Cleanup() {
-	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter(), false)
+	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter())
 	if len(extentInfoSlice) == 0 {
 		return
 	}
