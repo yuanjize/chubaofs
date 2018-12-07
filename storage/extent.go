@@ -56,9 +56,19 @@ func (ei *FileInfo) FromExtent(extent Extent) {
 		ei.Inode = extent.Ino()
 		ei.Size = uint64(extent.Size())
 		if !IsTinyExtent(ei.FileId) {
-			ei.Crc = extent.HeaderChecksum()
 			ei.Deleted = extent.IsMarkDelete()
 			ei.ModTime = extent.ModTime()
+		}
+	}
+}
+
+func (ei *FileInfo) FromExtentUpdateCrc(extent Extent) {
+	if extent != nil {
+		ei.FileId = extent.ID()
+		ei.Inode = extent.Ino()
+		ei.Size = uint64(extent.Size())
+		if !IsTinyExtent(ei.FileId) {
+			ei.Crc = extent.HeaderChecksum()
 		}
 	}
 }
@@ -345,15 +355,14 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 		return e.WriteTiny(data, offset, size, crc)
 	}
 
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if err = e.checkOffsetAndSize(offset, size); err != nil {
 		return
 	}
 	var (
 		writeSize int
 	)
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
 	if writeSize, err = e.file.WriteAt(data[:size], int64(offset+util.BlockHeaderSize)); err != nil {
 		return
 	}

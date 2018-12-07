@@ -194,6 +194,7 @@ func (d *Disk) GetDataPartition(partitionId uint32) (partition DataPartition) {
 }
 
 func (d *Disk) ForceLoadPartitionHeader() {
+	time.Sleep(time.Hour)
 	partitionList := d.DataPartitionList()
 	for _, partitionId := range partitionList {
 		partition := d.GetDataPartition(partitionId)

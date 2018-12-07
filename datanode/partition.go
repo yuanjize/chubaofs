@@ -65,9 +65,6 @@ type DataPartition interface {
 	GetExtentStore() *storage.ExtentStore
 	GetExtentCount() int
 
-	GetSnapShot() []*proto.File
-	ReloadSnapshot()
-
 	ForceLoadHeader()
 
 	LaunchRepair(fixExtentType uint8)
@@ -485,14 +482,6 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	return
 }
 
-func (dp *dataPartition) GetAllExtentsMeta() (files []*storage.FileInfo, err error) {
-	files, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
-	if err != nil {
-		return nil, err
-	}
-	return
-}
-
 func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	store := dp.extentStore
 	for _, addExtent := range metas.NeedAddExtentsTasks {
@@ -504,7 +493,7 @@ func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 			metas.NeedFixExtentSizeTasks = append(metas.NeedFixExtentSizeTasks, fixFileSizeTask)
 			continue
 		}
-		err := store.Create(uint64(addExtent.FileId), addExtent.Inode, false)
+		err := store.Create(uint64(addExtent.FileId), addExtent.Inode)
 		if err != nil {
 			continue
 		}

@@ -104,6 +104,7 @@ type ExtentStore struct {
 	unavaliTinyExtentCh chan uint64
 	blockSize           int
 	partitionId         uint32
+	initBaseExtentId    uint64
 }
 
 func CheckAndCreateSubdir(name string) (err error) {
@@ -141,6 +142,7 @@ func NewExtentStore(dataDir string, partitionId uint32, storeSize int) (s *Exten
 	s.storeSize = storeSize
 	s.closeC = make(chan bool, 1)
 	s.closed = false
+	atomic.StoreUint64(&s.initBaseExtentId, atomic.LoadUint64(&s.baseExtentId))
 	err = s.initTinyExtent()
 	return
 }
@@ -182,14 +184,11 @@ func (s *ExtentStore) getExtentKey(extent uint64) string {
 	return fmt.Sprintf("extent %v_%v", s.partitionId, extent)
 }
 
-func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err error) {
+func (s *ExtentStore) Create(extentId uint64, inode uint64) (err error) {
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	if s.IsExistExtent(extentId) {
-		if !overwrite {
-			err = ErrorExtentHasExsit
-			return err
-		}
+		err = ErrorExtentHasExsit
 		return err
 	} else {
 		extent = NewExtentInCore(name, extentId)
@@ -627,6 +626,11 @@ func (s *ExtentStore) GetWatermarkForWrite(extentId uint64) (watermark int64, er
 
 	return
 }
+
+const (
+	EmptyCrcValue = 4045511210
+)
+
 func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
@@ -639,6 +643,11 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	for _, extentInfo := range extentInfoSlice {
 		if filter != nil && !filter(extentInfo) {
 			continue
+		}
+		if extentInfo.FileId > s.initBaseExtentId && (extentInfo.Crc == EmptyCrcValue || extentInfo.Crc == 0) {
+			if e, extentErr := s.getExtentWithHeader(extentInfo.FileId); extentErr == nil {
+				extentInfo.FromExtentUpdateCrc(e)
+			}
 		}
 		extents = append(extents, extentInfo)
 	}
@@ -664,9 +673,11 @@ func (s *ExtentStore) BackEndLoadExtent() {
 			continue
 		}
 		extentInfo.FromExtent(e)
+		extentInfo.FromExtentUpdateCrc(e)
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentInfo.FileId] = extentInfo
 		s.extentInfoMux.Unlock()
+		time.Sleep(time.Millisecond * 5)
 	}
 	log.LogInfof("BackEnd Load datapartition (%v) success", s.dataDir)
 	return
@@ -790,7 +801,7 @@ func (s *ExtentStore) initTinyExtent() (err error) {
 	s.unavaliTinyExtentCh = make(chan uint64, TinyExtentCount)
 	var extentId uint64
 	for extentId = TinyExtentStartId; extentId < TinyExtentStartId+TinyExtentCount; extentId++ {
-		err = s.Create(extentId, 0, false)
+		err = s.Create(extentId, 0)
 		if err != nil && !strings.Contains(err.Error(), ErrorExtentHasExsit.Error()) {
 			return
 		}
