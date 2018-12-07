@@ -278,7 +278,6 @@ func (dp *dataPartition) ForceLoadHeader() {
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
-	start := time.Now().Unix()
 	var index int
 	for {
 		select {
