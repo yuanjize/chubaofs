@@ -478,15 +478,15 @@ func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode u
 	return false
 }
 
-func (s *ExtentStore)ForceUpdateCrc(extentId uint64){
+func (s *ExtentStore) ForceUpdateCrc(extentId uint64) {
 	s.extentInfoMux.RLock()
 	extentInfo, has := s.extentInfoMap[extentId]
 	s.extentInfoMux.RUnlock()
 	if !has {
 		return
 	}
-	e,err:=s.getExtentWithHeader(extentId)
-	if err!=nil {
+	e, err := s.getExtentWithHeader(extentId)
+	if err != nil {
 		return
 	}
 	extentInfo.FromExtentUpdateCrc(e)
