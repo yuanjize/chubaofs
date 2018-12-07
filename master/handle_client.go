@@ -179,7 +179,12 @@ func setDataPartitions(vol *Vol, view *VolView, liveRate float32) {
 	}
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
-	view.DataPartitions = vol.dataPartitions.GetDataPartitionsView(0)
+	dpResps := vol.dataPartitions.GetDataPartitionsView(0)
+	if vol.dataPartitions.readWriteDataPartitions == 0 && vol.getTotalUsedSpace() < vol.Capacity {
+		view.DataPartitions = make([]*DataPartitionResponse, 0)
+	} else {
+		view.DataPartitions = dpResps
+	}
 }
 func setMetaPartitions(vol *Vol, view *VolView, liveRate float32) {
 	if liveRate < NodesAliveRate {
