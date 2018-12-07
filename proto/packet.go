@@ -448,6 +448,12 @@ func (p *Packet) PackOkReadReply() {
 	p.Arglen = 0
 }
 
+func (p *Packet) PackWithBody(data []byte) {
+	p.Size = uint32(len(data))
+	p.Data = make([]byte, p.Size)
+	copy(p.Data, data)
+}
+
 func (p *Packet) PackOkGetWatermarkReply(size int64) {
 	p.Offset = size
 	p.Size = 0

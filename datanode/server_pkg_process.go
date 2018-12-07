@@ -119,9 +119,10 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 	var err error
 	if reply.IsErrPack() {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
-			reply.StartT, fmt.Errorf(string(reply.Data[:reply.Size]))))
+			reply.StartT, fmt.Errorf(reply.errMsg)))
 		log.LogErrorf("action[doReplyCh] %v", err)
 		reply.forceDestoryCheckUsedClosedConnect(err)
+		reply.PackWithBody([]byte(err.Error()))
 	}
 	s.cleanup(reply)
 	if err = reply.WriteToConn(msgH.inConn); err != nil {
