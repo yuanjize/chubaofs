@@ -151,11 +151,11 @@ func (s *ExtentStore) DeleteStore() (err error) {
 	return
 }
 
-func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
+func (s *ExtentStore) SnapShot(reloadCrc bool) (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter(), true); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter(), reloadCrc); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))

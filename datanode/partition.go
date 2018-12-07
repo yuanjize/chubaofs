@@ -66,7 +66,7 @@ type DataPartition interface {
 	GetExtentCount() int
 
 	GetSnapShot() []*proto.File
-	ReloadSnapshot()
+	ReloadSnapshot(reloadCrc bool)
 
 	ForceLoadHeader()
 
@@ -216,8 +216,8 @@ func (dp *dataPartition) ReplicaHosts() []string {
 	return dp.replicaHosts
 }
 
-func (dp *dataPartition) ReloadSnapshot() {
-	files, err := dp.extentStore.SnapShot()
+func (dp *dataPartition) ReloadSnapshot(reloadCrc bool) {
+	files, err := dp.extentStore.SnapShot(reloadCrc)
 	if err != nil {
 		return
 	}
@@ -281,6 +281,7 @@ func (dp *dataPartition) ForceLoadHeader() {
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
+	start:=time.Now().Unix()
 	var index int
 	for {
 		select {
@@ -296,7 +297,11 @@ func (dp *dataPartition) statusUpdateScheduler() {
 				dp.LaunchRepair(proto.NormalExtentMode)
 			}
 			dp.extentStore.Cleanup()
-			dp.ReloadSnapshot()
+			if time.Now().Unix()-start >60*30{
+				dp.ReloadSnapshot(true)
+			}else {
+				dp.ReloadSnapshot(false)
+			}
 		case <-dp.stopC:
 			ticker.Stop()
 			metricTicker.Stop()
