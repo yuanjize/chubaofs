@@ -261,7 +261,7 @@ func (p *Packet) IsErrPack() bool {
 }
 
 func (p *Packet) getErr() (m string) {
-	return fmt.Sprintf("req[%v] err[%v]", p.GetUniqueLogId(), string(p.Data[:p.Size]))
+	return fmt.Sprintf("req[%v] err[%v]", p.GetUniqueLogId(), p.errMsg)
 }
 
 func (p *Packet) ClassifyErrorOp(errLog string, errMsg string) {
