@@ -29,7 +29,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/tiglabs/containerfs/master"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/meta"
 	"github.com/tiglabs/containerfs/util"
