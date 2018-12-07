@@ -443,6 +443,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 		return
 	}
 	extentInfo.FromExtent(extent)
+	extentInfo.FromExtentUpdateCrc(extent)
 	extentInfo.Deleted = true
 
 	s.cache.Del(extent.ID())
@@ -610,6 +611,7 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 			return
 		}
 		extentInfo.FromExtent(extent)
+		extentInfo.FromExtentUpdateCrc(extent)
 	}
 	return
 }
@@ -778,6 +780,7 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	}
 
 	extentInfo.FromExtent(extent)
+	extentInfo.FromExtentUpdateCrc(extent)
 	s.cache.Del(extent.ID())
 
 	s.extentInfoMux.Lock()
