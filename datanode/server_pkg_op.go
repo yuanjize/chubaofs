@@ -122,7 +122,7 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 	if len(pkg.Data) >= 8 && pkg.Size >= 8 {
 		ino = binary.BigEndian.Uint64(pkg.Data)
 	}
-	err = pkg.DataPartition.GetExtentStore().Create(pkg.FileID, ino, false)
+	err = pkg.DataPartition.GetExtentStore().Create(pkg.FileID, ino)
 	return
 }
 

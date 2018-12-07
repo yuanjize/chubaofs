@@ -504,7 +504,7 @@ func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 			metas.NeedFixExtentSizeTasks = append(metas.NeedFixExtentSizeTasks, fixFileSizeTask)
 			continue
 		}
-		err := store.Create(uint64(addExtent.FileId), addExtent.Inode, false)
+		err := store.Create(uint64(addExtent.FileId), addExtent.Inode)
 		if err != nil {
 			continue
 		}

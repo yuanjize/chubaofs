@@ -182,14 +182,11 @@ func (s *ExtentStore) getExtentKey(extent uint64) string {
 	return fmt.Sprintf("extent %v_%v", s.partitionId, extent)
 }
 
-func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err error) {
+func (s *ExtentStore) Create(extentId uint64, inode uint64) (err error) {
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	if s.IsExistExtent(extentId) {
-		if !overwrite {
-			err = ErrorExtentHasExsit
-			return err
-		}
+		err = ErrorExtentHasExsit
 		return err
 	} else {
 		extent = NewExtentInCore(name, extentId)
@@ -790,7 +787,7 @@ func (s *ExtentStore) initTinyExtent() (err error) {
 	s.unavaliTinyExtentCh = make(chan uint64, TinyExtentCount)
 	var extentId uint64
 	for extentId = TinyExtentStartId; extentId < TinyExtentStartId+TinyExtentCount; extentId++ {
-		err = s.Create(extentId, 0, false)
+		err = s.Create(extentId, 0)
 		if err != nil && !strings.Contains(err.Error(), ErrorExtentHasExsit.Error()) {
 			return
 		}
