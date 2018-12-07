@@ -281,7 +281,7 @@ func (dp *dataPartition) ForceLoadHeader() {
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
-	start:=time.Now().Unix()
+	start := time.Now().Unix()
 	var index int
 	for {
 		select {
@@ -297,9 +297,9 @@ func (dp *dataPartition) statusUpdateScheduler() {
 				dp.LaunchRepair(proto.NormalExtentMode)
 			}
 			dp.extentStore.Cleanup()
-			if time.Now().Unix()-start >60*30{
+			if time.Now().Unix()-start > 60*30 {
 				dp.ReloadSnapshot(true)
-			}else {
+			} else {
 				dp.ReloadSnapshot(false)
 			}
 		case <-dp.stopC:
