@@ -485,14 +485,6 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	return
 }
 
-func (dp *dataPartition) GetAllExtentsMeta() (files []*storage.FileInfo, err error) {
-	files, err = dp.extentStore.GetAllWatermark(storage.GetStableExtentFilter())
-	if err != nil {
-		return nil, err
-	}
-	return
-}
-
 func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	store := dp.extentStore
 	for _, addExtent := range metas.NeedAddExtentsTasks {

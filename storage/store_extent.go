@@ -29,6 +29,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/tiglabs/containerfs/master"
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/meta"
 	"github.com/tiglabs/containerfs/util"
@@ -155,7 +156,7 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter(), true); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
@@ -476,7 +477,7 @@ func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode u
 }
 
 func (s *ExtentStore) Cleanup() {
-	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter())
+	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter(), false)
 	if len(extentInfoSlice) == 0 {
 		return
 	}
@@ -624,7 +625,12 @@ func (s *ExtentStore) GetWatermarkForWrite(extentId uint64) (watermark int64, er
 
 	return
 }
-func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
+
+const (
+	EmptyCrcValue = 4045511210
+)
+
+func (s *ExtentStore) GetAllWatermark(filter ExtentFilter, reloadCrc bool) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
 	s.extentInfoMux.RLock()
@@ -636,6 +642,11 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	for _, extentInfo := range extentInfoSlice {
 		if filter != nil && !filter(extentInfo) {
 			continue
+		}
+		if reloadCrc && (extentInfo.Crc == EmptyCrcValue || extentInfo.Crc == 0) {
+			if e, extentErr := s.getExtentWithHeader(extentInfo.FileId); extentErr == nil {
+				extentInfo.FromExtentUpdateCrc(e)
+			}
 		}
 		extents = append(extents, extentInfo)
 	}
