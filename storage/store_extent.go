@@ -688,64 +688,6 @@ func (s *ExtentStore) ParseExtentId(filename string) (extentId uint64, isExtent 
 	return
 }
 
-func (s *ExtentStore) UsedSize() (size int64) {
-	if fInfoArray, err := ioutil.ReadDir(s.dataDir); err == nil {
-		for _, fInfo := range fInfoArray {
-			if fInfo.IsDir() {
-				continue
-			}
-			if _, isExtent := s.ParseExtentId(fInfo.Name()); !isExtent {
-				continue
-			}
-			size += fInfo.Size()
-		}
-	}
-	return
-}
-
-func (s *ExtentStore) GetDelObjects() (extents []uint64) {
-	extents = make([]uint64, 0)
-	var (
-		offset   int64
-		extendId uint64
-	)
-	for {
-		buf := make([]byte, util.MB*10)
-		read, err := s.deleteFp.ReadAt(buf, offset)
-		if read == 0 {
-			break
-		}
-		offset += int64(read)
-		byteBuf := bytes.NewBuffer(buf[:read])
-		for {
-			if err := binary.Read(byteBuf, binary.BigEndian, &extendId); err != nil {
-				break
-			}
-			extents = append(extents, extendId)
-		}
-		if err == io.EOF || read == 0 {
-			break
-		}
-	}
-	return
-}
-
-func (s *ExtentStore) GetOneWatermark(extendId uint64, filter ExtentFilter) (extentInfo *FileInfo, err error) {
-	s.extentInfoMux.RLock()
-	extentInfo, has := s.extentInfoMap[extendId]
-	s.extentInfoMux.RUnlock()
-	if !has {
-		err = fmt.Errorf("extent not exist")
-		return nil, err
-	}
-	if filter != nil && !filter(extentInfo) {
-		err = fmt.Errorf("extent filter")
-		return nil, err
-	}
-
-	return
-}
-
 func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	var (
 		extent     Extent
