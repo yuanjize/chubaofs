@@ -302,6 +302,12 @@ func (p *Packet) PackErrorBody(action, msg string) {
 	p.errMsg = action + "_" + msg
 }
 
+func (p *Packet) PackWithBody(data []byte) {
+	p.Size = uint32(len(data))
+	p.Data = make([]byte, p.Size)
+	copy(p.Data, data)
+}
+
 func (p *Packet) ReadFull(c net.Conn, readSize int) (err error) {
 	if p.Opcode == proto.OpWrite && readSize == util.BlockSize {
 		p.Data, _ = proto.Buffers.Get(util.BlockSize)

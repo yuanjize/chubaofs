@@ -442,16 +442,9 @@ func (p *Packet) PackOkReply() {
 	p.Size = 0
 	p.Arglen = 0
 }
-
 func (p *Packet) PackOkReadReply() {
 	p.ResultCode = OpOk
 	p.Arglen = 0
-}
-
-func (p *Packet) PackWithBody(data []byte) {
-	p.Size = uint32(len(data))
-	p.Data = make([]byte, p.Size)
-	copy(p.Data, data)
 }
 
 func (p *Packet) PackOkGetWatermarkReply(size int64) {
