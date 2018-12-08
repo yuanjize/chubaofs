@@ -480,7 +480,11 @@ func (e *fsExtent) Flush() (err error) {
 func (e *fsExtent) HeaderChecksum() (crc uint32) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	crc = crc32.ChecksumIEEE(e.header)
+	blockNum := e.dataSize / util.BlockSize
+	if e.dataSize%util.BlockSize != 0 {
+		blockNum = blockNum + 1
+	}
+	crc = crc32.ChecksumIEEE(e.header[0:blockNum*util.PerBlockCrcSize])
 	return
 }
 
