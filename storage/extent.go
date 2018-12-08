@@ -48,6 +48,7 @@ type FileInfo struct {
 	Deleted bool      `json:"deleted"`
 	ModTime time.Time `json:"modTime"`
 	Source  string    `json:"src"`
+	Header  []byte    `json:"header"`
 }
 
 func (ei *FileInfo) FromExtent(extent Extent) {
@@ -59,6 +60,7 @@ func (ei *FileInfo) FromExtent(extent Extent) {
 			ei.Deleted = extent.IsMarkDelete()
 			ei.ModTime = extent.ModTime()
 			ei.Crc = extent.HeaderChecksum()
+			ei.Header = extent.(*fsExtent).header
 		}
 	}
 }
