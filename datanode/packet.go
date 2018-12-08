@@ -50,7 +50,6 @@ type Packet struct {
 	addrs         []string
 	tpObject      *ump.TpObject
 	useConnectMap bool
-	errMsg        string
 }
 
 func (p *Packet) afterTp() (ok bool) {
@@ -261,7 +260,7 @@ func (p *Packet) IsErrPack() bool {
 }
 
 func (p *Packet) getErr() (m string) {
-	return fmt.Sprintf("req[%v] err[%v]", p.GetUniqueLogId(), p.errMsg)
+	return fmt.Sprintf("req[%v] err[%v]", p.GetUniqueLogId(), string(p.Data[:p.Size]))
 }
 
 func (p *Packet) ClassifyErrorOp(errLog string, errMsg string) {
@@ -299,13 +298,9 @@ func (p *Packet) PackErrorBody(action, msg string) {
 	if p.ResultCode == proto.OpDiskNoSpaceErr || p.ResultCode == proto.OpDiskErr {
 		p.ResultCode = proto.OpIntraGroupNetErr
 	}
-	p.errMsg = action + "_" + msg
-}
-
-func (p *Packet) PackWithBody(data []byte) {
-	p.Size = uint32(len(data))
+	p.Size = uint32(len([]byte(action + "_" + msg)))
 	p.Data = make([]byte, p.Size)
-	copy(p.Data, data)
+	copy(p.Data[:int(p.Size)], []byte(action+"_"+msg))
 }
 
 func (p *Packet) ReadFull(c net.Conn, readSize int) (err error) {
