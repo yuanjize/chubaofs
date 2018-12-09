@@ -61,6 +61,9 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 		log.LogError(errors.ErrorStack(err))
 		return
 	}
+	for _, addExtent := range allMembers[0].NeedAddExtentsTasks {
+		dp.extentStore.Create(addExtent.FileId, addExtent.Inode)
+	}
 	for _, fixExtentFile := range allMembers[0].NeedFixExtentSizeTasks {
 		dp.streamRepairExtent(fixExtentFile) //fix leader filesize
 	}
@@ -140,6 +143,7 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 		return
 	}
 	for _, fi := range files {
+		fi.Source = dp.replicaHosts[0]
 		leaderFileMetas.files[fi.FileId] = fi
 	}
 	allMemberFileMetas[0] = leaderFileMetas
@@ -186,6 +190,7 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 		gConnPool.Put(conn, true)
 		slaverFileMetas := NewMemberFileMetas()
 		for _, fileInfo := range fileInfos {
+			fileInfo.Source = target
 			slaverFileMetas.files[fileInfo.FileId] = fileInfo
 		}
 		allMemberFileMetas[i] = slaverFileMetas
@@ -195,28 +200,26 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 
 //generator file task
 func (dp *dataPartition) generatorExtentRepairTasks(allMembers []*MembersFileMetas) (noNeedFix []uint64, needFix []uint64) {
-	dp.generatorAddExtentsTasks(allMembers) //add extentTask
-	noNeedFix, needFix = dp.generatorFixExtentSizeTasks(allMembers)
+	maxSizeExtentMap := dp.mapMaxSizeExtentToIndex(allMembers) //map maxSize extentId to allMembers index
+	dp.generatorAddExtentsTasks(allMembers, maxSizeExtentMap)  //add extentTask
+	noNeedFix, needFix = dp.generatorFixExtentSizeTasks(allMembers, maxSizeExtentMap)
 	return
 }
 
 /* pasre all extent,select maxExtentSize to member index map
  */
-func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas) (maxSizeExtentMap map[uint64]int) {
-	leader := allMembers[0]
-	maxSizeExtentMap = make(map[uint64]int)
-	for fileId := range leader.files { //range leader all extentFiles
-		maxSizeExtentMap[fileId] = 0
-		var maxFileSize uint64
-		for index := 0; index < len(allMembers); index++ {
-			member := allMembers[index]
-			_, ok := member.files[fileId]
+func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas) (maxSizeExtentMap map[uint64]*storage.FileInfo) {
+	maxSizeExtentMap = make(map[uint64]*storage.FileInfo)
+	for index := 0; index < len(allMembers); index++ {
+		member := allMembers[index]
+		for fileId, fileInfo := range member.files {
+			maxFileInfo, ok := maxSizeExtentMap[fileId]
 			if !ok {
-				continue
-			}
-			if maxFileSize < member.files[fileId].Size {
-				maxFileSize = member.files[fileId].Size
-				maxSizeExtentMap[fileId] = index //map maxSize extentId to allMembers index
+				maxSizeExtentMap[fileId] = maxFileInfo
+			} else {
+				if fileInfo.Size >= maxFileInfo.Size {
+					maxSizeExtentMap[fileId] = fileInfo
+				}
 			}
 		}
 	}
@@ -224,46 +227,36 @@ func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas)
 }
 
 /*generator add extent if follower not have this extent*/
-func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas) {
-	leader := allMembers[0]
-	leaderAddr := dp.replicaHosts[0]
-	for fileId, leaderFile := range leader.files {
+func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) {
+	for fileId, maxFileInfo := range maxSizeExtentMap {
 		if storage.IsTinyExtent(fileId) {
 			continue
 		}
-		for index := 1; index < len(allMembers); index++ {
+		for index := 0; index < len(allMembers); index++ {
 			follower := allMembers[index]
-			if _, ok := follower.files[fileId]; !ok && leaderFile.Deleted == false {
-				addFile := &storage.FileInfo{Source: leaderAddr, FileId: fileId, Size: leaderFile.Size, Inode: leaderFile.Inode}
+			if _, ok := follower.files[fileId]; !ok && maxFileInfo.Deleted == false {
+				addFile := &storage.FileInfo{Source: maxFileInfo.Source, FileId: fileId, Size: maxFileInfo.Size, Inode: maxFileInfo.Inode}
 				follower.NeedAddExtentsTasks = append(follower.NeedAddExtentsTasks, addFile)
-				log.LogInfof("action[generatorAddExtentsTasks] partition(%v) addFile(%v).", dp.partitionId, addFile)
+				follower.NeedFixExtentSizeTasks = append(follower.NeedFixExtentSizeTasks, addFile)
+				log.LogInfof("action[generatorAddExtentsTasks] partition(%v) addFile(%v) on Index(%v).", dp.partitionId, addFile, index)
 			}
 		}
 	}
 }
 
 /*generator fix extent Size ,if all members  Not the same length*/
-func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMetas) (noNeedFix []uint64, needFix []uint64) {
-	leader := allMembers[0]
-	maxSizeExtentMap := dp.mapMaxSizeExtentToIndex(allMembers) //map maxSize extentId to allMembers index
+func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) (noNeedFix []uint64, needFix []uint64) {
 	noNeedFix = make([]uint64, 0)
 	needFix = make([]uint64, 0)
-	for fileId, leaderFile := range leader.files {
-		maxSizeExtentIdIndex := maxSizeExtentMap[fileId]
-		maxSize := allMembers[maxSizeExtentIdIndex].files[fileId].Size
-		sourceAddr := dp.replicaHosts[maxSizeExtentIdIndex]
-		inode := leaderFile.Inode
+	for fileId, maxFileInfo := range maxSizeExtentMap {
 		isFix := true
 		for index := 0; index < len(allMembers); index++ {
-			if index == maxSizeExtentIdIndex {
-				continue
-			}
 			extentInfo, ok := allMembers[index].files[fileId]
 			if !ok {
 				continue
 			}
-			if extentInfo.Size < maxSize {
-				fixExtent := &storage.FileInfo{Source: sourceAddr, FileId: fileId, Size: maxSize, Inode: inode}
+			if extentInfo.Size < maxFileInfo.Size {
+				fixExtent := &storage.FileInfo{Source: maxFileInfo.Source, FileId: fileId, Size: maxFileInfo.Size, Inode: maxFileInfo.Inode}
 				allMembers[index].NeedFixExtentSizeTasks = append(allMembers[index].NeedFixExtentSizeTasks, fixExtent)
 				log.LogInfof("action[generatorFixExtentSizeTasks] partition(%v) fixExtent(%v).", dp.partitionId, fixExtent)
 				isFix = false
