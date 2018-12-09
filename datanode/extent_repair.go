@@ -346,6 +346,10 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		return
 	}
 
+	defer func() {
+		store.GetWatermark(remoteExtentInfo.FileId, true)
+	}()
+
 	// Get local extent file info
 	localExtentInfo, err := store.GetWatermark(remoteExtentInfo.FileId, true)
 	if err != nil {
