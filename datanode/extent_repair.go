@@ -62,9 +62,6 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 		return
 	}
 	for _, addExtent := range allMembers[0].NeedAddExtentsTasks {
-		if addExtent.Inode == 0 {
-			continue
-		}
 		dp.extentStore.Create(addExtent.FileId, addExtent.Inode)
 	}
 	for _, fixExtentFile := range allMembers[0].NeedFixExtentSizeTasks {
