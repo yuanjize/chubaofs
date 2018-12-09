@@ -303,6 +303,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		}
 		extentInfo = &FileInfo{}
 		extentInfo.FromExtent(extent)
+		extentInfo.Crc = 0
 		s.extentInfoMux.Lock()
 		s.extentInfoMap[extentId] = extentInfo
 		s.extentInfoMux.Unlock()
