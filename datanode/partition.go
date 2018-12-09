@@ -216,10 +216,7 @@ func (dp *dataPartition) ReplicaHosts() []string {
 }
 
 func (dp *dataPartition) ReloadSnapshot() {
-	if dp.loadExtentHeaderStatus == StartLoadDataPartitionExtentHeader {
-		return
-	}
-	files, err := dp.extentStore.SnapShot()
+	files, err := dp.extentStore.SnapShot(dp.loadExtentHeaderStatus == FinishLoadDataPartitionExtentHeader)
 	if err != nil {
 		return
 	}

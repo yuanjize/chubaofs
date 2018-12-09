@@ -151,7 +151,7 @@ func (s *ExtentStore) DeleteStore() (err error) {
 	return
 }
 
-func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
+func (s *ExtentStore) SnapShot(isLoadCrc bool) (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
@@ -165,9 +165,12 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 		}
 		file := &proto.File{
 			Name:     strconv.FormatUint(extentInfo.FileId, 10),
-			Crc:      extentInfo.Crc,
+			Crc:      0,
 			Size:     uint32(extentInfo.Size),
 			Modified: extentInfo.ModTime.Unix(),
+		}
+		if isLoadCrc {
+			file.Crc = extentInfo.Crc
 		}
 		files = append(files, file)
 	}
