@@ -410,15 +410,7 @@ func (e *fsExtent) Read(data []byte, offset, size int64) (crc uint32, err error)
 	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
-	var (
-		readN int
-	)
-	if readN, err = e.file.ReadAt(data[:size], offset+util.BlockHeaderSize); err != nil {
-		return
-	}
-	if offset%util.BlockSize == 0 && readN == util.BlockSize {
-		blockNo := offset / util.BlockSize
-		crc = e.getBlockCrc(int(blockNo))
+	if _, err = e.file.ReadAt(data[:size], offset+util.BlockHeaderSize); err != nil {
 		return
 	}
 	crc = crc32.ChecksumIEEE(data)
