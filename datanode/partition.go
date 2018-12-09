@@ -295,7 +295,6 @@ func (dp *dataPartition) statusUpdateScheduler() {
 			} else {
 				dp.LaunchRepair(proto.NormalExtentMode)
 			}
-			dp.extentStore.Cleanup()
 			dp.ReloadSnapshot()
 		case <-dp.stopC:
 			ticker.Stop()
