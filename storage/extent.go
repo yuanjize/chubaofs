@@ -474,7 +474,7 @@ func (e *fsExtent) HeaderChecksum() (crc uint32) {
 	if e.dataSize%util.BlockSize != 0 {
 		blockNum = blockNum + 1
 	}
-	crc = crc32.ChecksumIEEE(e.header[0 : blockNum*util.PerBlockCrcSize])
+	crc = crc32.ChecksumIEEE(e.header[9: blockNum*util.PerBlockCrcSize])
 	return
 }
 
