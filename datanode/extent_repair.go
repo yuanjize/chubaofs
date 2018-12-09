@@ -62,6 +62,9 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 		return
 	}
 	for _, addExtent := range allMembers[0].NeedAddExtentsTasks {
+		if addExtent.Inode == 0 {
+			continue
+		}
 		dp.extentStore.Create(addExtent.FileId, addExtent.Inode)
 	}
 	for _, fixExtentFile := range allMembers[0].NeedFixExtentSizeTasks {
@@ -235,6 +238,9 @@ func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas
 		for index := 0; index < len(allMembers); index++ {
 			follower := allMembers[index]
 			if _, ok := follower.files[fileId]; !ok && maxFileInfo.Deleted == false {
+				if maxFileInfo.Inode == 0 {
+					continue
+				}
 				addFile := &storage.FileInfo{Source: maxFileInfo.Source, FileId: fileId, Size: maxFileInfo.Size, Inode: maxFileInfo.Inode}
 				follower.NeedAddExtentsTasks = append(follower.NeedAddExtentsTasks, addFile)
 				follower.NeedFixExtentSizeTasks = append(follower.NeedFixExtentSizeTasks, addFile)
@@ -335,7 +341,7 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	}
 
 	// Get local extent file info
-	localExtentInfo, err := store.GetWatermark(remoteExtentInfo.FileId, false)
+	localExtentInfo, err := store.GetWatermark(remoteExtentInfo.FileId, true)
 	if err != nil {
 		return errors.Annotatef(err, "streamRepairExtent GetWatermark error")
 	}
