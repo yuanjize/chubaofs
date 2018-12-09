@@ -215,7 +215,7 @@ func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas)
 		for fileId, fileInfo := range member.files {
 			maxFileInfo, ok := maxSizeExtentMap[fileId]
 			if !ok {
-				maxSizeExtentMap[fileId] = maxFileInfo
+				maxSizeExtentMap[fileId] = fileInfo
 			} else {
 				if fileInfo.Size >= maxFileInfo.Size {
 					maxSizeExtentMap[fileId] = fileInfo
