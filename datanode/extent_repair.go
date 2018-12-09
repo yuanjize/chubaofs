@@ -220,7 +220,7 @@ func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas)
 			if !ok {
 				maxSizeExtentMap[fileId] = fileInfo
 			} else {
-				if fileInfo.Size >= maxFileInfo.Size {
+				if fileInfo.Size > maxFileInfo.Size {
 					maxSizeExtentMap[fileId] = fileInfo
 				}
 			}
