@@ -242,7 +242,9 @@ func (space *spaceManager) putPartition(dp DataPartition) {
 }
 
 func (space *spaceManager) CreatePartition(volId string, partitionId uint32, storeSize int, storeType string) (dp DataPartition, err error) {
-	if space.GetPartition(partitionId) != nil {
+	space.partitionMu.Lock()
+	defer space.partitionMu.Unlock()
+	if space.partitions[partitionId] != nil {
 		return
 	}
 	var (
@@ -263,9 +265,6 @@ func (space *spaceManager) CreatePartition(volId string, partitionId uint32, sto
 	if dp, err = CreateDataPartition(volId, partitionId, disk, storeSize, storeType); err != nil {
 		return
 	}
-
-	space.partitionMu.Lock()
-	defer space.partitionMu.Unlock()
 	space.partitions[dp.ID()] = dp
 
 	return
