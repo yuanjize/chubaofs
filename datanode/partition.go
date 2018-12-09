@@ -216,7 +216,10 @@ func (dp *dataPartition) ReplicaHosts() []string {
 }
 
 func (dp *dataPartition) ReloadSnapshot() {
-	files, err := dp.extentStore.SnapShot(dp.loadExtentHeaderStatus == FinishLoadDataPartitionExtentHeader)
+	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
+		return
+	}
+	files, err := dp.extentStore.SnapShot()
 	if err != nil {
 		return
 	}
@@ -475,7 +478,11 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response.PartitionStatus = dp.partitionStatus
 	response.Used = uint64(dp.Used())
 	var err error
-	response.PartitionSnapshot = dp.GetSnapShot()
+	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
+		response.PartitionSnapshot = make([]*proto.File, 0)
+	} else {
+		response.PartitionSnapshot = dp.GetSnapShot()
+	}
 	if err != nil {
 		response.Status = proto.TaskFail
 		response.Result = err.Error()
