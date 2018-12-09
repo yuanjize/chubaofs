@@ -50,6 +50,11 @@ const (
 )
 
 const (
+	StartLoadDataPartitionExtentHeader  = -1
+	FinishLoadDataPartitionExtentHeader = 1
+)
+
+const (
 	NetType           = "tcp"
 	MinFixTinyExtents = 10
 )

@@ -115,8 +115,9 @@ type dataPartition struct {
 	updatePartitionSizeTime int64
 	isFirstFixTinyExtents   bool
 
-	snapshot     []*proto.File
-	snapshotLock sync.RWMutex
+	snapshot               []*proto.File
+	snapshotLock           sync.RWMutex
+	loadExtentHeaderStatus int
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
@@ -173,15 +174,16 @@ func LoadDataPartition(partitionDir string, disk *Disk) (dp DataPartition, err e
 
 func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int) (dp DataPartition, err error) {
 	partition := &dataPartition{
-		volumeId:        volumeId,
-		partitionId:     partitionId,
-		disk:            disk,
-		path:            path.Join(disk.Path, fmt.Sprintf(DataPartitionPrefix+"_%v_%v", partitionId, size)),
-		partitionSize:   size,
-		replicaHosts:    make([]string, 0),
-		stopC:           make(chan bool, 0),
-		partitionStatus: proto.ReadWrite,
-		runtimeMetrics:  NewDataPartitionMetrics(),
+		volumeId:               volumeId,
+		partitionId:            partitionId,
+		disk:                   disk,
+		path:                   path.Join(disk.Path, fmt.Sprintf(DataPartitionPrefix+"_%v_%v", partitionId, size)),
+		partitionSize:          size,
+		replicaHosts:           make([]string, 0),
+		stopC:                  make(chan bool, 0),
+		partitionStatus:        proto.ReadWrite,
+		runtimeMetrics:         NewDataPartitionMetrics(),
+		loadExtentHeaderStatus: StartLoadDataPartitionExtentHeader,
 	}
 	partition.extentStore, err = storage.NewExtentStore(partition.path, partitionId, size)
 	if err != nil {
@@ -214,6 +216,9 @@ func (dp *dataPartition) ReplicaHosts() []string {
 }
 
 func (dp *dataPartition) ReloadSnapshot() {
+	if dp.loadExtentHeaderStatus == StartLoadDataPartitionExtentHeader {
+		return
+	}
 	files, err := dp.extentStore.SnapShot()
 	if err != nil {
 		return
@@ -273,6 +278,7 @@ func (dp *dataPartition) ChangeStatus(status int) {
 
 func (dp *dataPartition) ForceLoadHeader() {
 	dp.extentStore.BackEndLoadExtent()
+	dp.loadExtentHeaderStatus = FinishLoadDataPartitionExtentHeader
 }
 
 func (dp *dataPartition) statusUpdateScheduler() {
