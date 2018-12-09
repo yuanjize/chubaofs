@@ -79,6 +79,8 @@ type Extent interface {
 	// Ino returns this inode ID of this extent block belong to.
 	Ino() uint64
 
+	ModifyIno(newInode uint64)
+
 	// Close this extent and release FD.
 	Close() error
 
@@ -163,6 +165,11 @@ func (e *fsExtent) Close() (err error) {
 func (e *fsExtent) Ino() (ino uint64) {
 	ino = binary.BigEndian.Uint64(e.header[:util.BlockHeaderInoSize])
 	return
+}
+
+func (e *fsExtent) ModifyIno(newInode uint64) {
+	binary.BigEndian.PutUint64(e.header[:util.BlockHeaderInoSize], newInode)
+	e.file.WriteAt(e.header[:util.BlockHeaderInoSize], 0)
 }
 
 // ID returns the identity value (extentId) of this extent entity.

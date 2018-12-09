@@ -271,6 +271,11 @@ func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMe
 				log.LogInfof("action[generatorFixExtentSizeTasks] partition(%v) fixExtent(%v).", dp.partitionId, fixExtent)
 				isFix = false
 			}
+			if maxFileInfo.Inode != 0 && extentInfo.Inode == 0 {
+				fixExtent := &storage.FileInfo{Source: maxFileInfo.Source, FileId: fileId, Size: maxFileInfo.Size, Inode: maxFileInfo.Inode}
+				allMembers[index].NeedFixExtentSizeTasks = append(allMembers[index].NeedFixExtentSizeTasks, fixExtent)
+				log.LogInfof("action[generatorFixExtentSizeTasks] partition(%v) Modify Ino fixExtent(%v).", dp.partitionId, fixExtent)
+			}
 		}
 		if storage.IsTinyExtent(fileId) {
 			if isFix {
@@ -348,6 +353,10 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	localExtentInfo, err := store.GetWatermark(remoteExtentInfo.FileId, true)
 	if err != nil {
 		return errors.Annotatef(err, "streamRepairExtent GetWatermark error")
+	}
+	if localExtentInfo.Inode == 0 && remoteExtentInfo.Inode != 0 {
+		store.ModifyInode(remoteExtentInfo.Inode, remoteExtentInfo.FileId)
+		log.LogInfof("%v Modify Inode to %v", dp.applyRepairKey(int(remoteExtentInfo.FileId)), remoteExtentInfo.Inode)
 	}
 
 	// Get need fix size for this extent file

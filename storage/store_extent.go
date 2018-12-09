@@ -595,6 +595,28 @@ func (s *ExtentStore) Close() {
 	s.closed = true
 }
 
+func (s *ExtentStore) ModifyInode(newIndoe uint64, extentId uint64) {
+	var (
+		extent Extent
+		err    error
+	)
+	s.extentInfoMux.RLock()
+	extentInfo, has := s.extentInfoMap[extentId]
+	s.extentInfoMux.RUnlock()
+	if !has {
+		err = fmt.Errorf("extent %v not exist", s.getExtentKey(extentId))
+		return
+	}
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
+		return
+	}
+	extent.ModifyIno(newIndoe)
+	extentInfo.FromExtent(extent)
+	s.extentInfoMux.Lock()
+	s.extentInfoMap[extentId] = extentInfo
+	s.extentInfoMux.Unlock()
+}
+
 func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *FileInfo, err error) {
 	var (
 		has    bool
@@ -612,6 +634,9 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 			return
 		}
 		extentInfo.FromExtent(extent)
+		s.extentInfoMux.Lock()
+		s.extentInfoMap[extentId] = extentInfo
+		s.extentInfoMux.Unlock()
 	}
 	return
 }
