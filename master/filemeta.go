@@ -56,9 +56,10 @@ func (fm *FileMetaOnNode) getFileCrc() (crc uint32) {
 	return fm.Crc
 }
 
-func NewFileInCore(name string) (fc *FileInCore) {
+func NewFileInCore(name string, lastModify int64) (fc *FileInCore) {
 	fc = new(FileInCore)
 	fc.Name = name
+	fc.LastModify = lastModify
 	fc.Metas = make([]*FileMetaOnNode, 0)
 
 	return

@@ -409,7 +409,7 @@ func (partition *DataPartition) LoadFile(dataNode *DataNode, resp *proto.LoadDat
 		}
 		fc, ok := partition.FileInCoreMap[dpf.Name]
 		if !ok {
-			fc = NewFileInCore(dpf.Name)
+			fc = NewFileInCore(dpf.Name, dpf.Modified)
 			partition.FileInCoreMap[dpf.Name] = fc
 		}
 		fc.updateFileInCore(partition.PartitionID, dpf, replica, index)
