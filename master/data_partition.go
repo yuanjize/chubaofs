@@ -402,7 +402,6 @@ func (partition *DataPartition) LoadFile(dataNode *DataNode, resp *proto.LoadDat
 		return
 	}
 	replica := partition.Replicas[index]
-	replica.LoadPartitionIsResponse = true
 	for _, dpf := range resp.PartitionSnapshot {
 		if dpf == nil {
 			continue
@@ -414,6 +413,7 @@ func (partition *DataPartition) LoadFile(dataNode *DataNode, resp *proto.LoadDat
 		}
 		fc.updateFileInCore(partition.PartitionID, dpf, replica, index)
 	}
+	replica.LoadPartitionIsResponse = true
 }
 
 func (partition *DataPartition) getReplicaIndex(addr string) (index int, err error) {
