@@ -333,7 +333,7 @@ func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err e
 
 func (e *fsExtent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
 	if !IsTinyExtent(e.extentId) {
-		return fmt.Errorf("extent %v not tinyExtent", e.extentId)
+		return ErrorUnavaliExtent
 	}
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
