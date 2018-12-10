@@ -308,6 +308,7 @@ func (s *DataNode) fillHeartBeatResponse(response *proto.DataNodeHeartBeatRespon
 			Used:            uint64(partition.Used()),
 			DiskPath:        partition.Disk().Path,
 			ExtentCount:     partition.GetExtentStore().GetExtentCount(),
+			NeedCompare:     partition.LoadExtentHeaderStatus() == FinishLoadDataPartitionExtentHeader,
 		}
 		response.PartitionInfo = append(response.PartitionInfo, vr)
 		return true

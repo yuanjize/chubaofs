@@ -101,6 +101,7 @@ type PartitionReport struct {
 	Used            uint64
 	DiskPath        string
 	ExtentCount     int
+	NeedCompare     bool
 }
 
 type DataNodeHeartBeatResponse struct {

@@ -318,12 +318,11 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 
 func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
 	var (
-		extentInfo *FileInfo
-		has        bool
-		extent     Extent
+		has    bool
+		extent Extent
 	)
 	s.extentInfoMux.RLock()
-	extentInfo, has = s.extentInfoMap[extentId]
+	_, has = s.extentInfoMap[extentId]
 	s.extentInfoMux.RUnlock()
 	if !has {
 		err = fmt.Errorf("extent %v not exist", extentId)
@@ -342,7 +341,9 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	if err = extent.Write(data, offset, size, crc); err != nil {
 		return err
 	}
-	extentInfo.FromExtent(extent)
+	s.extentInfoMux.RLock()
+	s.extentInfoMap[extentId].FromExtent(extent)
+	s.extentInfoMux.RUnlock()
 	return nil
 }
 

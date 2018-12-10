@@ -436,9 +436,7 @@ func (e *fsExtent) ReadTiny(data []byte, offset, size int64) (crc uint32, err er
 func (e *fsExtent) updateBlockCrc(blockNo int, crc uint32) (err error) {
 	startIdx := util.BlockHeaderCrcIndex + blockNo*util.PerBlockCrcSize
 	endIdx := startIdx + util.PerBlockCrcSize
-	data := make([]byte, util.PerBlockCrcSize)
-	binary.BigEndian.PutUint32(data, crc)
-	copy(e.header[startIdx:endIdx], data)
+	binary.BigEndian.PutUint32(e.header[startIdx:endIdx], crc)
 	if _, err = e.file.WriteAt(e.header[startIdx:endIdx], int64(startIdx)); err != nil {
 		return
 	}
@@ -483,7 +481,7 @@ func (e *fsExtent) HeaderChecksum() (crc uint32) {
 	if e.dataSize%util.BlockSize != 0 {
 		blockNum = blockNum + 1
 	}
-	crc = crc32.ChecksumIEEE(e.header[util.BlockHeaderCrcIndex: util.BlockHeaderCrcIndex+blockNum*util.PerBlockCrcSize])
+	crc = crc32.ChecksumIEEE(e.header[util.BlockHeaderCrcIndex : util.BlockHeaderCrcIndex+blockNum*util.PerBlockCrcSize])
 	return
 }
 

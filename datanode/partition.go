@@ -75,6 +75,8 @@ type DataPartition interface {
 	AddWriteMetrics(latency uint64)
 	AddReadMetrics(latency uint64)
 
+	LoadExtentHeaderStatus() int
+
 	Stop()
 }
 
@@ -213,6 +215,10 @@ func (dp *dataPartition) IsLeader() bool {
 
 func (dp *dataPartition) ReplicaHosts() []string {
 	return dp.replicaHosts
+}
+
+func (dp *dataPartition) LoadExtentHeaderStatus() int {
+	return dp.loadExtentHeaderStatus
 }
 
 func (dp *dataPartition) ReloadSnapshot() {
