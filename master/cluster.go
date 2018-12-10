@@ -123,8 +123,8 @@ func (c *Cluster) checkDataPartitions() {
 	vols := c.getAllNormalVols()
 	for _, vol := range vols {
 		readWrites := vol.checkDataPartitions(c)
-		vol.dataPartitions.setReadWriteDataPartitions(readWrites, c.Name)
 		vol.dataPartitions.updateDataPartitionResponseCache(true, 0)
+		vol.dataPartitions.setReadWriteDataPartitions(readWrites, c.Name)
 		msg := fmt.Sprintf("action[checkDataPartitions],vol[%v] can readWrite dataPartitions:%v  ", vol.Name, vol.dataPartitions.readWriteDataPartitions)
 		log.LogInfo(msg)
 	}
