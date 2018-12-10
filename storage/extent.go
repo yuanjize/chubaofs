@@ -333,7 +333,7 @@ func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err e
 
 func (e *fsExtent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
 	if !IsTinyExtent(e.extentId) {
-		return fmt.Errorf("extent %v not tinyExtent", e.extentId)
+		return ErrorUnavaliExtent
 	}
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
@@ -387,7 +387,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 			break
 		}
 		readN, readErr := e.file.ReadAt(blockBuffer, int64(blockNo*util.BlockSize+util.BlockHeaderSize))
-		if readErr != nil && readErr != io.EOF {
+		if readErr != nil && !strings.Contains(readErr.Error(), "EOF") {
 			err = readErr
 			return
 		}
@@ -475,8 +475,8 @@ func (e *fsExtent) Flush() (err error) {
 // HeaderChecksum returns crc checksum value of extent header data
 // include inode data and block crc.
 func (e *fsExtent) HeaderChecksum() (crc uint32) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 	blockNum := e.dataSize / util.BlockSize
 	if e.dataSize%util.BlockSize != 0 {
 		blockNum = blockNum + 1
