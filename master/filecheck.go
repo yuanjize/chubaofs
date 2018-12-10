@@ -60,6 +60,10 @@ func (partition *DataPartition) checkFileInternal(liveReplicas []*DataReplica, c
 		if err != nil {
 			continue
 		}
+		//history reason,don't check extentId =1
+		if extentId == 1 {
+			continue
+		}
 		if IsTinyExtent(extentId) {
 			partition.checkChunkFile(fc, liveReplicas, clusterID)
 		} else {
