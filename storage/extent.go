@@ -367,7 +367,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 	offsetInBlock := offset % util.BlockSize
 	e.dataSize = int64(math.Max(float64(e.dataSize), float64(offset+size)))
 	e.modifyTime = time.Now()
-	if offsetInBlock == 0 {
+	if offsetInBlock == 0 && size == util.BlockSize {
 		return e.updateBlockCrc(int(blockNo), crc)
 	}
 
@@ -387,7 +387,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 			break
 		}
 		readN, readErr := e.file.ReadAt(blockBuffer, int64(blockNo*util.BlockSize+util.BlockHeaderSize))
-		if readErr != nil && !strings.Contains(readErr.Error(), "EOF") {
+		if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
 			err = readErr
 			return
 		}
@@ -398,7 +398,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 		if err = e.updateBlockCrc(int(blockNo), crc); err != nil {
 			return
 		}
-		if readErr == io.EOF || readN < util.BlockSize {
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF || readN < util.BlockSize {
 			break
 		}
 		remainCheckByteCnt -= int64(readN)
