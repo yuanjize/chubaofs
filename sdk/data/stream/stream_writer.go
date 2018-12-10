@@ -270,6 +270,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			err = fmt.Errorf("recovery package maxretry not flush to datanode")
 		}
 	}()
+	stream.errCount=0
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = stream.flushData()
 		if err == nil || err == syscall.ENOENT {
@@ -278,13 +279,20 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			return
 		}
 		if err = stream.recoverExtent(); err == nil {
-			if err = stream.flushData(); err == nil {
+			err=stream.flushData()
+			if err == nil || err == syscall.ENOENT {
+				stream.errCount = 0
+				err = nil
 				return
 			}
 			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v", stream.toString(), err.Error())
-			continue
 		}
 		log.LogWarnf("FlushCurrentExtent %v failed,err %v", stream.toString(), err.Error())
+
+		stream.errCount++
+		if stream.errCount>MaxSelectDataPartionForWrite{
+			break
+		}
 	}
 
 	return err
