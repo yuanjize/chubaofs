@@ -387,7 +387,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 			break
 		}
 		readN, readErr := e.file.ReadAt(blockBuffer, int64(blockNo*util.BlockSize+util.BlockHeaderSize))
-		if readErr != nil && !strings.Contains(readErr.Error(), "EOF") {
+		if readErr != nil && (readErr != io.EOF || readErr != io.ErrUnexpectedEOF) {
 			err = readErr
 			return
 		}
