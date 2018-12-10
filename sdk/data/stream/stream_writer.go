@@ -270,6 +270,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			err = fmt.Errorf("recovery package maxretry not flush to datanode")
 		}
 	}()
+	stream.errCount=0
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = stream.flushData()
 		if err == nil || err == syscall.ENOENT {
@@ -278,13 +279,20 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			return
 		}
 		if err = stream.recoverExtent(); err == nil {
-			if err = stream.flushData(); err == nil {
+			err=stream.flushData()
+			if err == nil || err == syscall.ENOENT {
+				stream.errCount = 0
+				err = nil
 				return
 			}
 			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v", stream.toString(), err.Error())
-			continue
 		}
 		log.LogWarnf("FlushCurrentExtent %v failed,err %v", stream.toString(), err.Error())
+
+		stream.errCount++
+		if stream.errCount>MaxSelectDataPartionForWrite{
+			break
+		}
 	}
 
 	return err
@@ -338,7 +346,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 		if err != nil {
 			err = errors.Annotatef(err, "pkg(%v) RecoverExtent write failed", p.GetUniqueLogId())
 			log.LogErrorf("stream(%v) err(%v)", stream.toStringWithWriter(writer), err.Error())
-			stream.excludePartition = append(stream.excludePartition, writer.dp.PartitionID)
+			stream.excludePartitionId(writer.dp.PartitionID)
 			return err
 		}
 	}
@@ -346,7 +354,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 }
 
 func (stream *StreamWriter) recoverExtent() (err error) {
-	stream.excludePartition = append(stream.excludePartition, stream.currentWriter.dp.PartitionID) //exclude current PartionId
+	stream.excludePartitionId(stream.currentWriter.dp.PartitionID)
 	stream.currentWriter.notifyRecvThreadExit()
 	stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
@@ -381,6 +389,23 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 
 }
 
+func (stream *StreamWriter) excludePartitionId(partitionId uint32) {
+	if stream.excludePartition == nil {
+		stream.excludePartition = make([]uint32, 0)
+	}
+	hasExclude := false
+	for _, pId := range stream.excludePartition {
+		if pId == partitionId {
+			hasExclude = true
+			break
+		}
+	}
+	if hasExclude == false {
+		stream.excludePartition = append(stream.excludePartition, partitionId)
+	}
+
+}
+
 func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (writer *ExtentWriter, err error) {
 	var (
 		dp       *wrapper.DataPartition
@@ -398,14 +423,14 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 			if extentId, err = stream.createExtent(dp); err != nil {
 				log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
 					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
-				stream.excludePartition = append(stream.excludePartition, dp.PartitionID)
+				stream.excludePartitionId(dp.PartitionID)
 				continue
 			}
 		}
 		if writer, err = NewExtentWriter(stream.Inode, dp, extentId); err != nil {
 			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
-			stream.excludePartition = append(stream.excludePartition, dp.PartitionID)
+			stream.excludePartitionId(dp.PartitionID)
 			continue
 		}
 		err = nil
