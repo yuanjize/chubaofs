@@ -458,14 +458,20 @@ func (writer *ExtentWriter) getPacket() (p *Packet) {
 }
 
 func (writer *ExtentWriter) markDirty() {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	atomic.StoreInt32(&writer.dirty, 1)
 }
 
 func (writer *ExtentWriter) clearDirty() {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	atomic.StoreInt32(&writer.dirty, 0)
 }
 
 func (writer *ExtentWriter) isDirty() bool {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	dirty := atomic.LoadInt32(&writer.dirty)
 	return dirty == 1
 }
