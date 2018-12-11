@@ -151,7 +151,7 @@ func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int,
 		return
 	}
 
-	dp.ForceLoadHeader()
+	go dp.ForceLoadHeader()
 
 	return
 }
