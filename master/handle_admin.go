@@ -865,7 +865,7 @@ func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum, capa
 			err = UnMatchPara
 		}
 	} else {
-		err = paraNotFound(ParaVolCapacity)
+		capacity = DefaultVolCapacity
 	}
 	return
 }

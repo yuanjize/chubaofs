@@ -54,10 +54,11 @@ const (
 	CheckMissFileReplicaTime                = 600
 	MinReadWriteDataPartitions              = 20
 	EmptyCrcValue                   uint32  = 4045511210
+	DefaultVolCapacity                      = 200
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 
