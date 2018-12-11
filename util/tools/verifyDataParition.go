@@ -97,20 +97,24 @@ func getDataPartitionResult(partitionId int) (err error) {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v json unmash %v", partitionId, resp.StatusCode, err.Error())
 		return
 	}
+	if len(fi.FileInCoreMap) == 0 {
+		err = fmt.Errorf("cannot get partitonId %v result status code %v fileInCoremap 0 ", partitionId, resp.StatusCode)
+		return err
+	}
 	for _, file := range fi.FileInCoreMap {
 		metas := file.Metas
-		success := true
+		if len(metas) == 0 {
+			return
+		}
 		for index := 0; index < len(metas)-1; index++ {
 			if metas[index].Size == metas[index+1].Size {
 				if metas[index].Crc != metas[index+1].Crc {
-					fmt.Println(fmt.Sprintf("file %v_%v failed verify", partitionId, file.Name))
-					success = false
+					err = fmt.Errorf(fmt.Sprintf("file %v_%v failed verify", partitionId, file.Name)
+					return
 				}
 			}
 		}
-		if success {
-			fmt.Println(fmt.Sprintf("file %v_%v success verify", partitionId, file.Name))
-		}
+		fmt.Println(fmt.Sprintf("file %v_%v success verify", partitionId, file.Name))
 	}
 	return nil
 }
