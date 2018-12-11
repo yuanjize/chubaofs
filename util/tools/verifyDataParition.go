@@ -37,7 +37,7 @@ func verifyWorker() {
 			if err != nil {
 				fmt.Println(fmt.Sprintf("verify partitionId %v FAILED %v", partitionId, err.Error()))
 			} else {
-				fmt.Println(fmt.Sprintf("verify partitionId %v SUCCESS %v", partitionId, err.Error()))
+				fmt.Println(fmt.Sprintf("verify partitionId %v SUCCESS", partitionId))
 			}
 
 		}
