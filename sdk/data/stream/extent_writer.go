@@ -312,7 +312,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 			break
 		}
 	}
-	writer.markDirty()
+	atomic.StoreInt32(&writer.dirty, 1)
 	writer.updateSizeLock.Unlock()
 	log.LogDebugf("recive inode(%v) kerneloffset(%v) to extent(%v) pkg(%v) recive(%v)",
 		writer.inode, request.kernelOffset, writer.toString(), request.GetUniqueLogId(), reply.GetUniqueLogId())
@@ -455,12 +455,6 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 
 func (writer *ExtentWriter) getPacket() (p *Packet) {
 	return writer.currentPacket
-}
-
-func (writer *ExtentWriter) markDirty() {
-	writer.updateSizeLock.Lock()
-	defer writer.updateSizeLock.Unlock()
-	atomic.StoreInt32(&writer.dirty, 1)
 }
 
 func (writer *ExtentWriter) clearDirty() {
