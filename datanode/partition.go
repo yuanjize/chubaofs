@@ -150,6 +150,9 @@ func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int,
 	if _, err = metaFile.Write(metaData); err != nil {
 		return
 	}
+
+	dp.ForceLoadHeader()
+
 	return
 }
 
