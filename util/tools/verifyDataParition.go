@@ -109,8 +109,8 @@ func getDataPartitionResult(partitionId int) (err error) {
 		for index := 0; index < len(metas)-1; index++ {
 			if metas[index].Size == metas[index+1].Size {
 				if metas[index].Crc != metas[index+1].Crc {
-					err = fmt.Errorf(fmt.Sprintf("file %v_%v failed verify", partitionId, file.Name)
-					return
+					err = fmt.Errorf(fmt.Sprintf("file %v_%v failed verify", partitionId, file.Name))
+					return err
 				}
 			}
 		}
