@@ -408,7 +408,7 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		}
 
 		log.LogInfof("action[streamRepairExtent] partition(%v) extent(%v) start fix from (%v)"+
-			" remoteSize(%v) localSize(%v).", dp.ID(), remoteExtentInfo.FileId,
+			" remoteSize(%v) localSize(%v) reply().", dp.ID(), remoteExtentInfo.FileId,
 			remoteExtentInfo.Source, remoteExtentInfo.Size, currFixOffset)
 
 		if reply.Crc != crc32.ChecksumIEEE(reply.Data[:reply.Size]) {
