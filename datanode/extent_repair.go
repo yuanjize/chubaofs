@@ -382,15 +382,16 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	}
 	currFixOffset := localExtentInfo.Size
 	for currFixOffset < remoteExtentInfo.Size {
-		// If local extent size has great remoteExtent file size ,then break
-		if currFixOffset >= remoteExtentInfo.Size {
-			break
-		}
-		localExtentInfo, err = store.GetWatermark(remoteExtentInfo.FileId, false)
+		localExtentInfo, err = store.GetWatermark(remoteExtentInfo.FileId, true)
 		if err != nil {
 			err = errors.Annotatef(err, "streamRepairExtent GetWatermark error")
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return err
+		}
+
+		// If local extent size has great remoteExtent file size ,then break
+		if currFixOffset >= remoteExtentInfo.Size {
+			break
 		}
 		if localExtentInfo.Size > currFixOffset {
 			err = errors.Annotatef(err, "streamRepairExtent unavali fix localSize(%v) "+
