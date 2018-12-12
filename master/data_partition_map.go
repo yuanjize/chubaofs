@@ -30,8 +30,8 @@ type DataPartitionMap struct {
 	dataPartitionMap           map[uint64]*DataPartition
 	dataPartitionCount         int
 	readWriteDataPartitions    int
-	lastCheckPartitionID       uint64
-	lastReleasePartitionID     uint64
+	lastCheckIndex             uint64
+	lastReleaseIndex           uint64
 	dataPartitions             []*DataPartition
 	cacheDataPartitionResponse []byte
 	volName                    string
@@ -145,14 +145,17 @@ func (dpMap *DataPartitionMap) getNeedReleaseDataPartitions(everyReleaseDataPart
 	partitions = make([]*DataPartition, 0)
 	dpMap.RLock()
 	defer dpMap.RUnlock()
-
+	dpLen := len(dpMap.dataPartitions)
+	if dpLen == 0 {
+		return
+	}
 	for i := 0; i < everyReleaseDataPartitionCount; i++ {
-		if dpMap.lastReleasePartitionID > (uint64)(len(dpMap.dataPartitionMap)) {
-			dpMap.lastReleasePartitionID = 0
+		if dpMap.lastReleaseIndex >= uint64(dpLen) {
+			dpMap.lastReleaseIndex = 0
 		}
-		dpMap.lastReleasePartitionID++
-		dp, ok := dpMap.dataPartitionMap[dpMap.lastReleasePartitionID]
-		if ok && time.Now().Unix()-dp.LastLoadTime >= releaseDataPartitionAfterLoadSeconds {
+		dp := dpMap.dataPartitions[dpMap.lastReleaseIndex]
+		dpMap.lastReleaseIndex++
+		if time.Now().Unix()-dp.LastLoadTime >= releaseDataPartitionAfterLoadSeconds {
 			partitions = append(partitions, dp)
 		}
 	}
@@ -181,19 +184,28 @@ func (dpMap *DataPartitionMap) releaseDataPartitions(partitions []*DataPartition
 
 }
 
-func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(everyLoadCount int, loadFrequencyTime int64) (partitions []*DataPartition) {
+func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(loadFrequencyTime int64) (partitions []*DataPartition) {
 	partitions = make([]*DataPartition, 0)
 	dpMap.RLock()
 	defer dpMap.RUnlock()
 
-	for i := 0; i < everyLoadCount; i++ {
-		if dpMap.lastCheckPartitionID > (uint64)(len(dpMap.dataPartitionMap)) {
-			dpMap.lastCheckPartitionID = 0
+	dpLen := len(dpMap.dataPartitions)
+	if dpLen == 0 {
+		return
+	}
+	needLoadCount := dpLen / LoadDataPartitionPeriod
+	if needLoadCount == 0 {
+		needLoadCount = 1
+	}
+
+	for i := 0; i < needLoadCount; i++ {
+		if dpMap.lastCheckIndex >= (uint64)(len(dpMap.dataPartitions)) {
+			dpMap.lastCheckIndex = 0
 		}
-		dpMap.lastCheckPartitionID++
-		v, ok := dpMap.dataPartitionMap[dpMap.lastCheckPartitionID]
-		if ok && time.Now().Unix()-v.LastLoadTime >= loadFrequencyTime {
-			partitions = append(partitions, v)
+		dp := dpMap.dataPartitions[dpMap.lastCheckIndex]
+		dpMap.lastCheckIndex++
+		if time.Now().Unix()-dp.LastLoadTime >= loadFrequencyTime {
+			partitions = append(partitions, dp)
 		}
 	}
 

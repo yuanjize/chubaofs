@@ -47,7 +47,7 @@ const (
 	DefaultDataPartitionMissSec                 = 24 * 3600
 	DefaultDataPartitionWarnInterval            = 60 * 60
 	LoadDataPartitionWaitTime                   = 100
-	DefaultLoadDataPartitionFrequencyTime       = 60 * 60
+	DefaultLoadDataPartitionFrequencyTime       = 60 * 60 * 4
 	DefaultEveryLoadDataPartitionCount          = 50
 	DefaultMetaPartitionTimeOutSec              = 10 * DefaultCheckHeartbeatIntervalSeconds
 	//DefaultMetaPartitionMissSec                         = 3600

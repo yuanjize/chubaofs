@@ -123,7 +123,7 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 }
 
 func (vol *Vol) LoadDataPartition(c *Cluster) {
-	needCheckDataPartitions := vol.dataPartitions.getNeedCheckDataPartitions(c.cfg.everyLoadDataPartitionCount, c.cfg.LoadDataPartitionFrequencyTime)
+	needCheckDataPartitions := vol.dataPartitions.getNeedCheckDataPartitions(c.cfg.LoadDataPartitionFrequencyTime)
 	if len(needCheckDataPartitions) == 0 {
 		return
 	}
