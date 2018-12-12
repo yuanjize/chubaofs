@@ -35,9 +35,12 @@ func (m *Master) handleLeaderChange(leader uint64) {
 	if m.id == leader {
 		Warn(m.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
 			m.clusterName, m.leaderInfo.addr))
-		//m.loadMetadata()
+		m.loadMetadata()
+		m.metaReady = true
 		m.cluster.checkDataNodeHeartbeat()
 		m.cluster.checkMetaNodeHeartbeat()
+	} else {
+		m.metaReady = false
 	}
 }
 

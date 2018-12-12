@@ -57,6 +57,7 @@ type Master struct {
 	partition    raftstore.Partition
 	wg           sync.WaitGroup
 	reverseProxy *httputil.ReverseProxy
+	metaReady    bool
 }
 
 func NewServer() *Master {

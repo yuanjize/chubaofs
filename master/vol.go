@@ -203,7 +203,7 @@ func (vol *Vol) getCapacity() uint64 {
 	return vol.Capacity
 }
 
-func (vol *Vol) checkAvailSpace(c *Cluster) {
+func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 	if vol.getStatus() == VolMarkDelete {
 		return
 	}

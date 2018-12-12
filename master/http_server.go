@@ -124,8 +124,14 @@ func (m *Master) handlerWithInterceptor() http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 
 			if m.partition.IsLeader() {
-				m.ServeHTTP(w, r)
-				return
+				if m.metaReady {
+					m.ServeHTTP(w, r)
+					return
+				} else {
+					log.LogWarnf("action[handlerWithInterceptor] leader meta has not ready")
+					http.Error(w, m.leaderInfo.addr, http.StatusBadRequest)
+					return
+				}
 			}
 			if m.leaderInfo.addr == "" {
 				log.LogErrorf("action[handlerWithInterceptor] no leader,request[%v]", r.URL)

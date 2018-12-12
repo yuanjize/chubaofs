@@ -90,12 +90,12 @@ func (c *Cluster) startCheckAvailSpace() {
 func (c *Cluster) startCheckVols() {
 	go func() {
 		//check vols after switching leader two minutes
-		time.Sleep(2 * time.Minute)
+		time.Sleep(5 * time.Minute)
 		for {
 			if c.partition.IsLeader() {
 				c.checkVols()
 			}
-			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 }
@@ -115,7 +115,7 @@ func (c *Cluster) checkVols() {
 	vols := c.copyVols()
 	for _, vol := range vols {
 		vol.checkStatus(c)
-		vol.checkAvailSpace(c)
+		vol.checkNeedAutoCreateDataPartitions(c)
 	}
 }
 
@@ -555,7 +555,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	c.putDataNodeTasks(tasks)
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {

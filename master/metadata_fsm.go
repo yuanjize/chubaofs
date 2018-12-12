@@ -126,9 +126,9 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 			panic(err)
 		}
 	}
-	if err = mf.applyHandler(cmd); err != nil {
-		panic(err)
-	}
+	//if err = mf.applyHandler(cmd); err != nil {
+	//	panic(err)
+	//}
 	mf.applied = index
 	return
 }
