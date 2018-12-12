@@ -55,7 +55,7 @@ const (
 	MinReadWriteDataPartitions              = 20
 	EmptyCrcValue                   uint32  = 4045511210
 	DefaultVolCapacity                      = 200
-	LoadDataPartitionPeriod                 = 24 * 60 * 60
+	LoadDataPartitionPeriod                 = 12 * 60 //24 *60 *60/LoadDataPartitionWaitTime
 )
 
 const (
