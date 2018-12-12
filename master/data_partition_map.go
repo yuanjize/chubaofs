@@ -141,7 +141,7 @@ func (dpMap *DataPartitionMap) GetDataPartitionsView(minPartitionID uint64) (dpR
 	return
 }
 
-func (dpMap *DataPartitionMap) getNeedReleaseDataPartitions(everyReleaseDataPartitionCount int, releaseDataPartitionAfterLoadSeconds int64) (partitions []*DataPartition) {
+func (dpMap *DataPartitionMap) getNeedReleaseDataPartitions(everyReleaseDataPartitionCount int, releaseDataPartitionAfterLoadSeconds int64) (partitions []*DataPartition, startIndex uint64) {
 	partitions = make([]*DataPartition, 0)
 	dpMap.RLock()
 	defer dpMap.RUnlock()
@@ -149,6 +149,7 @@ func (dpMap *DataPartitionMap) getNeedReleaseDataPartitions(everyReleaseDataPart
 	if dpLen == 0 {
 		return
 	}
+	startIndex = dpMap.lastReleaseIndex
 	for i := 0; i < everyReleaseDataPartitionCount; i++ {
 		if dpMap.lastReleaseIndex >= uint64(dpLen) {
 			dpMap.lastReleaseIndex = 0
@@ -184,7 +185,7 @@ func (dpMap *DataPartitionMap) releaseDataPartitions(partitions []*DataPartition
 
 }
 
-func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(loadFrequencyTime int64) (partitions []*DataPartition) {
+func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(loadFrequencyTime int64) (partitions []*DataPartition, startIndex uint64) {
 	partitions = make([]*DataPartition, 0)
 	dpMap.RLock()
 	defer dpMap.RUnlock()
@@ -193,6 +194,7 @@ func (dpMap *DataPartitionMap) getNeedCheckDataPartitions(loadFrequencyTime int6
 	if dpLen == 0 {
 		return
 	}
+	startIndex = dpMap.lastCheckIndex
 	needLoadCount := dpLen / LoadDataPartitionPeriod
 	if needLoadCount == 0 {
 		needLoadCount = 1

@@ -123,24 +123,24 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 }
 
 func (vol *Vol) LoadDataPartition(c *Cluster) {
-	needCheckDataPartitions := vol.dataPartitions.getNeedCheckDataPartitions(c.cfg.LoadDataPartitionFrequencyTime)
+	needCheckDataPartitions, startIndex := vol.dataPartitions.getNeedCheckDataPartitions(c.cfg.LoadDataPartitionFrequencyTime)
 	if len(needCheckDataPartitions) == 0 {
 		return
 	}
 	c.waitLoadDataPartitionResponse(needCheckDataPartitions)
-	msg := fmt.Sprintf("action[LoadDataPartition] checkstart:%v checkCount:%v",
-		needCheckDataPartitions[0].PartitionID, len(needCheckDataPartitions))
+	msg := fmt.Sprintf("action[LoadDataPartition] checkstartIndex:%v checkCount:%v",
+		startIndex, len(needCheckDataPartitions))
 	log.LogInfo(msg)
 }
 
 func (vol *Vol) ReleaseDataPartitionsAfterLoad(releaseCount int, afterLoadSeconds int64) {
-	needReleaseDataPartitions := vol.dataPartitions.getNeedReleaseDataPartitions(releaseCount, afterLoadSeconds)
+	needReleaseDataPartitions, startIndex := vol.dataPartitions.getNeedReleaseDataPartitions(releaseCount, afterLoadSeconds)
 	if len(needReleaseDataPartitions) == 0 {
 		return
 	}
 	vol.dataPartitions.releaseDataPartitions(needReleaseDataPartitions)
 	msg := fmt.Sprintf("action[ReleaseDataPartitionsAfterLoad]  release data partition start:%v needReleaseDataPartitions:%v",
-		needReleaseDataPartitions[0].PartitionID, len(needReleaseDataPartitions))
+		startIndex, len(needReleaseDataPartitions))
 	log.LogInfo(msg)
 }
 
