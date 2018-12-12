@@ -128,18 +128,18 @@ func (vol *Vol) LoadDataPartition(c *Cluster) {
 		return
 	}
 	c.waitLoadDataPartitionResponse(needCheckDataPartitions)
-	msg := fmt.Sprintf("action[LoadDataPartition] vol[%v],checkstartIndex:%v checkCount:%v",
+	msg := fmt.Sprintf("action[LoadDataPartition] vol[%v],checkStartIndex:%v checkCount:%v",
 		vol.Name, startIndex, len(needCheckDataPartitions))
 	log.LogInfo(msg)
 }
 
-func (vol *Vol) ReleaseDataPartitionsAfterLoad(releaseCount int, afterLoadSeconds int64) {
+func (vol *Vol) ReleaseDataPartitions(releaseCount int, afterLoadSeconds int64) {
 	needReleaseDataPartitions, startIndex := vol.dataPartitions.getNeedReleaseDataPartitions(releaseCount, afterLoadSeconds)
 	if len(needReleaseDataPartitions) == 0 {
 		return
 	}
 	vol.dataPartitions.releaseDataPartitions(needReleaseDataPartitions)
-	msg := fmt.Sprintf("action[ReleaseDataPartitionsAfterLoad] vol[%v] release data partition start:%v needReleaseDataPartitions:%v",
+	msg := fmt.Sprintf("action[ReleaseDataPartitions] vol[%v] release data partition start:%v releaseCount:%v",
 		vol.Name, startIndex, len(needReleaseDataPartitions))
 	log.LogInfo(msg)
 }

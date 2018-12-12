@@ -162,7 +162,7 @@ func (c *Cluster) startCheckReleaseDataPartitions() {
 func (c *Cluster) releaseDataPartitionAfterLoad() {
 	vols := c.copyVols()
 	for _, vol := range vols {
-		vol.ReleaseDataPartitionsAfterLoad(c.cfg.everyReleaseDataPartitionCount, c.cfg.releaseDataPartitionAfterLoadSeconds)
+		vol.ReleaseDataPartitions(c.cfg.everyReleaseDataPartitionCount, c.cfg.releaseDataPartitionAfterLoadSeconds)
 	}
 }
 
