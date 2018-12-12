@@ -21,10 +21,17 @@ import (
 	"time"
 )
 
-func (partition *DataPartition) checkStatus(needLog bool, dpTimeOutSec int64) {
+func (partition *DataPartition) checkStatus(clusterName string, needLog bool, dpTimeOutSec int64) {
 	partition.Lock()
 	defer partition.Unlock()
 	liveReplicas := partition.getLiveReplicasByPersistenceHosts(dpTimeOutSec)
+	if len(partition.Replicas) > len(liveReplicas) {
+		partition.Status = proto.ReadOnly
+		msg := fmt.Sprintf("action[checkStatus],partitionID:%v has exceed repica, replicaNum:%v  liveReplicas:%v   Status:%v  RocksDBHost:%v ",
+			partition.PartitionID, partition.ReplicaNum, len(liveReplicas), partition.Status, partition.PersistenceHosts)
+		Warn(clusterName, msg)
+		return
+	}
 	switch len(liveReplicas) {
 	case (int)(partition.ReplicaNum):
 		partition.Status = proto.ReadOnly
