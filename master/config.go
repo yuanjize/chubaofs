@@ -34,7 +34,7 @@ const (
 )
 
 const (
-	DefaultEveryReleaseDataPartitionCount       = 50
+	DefaultEveryReleaseDataPartitionCount       = 1000
 	DefaultReleaseDataPartitionAfterLoadSeconds = 5 * 60
 	DefaultReleaseDataPartitionInternalSeconds  = 10
 	DefaultCheckHeartbeatIntervalSeconds        = 60
