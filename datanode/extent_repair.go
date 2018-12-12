@@ -382,24 +382,9 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	}
 	currFixOffset := localExtentInfo.Size
 	for currFixOffset < remoteExtentInfo.Size {
-		localExtentInfo, err = store.GetWatermark(remoteExtentInfo.FileId, true)
-		if err != nil {
-			err = errors.Annotatef(err, "streamRepairExtent GetWatermark error")
-			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
-			return err
-		}
-
-		// If local extent size has great remoteExtent file size ,then break
 		if currFixOffset >= remoteExtentInfo.Size {
 			break
 		}
-		if localExtentInfo.Size > currFixOffset {
-			err = errors.Annotatef(err, "streamRepairExtent unavali fix localSize(%v) "+
-				"remoteSize(%v) want fixOffset(%v) data error", localExtentInfo.Size, remoteExtentInfo.Size, currFixOffset)
-			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
-			return err
-		}
-
 		reply := NewPacket()
 		// Read 64k stream repair packet
 		if err = reply.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
@@ -414,7 +399,8 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 			return
 		}
 
-		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID || reply.FileID != request.FileID {
+		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
+			reply.FileID != request.FileID || reply.Size == 0 || reply.Offset != int64(currFixOffset) {
 			err = errors.Annotatef(err, "streamRepairExtent receive unavalid "+
 				"request(%v) reply(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId())
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
@@ -422,8 +408,8 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		}
 
 		log.LogInfof("action[streamRepairExtent] partition(%v) extent(%v) start fix from (%v)"+
-			" remoteSize(%v) localSize(%v).", dp.ID(), remoteExtentInfo.FileId,
-			remoteExtentInfo.Source, remoteExtentInfo.Size, currFixOffset)
+			" remoteSize(%v) localSize(%v) reply(%v).", dp.ID(), remoteExtentInfo.FileId,
+			remoteExtentInfo.Source, remoteExtentInfo.Size, currFixOffset, reply.GetUniqueLogId())
 
 		if reply.Crc != crc32.ChecksumIEEE(reply.Data[:reply.Size]) {
 			err = fmt.Errorf("streamRepairExtent crc mismatch partition(%v) extent(%v) start fix from (%v)"+
@@ -444,6 +430,9 @@ func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 			return
 		}
 		currFixOffset += uint64(reply.Size)
+		if currFixOffset >= remoteExtentInfo.Size {
+			break
+		}
 
 	}
 	return
