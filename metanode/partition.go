@@ -225,13 +225,13 @@ func (mp *metaPartition) onStart() (err error) {
 			mp.config.PartitionId, err.Error())
 		return
 	}
+	mp.startSchedule(mp.applyID)
 	if err = mp.startRaft(); err != nil {
 		err = errors.Errorf("[onStart]start raft id=%d: %s",
 			mp.config.PartitionId,
 			err.Error())
 		return
 	}
-	mp.startSchedule(mp.applyID)
 	mp.startFreeList()
 	return
 }
