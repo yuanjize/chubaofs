@@ -27,21 +27,15 @@ const (
 )
 
 const (
-	ActionSendToNext                                 = "ActionSendToNext"
-	LocalProcessAddr                                 = "LocalProcess"
-	ActionReceiveFromNext                            = "ActionReceiveFromNext"
-	ActionStreamRead                                 = "ActionStreamRead"
-	ActionWriteToCli                                 = "ActionWriteToCli"
-	ActionGetDataPartitionMetrics                    = "ActionGetDataPartitionMetrics"
-	ActionCheckAndAddInfos                           = "ActionCheckAndAddInfos"
-	ActionCheckBlobFileInfo                          = "ActionCheckBlobFileInfo"
-	ActionPostToMaster                               = "ActionPostToMaster"
-	ActionFollowerRequireBlobFileRepairCmd           = "ActionFollowerRequireBlobFileRepairCmd"
-	ActionLeaderToFollowerOpRepairReadPackBuffer     = "ActionLeaderToFollowerOpRepairReadPackBuffer"
-	ActionLeaderToFollowerOpRepairReadSendPackBuffer = "ActionLeaderToFollowerOpRepairReadSendPackBuffer"
+	ActionSendToNext              = "ActionSendToNext"
+	ActionReceiveFromNext         = "ActionReceiveFromNext"
+	ActionStreamRead              = "ActionStreamRead"
+	ActionWriteToCli              = "ActionWriteToCli"
+	ActionGetDataPartitionMetrics = "ActionGetDataPartitionMetrics"
+	ActionCheckAndAddInfos        = "ActionCheckAndAddInfos"
 
-	ActionGetFollowers    = "ActionGetFollowers"
-	ActionCheckReplyAvail = "ActionCheckReplyAvail"
+	ActionCheckReplyAvail     = "ActionCheckReplyAvail"
+	ActionCreateDataPartition = "ActionCreateDataPartition"
 )
 
 const (
