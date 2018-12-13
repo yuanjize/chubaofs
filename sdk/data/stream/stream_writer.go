@@ -315,7 +315,8 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 		}
 
 		if writer.isDirty() == false {
-			log.LogDebugf("updateToMetaNode: ino(%v) writeer(%v) current extent writer not dirty", stream.Inode, writer.toString())
+			log.LogDebugf("updateToMetaNode: ino(%v) writeer(%v) current extent" +
+				" writer not dirty", stream.Inode, writer.toString())
 			return
 		}
 
@@ -330,7 +331,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
 		}
-		writer.clearDirty()
+		writer.clearDirty(ek.Size)
 		stream.metaNodeStreamKey.Put(ek)
 		return
 	}

@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
-	"strings"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"runtime"
+	"strings"
 	"time"
 )
 
