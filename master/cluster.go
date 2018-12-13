@@ -368,14 +368,15 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	var (
 		vol         *Vol
 		partitionID uint64
-		tasks       []*proto.AdminTask
 		targetHosts []string
+		wg          sync.WaitGroup
 	)
 	c.createDpLock.Lock()
 	defer c.createDpLock.Unlock()
 	if vol, err = c.getVol(volName); err != nil {
-		goto errDeal
+		return
 	}
+	errChannel := make(chan error, vol.dpReplicaNum)
 	if targetHosts, err = c.ChooseTargetDataHosts(int(vol.dpReplicaNum)); err != nil {
 		goto errDeal
 	}
@@ -384,11 +385,28 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	}
 	dp = newDataPartition(partitionID, vol.dpReplicaNum, partitionType, volName)
 	dp.PersistenceHosts = targetHosts
+	for _, host := range targetHosts {
+		wg.Add(1)
+		go func(host string) {
+			defer func() {
+				wg.Done()
+			}()
+			task := dp.generateCreateTask(host)
+			if err = c.syncCreateDataPartitionToDataNode(host, task); err != nil {
+				errChannel <- err
+			}
+		}(host)
+	}
+	wg.Wait()
+
+	select {
+	case err = <-errChannel:
+		goto errDeal
+	}
+
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
 		goto errDeal
 	}
-	tasks = dp.GenerateCreateTasks()
-	c.putDataNodeTasks(tasks)
 	vol.dataPartitions.putDataPartition(dp)
 
 	return
@@ -396,6 +414,22 @@ errDeal:
 	err = fmt.Errorf("action[createDataPartition],clusterID[%v] vol[%v] Err:%v ", c.Name, volName, err.Error())
 	log.LogError(errors.ErrorStack(err))
 	Warn(c.Name, err.Error())
+	return
+}
+
+func (c *Cluster) syncCreateDataPartitionToDataNode(host string, task *proto.AdminTask) (err error) {
+	dataNode, err := c.getDataNode(host)
+	if err != nil {
+		return
+	}
+	conn, err := dataNode.Sender.connPool.Get(dataNode.Addr)
+	if err != nil {
+		return
+	}
+	if dataNode.Sender.sendAdminTask(task, conn); err != nil {
+		return
+	}
+	dataNode.Sender.connPool.Put(conn, false)
 	return
 }
 
@@ -551,8 +585,10 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	task = dp.GenerateDeleteTask(offlineAddr)
 	tasks = make([]*proto.AdminTask, 0)
 	tasks = append(tasks, task)
-	tasks = append(tasks, dp.generateCreateTask(newAddr))
 	c.putDataNodeTasks(tasks)
+	if err = c.syncCreateDataPartitionToDataNode(newAddr, dp.generateCreateTask(newAddr)); err != nil {
+		goto errDeal
+	}
 	goto errDeal
 errDeal:
 	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
@@ -613,7 +649,10 @@ errDeal:
 }
 
 func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int) (err error) {
-	var vol *Vol
+	var (
+		vol                     *Vol
+		readWriteDataPartitions int
+	)
 	if vol, err = c.createVolInternal(name, volType, replicaNum, capacity); err != nil {
 		goto errDeal
 	}
@@ -625,6 +664,12 @@ func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int
 	if err = c.CreateMetaPartition(name, 0, DefaultMaxMetaPartitionInodeID); err != nil {
 		c.deleteVol(name)
 		goto errDeal
+	}
+	vol.initDataPartitions(c)
+	readWriteDataPartitions = vol.checkDataPartitionStatus(c)
+	for retryCount := 0; readWriteDataPartitions < DefaultInitDataPartitions && retryCount < 3; retryCount++ {
+		vol.initDataPartitions(c)
+		readWriteDataPartitions = vol.checkDataPartitionStatus(c)
 	}
 	return
 errDeal:

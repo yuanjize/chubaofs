@@ -53,6 +53,7 @@ const (
 	SpaceAvailRate                          = 0.90
 	CheckMissFileReplicaTime                = 600
 	MinReadWriteDataPartitions              = 20
+	DefaultInitDataPartitions               = 10
 	EmptyCrcValue                   uint32  = 4045511210
 	DefaultVolCapacity                      = 200
 	LoadDataPartitionPeriod                 = 12 * 60 //24 *60 *60/LoadDataPartitionWaitTime

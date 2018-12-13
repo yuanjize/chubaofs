@@ -414,11 +414,6 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	if vol, err = m.cluster.getVol(name); err != nil {
 		goto errDeal
 	}
-	for i := 0; i < MinReadWriteDataPartitions; i++ {
-		if _, err = m.cluster.createDataPartition(name, volType); err != nil {
-			goto errDeal
-		}
-	}
 	msg = fmt.Sprintf("create vol[%v] success,has allocate [%v] data partitions", name, len(vol.dataPartitions.dataPartitions))
 	io.WriteString(w, msg)
 	return

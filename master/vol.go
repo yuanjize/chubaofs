@@ -97,12 +97,33 @@ func (vol *Vol) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err
 	return vol.dataPartitions.getDataPartition(partitionID)
 }
 
+func (vol *Vol) initDataPartitions(c *Cluster) {
+	//init ten data partitions
+	for i := 0; i < DefaultInitDataPartitions; i++ {
+		if _, err := c.createDataPartition(vol.Name, vol.VolType); err != nil {
+			log.LogErrorf("action[initDataPartitions] vol[%v] err[%v]", vol.Name, err)
+		}
+	}
+	return
+}
+func (vol *Vol) checkDataPartitionStatus(c *Cluster) (readWriteDataPartitions int) {
+	vol.dataPartitions.RLock()
+	defer vol.dataPartitions.RUnlock()
+	for _, dp := range vol.dataPartitions.dataPartitionMap {
+		dp.checkStatus(c.Name, true, c.cfg.DataPartitionTimeOutSec)
+		if dp.Status == proto.ReadWrite {
+			readWriteDataPartitions++
+		}
+	}
+	return
+}
+
 func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
 	for _, dp := range vol.dataPartitions.dataPartitionMap {
 		dp.checkReplicaStatus(c.cfg.DataPartitionTimeOutSec)
-		dp.checkStatus(c.Name,true, c.cfg.DataPartitionTimeOutSec)
+		dp.checkStatus(c.Name, true, c.cfg.DataPartitionTimeOutSec)
 		dp.checkMiss(c.Name, c.cfg.DataPartitionMissSec, c.cfg.DataPartitionWarnInterval)
 		dp.checkReplicaNum(c, vol.Name)
 		if dp.Status == proto.ReadWrite {
