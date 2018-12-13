@@ -330,7 +330,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
 		}
-		writer.clearDirty()
+		writer.clearDirty(ek.Size)
 		stream.metaNodeStreamKey.Put(ek)
 		return
 	}
