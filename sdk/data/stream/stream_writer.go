@@ -315,7 +315,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 		}
 
 		if writer.isDirty() == false {
-			log.LogDebugf("updateToMetaNode: ino(%v) writeer(%v) current extent" +
+			log.LogDebugf("updateToMetaNode: ino(%v) writeer(%v) current extent"+
 				" writer not dirty", stream.Inode, writer.toString())
 			return
 		}
