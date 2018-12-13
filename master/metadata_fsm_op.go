@@ -565,11 +565,14 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
 			return
 		}
-		if _, err := vol.getDataPartitionByID(dpv.PartitionID); err != nil {
+		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
+		if err != nil {
 			log.LogError(fmt.Sprintf("action[applyUpdateDataPartition] failed,err:%v", err))
 			return
 		}
-		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
+		dp.ReplicaNum = dpv.ReplicaNum
+		dp.PartitionType = dpv.PartitionType
+		dp.VolName = vol.Name
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		vol.dataPartitions.putDataPartition(dp)
 	}
