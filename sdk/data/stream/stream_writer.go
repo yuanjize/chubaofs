@@ -57,7 +57,6 @@ type CloseRequest struct {
 
 type StreamWriter struct {
 	currentWriter           *ExtentWriter //current ExtentWriter
-	errCount                int           //error count
 	currentPartitionId      uint32        //current PartitionId
 	currentExtentId         uint64        //current FileId
 	Inode                   uint64        //inode
@@ -71,6 +70,7 @@ type StreamWriter struct {
 	metaNodeStreamKey       *proto.StreamKey
 	hasUpdateToMetaNodeSize uint64
 	recoverPackages         []*Packet
+	inodeHasDelete          bool
 }
 
 func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (stream *StreamWriter) {
@@ -266,31 +266,34 @@ func (stream *StreamWriter) flushData() (err error) {
 
 func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 	defer func() {
-		if len(stream.recoverPackages) != 0 {
-			err = fmt.Errorf("recovery package maxretry not flush to datanode")
-		}
-	}()
-	stream.errCount = 0
-	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
-		err = stream.flushData()
-		if err == nil || err == syscall.ENOENT {
-			stream.errCount = 0
-			err = nil
+		if err == syscall.ENOENT {
 			return
 		}
-		if err = stream.recoverExtent(); err == nil {
-			err = stream.flushData()
-			if err == nil || err == syscall.ENOENT {
-				stream.errCount = 0
-				err = nil
-				return
-			}
-			log.LogWarnf("FlushCurrentExtent flushData %v failed,err %v", stream.toString(), err.Error())
+		if len(stream.recoverPackages) != 0 {
+			log.LogErrorf("MaxFlushCurrentExtent %v failed,packet(%v) not flush %v",
+				stream.toString(),len(stream.recoverPackages))
 		}
-		log.LogWarnf("FlushCurrentExtent %v failed,err %v", stream.toString(), err.Error())
+	}()
+	var errCount = 0
+	for {
+		err = stream.flushData()
+		if err == nil {
+			return
+		}
+		if err == syscall.ENOENT {
+			return
+		}
 
-		stream.errCount++
-		if stream.errCount > MaxSelectDataPartionForWrite {
+		err = stream.recoverExtent()
+		if err == nil {
+			return
+		}
+		if err == syscall.ENOENT {
+			return
+		}
+		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v", stream.toString(), err.Error(),errCount)
+		errCount++
+		if errCount > MaxSelectDataPartionForWrite {
 			break
 		}
 	}
@@ -323,7 +326,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 		ek := writer.toKey()                           //first get currentExtent Key
 		err = stream.appendExtentKey(stream.Inode, ek) //put it to metanode
 		if err == syscall.ENOENT {
-			stream.exit()
+			stream.inodeHasDelete = true
 			return
 		}
 		if err != nil {
@@ -361,6 +364,9 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if err = stream.updateToMetaNode(); err == nil {
 			break
+		}
+		if err == syscall.ENOENT {
+			return err
 		}
 	}
 	if len(stream.recoverPackages) == 0 {
