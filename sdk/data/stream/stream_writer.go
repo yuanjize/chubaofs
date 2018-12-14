@@ -162,6 +162,11 @@ func (stream *StreamWriter) handleRequest(request interface{}) {
 				request.cutSize = cutSize
 			}
 		}
+		if stream.inodeHasDelete {
+			request.err = syscall.ENOENT
+			request.done <- struct{}{}
+			return
+		}
 		request.canWrite, request.err = stream.write(request.data, request.kernelOffset, request.size)
 		stream.addHasWriteSize(request.canWrite)
 		request.done <- struct{}{}
