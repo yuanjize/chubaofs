@@ -152,6 +152,9 @@ func (s *DataNode) cleanup(pkg *Packet) {
 }
 
 func (s *DataNode) addMetrics(reply *Packet) {
+	if reply.IsMasterCommand() {
+		return
+	}
 	reply.afterTp()
 	latency := time.Since(reply.tpObject.StartTime)
 	if reply.DataPartition == nil {
