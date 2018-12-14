@@ -222,10 +222,10 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 			return
 		}
 		if err != nil {
-			initRetry++
 			if initRetry > MaxStreamInitRetry {
 				return
 			}
+			initRetry++
 			continue
 		}
 		write, err = stream.currentWriter.write(data[total:size], offset, size-total)
@@ -237,7 +237,11 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		if strings.Contains(err.Error(), FullExtentErr.Error()) {
 			continue
 		}
-		if err = stream.recoverExtent(); err != nil {
+		err = stream.recoverExtent()
+		if err == syscall.ENOENT {
+			return
+		}
+		if err != nil {
 			return
 		}
 		total += write
