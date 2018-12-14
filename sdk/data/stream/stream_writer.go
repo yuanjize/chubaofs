@@ -93,16 +93,14 @@ func (stream *StreamWriter) toString() (m string) {
 	if stream.currentWriter != nil {
 		currentWriterMsg = stream.currentWriter.toString()
 	}
-	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)"+
-		" errCount(%v)", stream.Inode, stream.currentPartitionId, currentWriterMsg,
-		stream.errCount)
+	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)",
+		stream.Inode, stream.currentPartitionId, currentWriterMsg)
 }
 
 func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) {
 	currentWriterMsg := writer.toString()
-	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)"+
-		" errCount(%v)", stream.Inode, stream.currentPartitionId, currentWriterMsg,
-		stream.errCount)
+	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)",
+		stream.Inode, stream.currentPartitionId, currentWriterMsg)
 }
 
 //stream init,alloc a extent ,select dp and extent
