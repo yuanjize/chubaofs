@@ -276,8 +276,9 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			return
 		}
 		if len(stream.recoverPackages) != 0 {
-			log.LogErrorf("MaxFlushCurrentExtent %v failed,packet(%v) not flush %v",
+			err = fmt.Errorf("MaxFlushCurrentExtent failed,packet(%v) not flush %v",
 				stream.toString(), len(stream.recoverPackages))
+			log.LogErrorf(err.Error())
 		}
 	}()
 	var errCount = 0
@@ -289,7 +290,8 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		if err == syscall.ENOENT {
 			return
 		}
-
+		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
+			stream.toString(), err.Error(), errCount)
 		err = stream.recoverExtent()
 		if err == nil {
 			return
@@ -297,7 +299,8 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		if err == syscall.ENOENT {
 			return
 		}
-		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v", stream.toString(), err.Error(), errCount)
+		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
+			stream.toString(), err.Error(), errCount)
 		errCount++
 		if errCount > MaxSelectDataPartionForWrite {
 			break
