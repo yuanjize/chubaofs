@@ -247,14 +247,22 @@ func (stream *StreamWriter) flushData() (err error) {
 		err = errors.Annotatef(err, "writer(%v) Flush Failed", writer.toString())
 		return err
 	}
-	if err = stream.updateToMetaNode(); err != nil {
+	err = stream.updateToMetaNode()
+	if err == syscall.ENOENT {
+		return
+	}
+	if err != nil {
 		err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 		return err
 	}
 	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
 		writer.close()
 		writer.getConnect().Close()
-		if err = stream.updateToMetaNode(); err != nil {
+		err = stream.updateToMetaNode()
+		if err == syscall.ENOENT {
+			return
+		}
+		if err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
 			return err
 		}
@@ -271,7 +279,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		}
 		if len(stream.recoverPackages) != 0 {
 			log.LogErrorf("MaxFlushCurrentExtent %v failed,packet(%v) not flush %v",
-				stream.toString(),len(stream.recoverPackages))
+				stream.toString(), len(stream.recoverPackages))
 		}
 	}()
 	var errCount = 0
@@ -291,7 +299,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		if err == syscall.ENOENT {
 			return
 		}
-		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v", stream.toString(), err.Error(),errCount)
+		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v", stream.toString(), err.Error(), errCount)
 		errCount++
 		if errCount > MaxSelectDataPartionForWrite {
 			break
