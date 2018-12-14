@@ -27,6 +27,7 @@ import (
 	"github.com/tiglabs/containerfs/third_party/pool"
 	"github.com/tiglabs/containerfs/util/log"
 	raftproto "github.com/tiglabs/raft/proto"
+	"os"
 )
 
 var (
@@ -168,12 +169,13 @@ type MetaPartition interface {
 type metaPartition struct {
 	config        *MetaPartitionConfig
 	size          uint64 // For partition all file size
-	applyID       uint64 // For store Inode/Dentry max applyID, this index will be update after restore from dump data.
+	applyID       uint64 // store the applyID
 	dentryTree    *BTree
 	inodeTree     *BTree              // B-Tree for Inode.
 	raftPartition raftstore.Partition // RaftStore partition instance of this meta partition.
 	stopC         chan bool
 	storeChan     chan *storeMsg
+	deleteFp      *os.File
 	state         uint32
 	freeList      *freeList // Free inode list
 	vol           *Vol
@@ -232,13 +234,24 @@ func (mp *metaPartition) onStart() (err error) {
 			err.Error())
 		return
 	}
-	mp.startFreeList()
+	if err = mp.startFreeList(); err != nil {
+		if mp.config.BeforeStop != nil {
+			mp.config.BeforeStop()
+		}
+		mp.onStop()
+		err = errors.Errorf("[onStart]start freelist id=%d: %s",
+			mp.config.PartitionId, err.Error())
+		return
+	}
 	return
 }
 
 func (mp *metaPartition) onStop() {
 	mp.stopRaft()
 	mp.stop()
+	if mp.deleteFp != nil {
+		mp.deleteFp.Close()
+	}
 }
 
 func (mp *metaPartition) startRaft() (err error) {
