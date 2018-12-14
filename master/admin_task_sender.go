@@ -189,8 +189,10 @@ func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn n
 	if err = packet.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
 		return errors.Annotatef(err, "action[createDataPartition],ReadFromConn failed task:%v", task.ID)
 	}
+	data := packet.GetData()
+	log.LogErrorf("action[createDataPartition],data[%v]", data)
 	if packet.ResultCode != proto.OpOk {
-		err = fmt.Errorf(packet.GetData())
+		err = fmt.Errorf(data)
 		return
 	}
 	log.LogDebugf(fmt.Sprintf("action[createDataPartition] sender task:%v success", task.ToString()))

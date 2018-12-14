@@ -396,18 +396,20 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			}
 		}(host)
 	}
+	log.LogErrorf("action[createDataPartition] before wait,partition[%v]", partitionID)
 	wg.Wait()
-
+	log.LogErrorf("action[createDataPartition] after wait,partition[%v]", partitionID)
 	select {
 	case err = <-errChannel:
 		goto errDeal
-	}
+	default:
 
+	}
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
 		goto errDeal
 	}
 	vol.dataPartitions.putDataPartition(dp)
-
+	log.LogErrorf("action[createDataPartition] success,partition[%v]", partitionID)
 	return
 errDeal:
 	err = fmt.Errorf("action[createDataPartition],clusterID[%v] vol[%v] Err:%v ", c.Name, volName, err.Error())
@@ -597,7 +599,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	}
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
