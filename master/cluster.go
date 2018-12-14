@@ -66,7 +66,8 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckHeartbeat()
 	c.startCheckMetaPartitions()
 	c.startCheckAvailSpace()
-	c.startCheckVols()
+	c.startCheckCreateDataPartitions()
+	c.startCheckVolStatus()
 	c.startCheckBadDiskRecovery()
 	return
 }
@@ -87,15 +88,30 @@ func (c *Cluster) startCheckAvailSpace() {
 
 }
 
-func (c *Cluster) startCheckVols() {
+func (c *Cluster) startCheckCreateDataPartitions() {
 	go func() {
 		//check vols after switching leader two minutes
 		time.Sleep(5 * time.Minute)
 		for {
 			if c.partition.IsLeader() {
-				c.checkVols()
+				c.checkCreateDataPartitions()
 			}
 			time.Sleep(5 * time.Minute)
+		}
+	}()
+}
+
+func (c *Cluster) startCheckVolStatus() {
+	go func() {
+		//check vols after switching leader two minutes
+		for {
+			if c.partition.IsLeader() {
+				vols := c.copyVols()
+				for _, vol := range vols {
+					vol.checkStatus(c)
+				}
+			}
+			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
 		}
 	}()
 }
@@ -111,10 +127,9 @@ func (c *Cluster) startCheckDataPartitions() {
 	}()
 }
 
-func (c *Cluster) checkVols() {
+func (c *Cluster) checkCreateDataPartitions() {
 	vols := c.copyVols()
 	for _, vol := range vols {
-		vol.checkStatus(c)
 		vol.checkNeedAutoCreateDataPartitions(c)
 	}
 }
