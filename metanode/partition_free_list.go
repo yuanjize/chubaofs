@@ -20,6 +20,8 @@ import (
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
+	"os"
+	"path"
 	"runtime"
 	"time"
 )
@@ -28,14 +30,22 @@ const (
 	AsyncDeleteInterval = 10 * time.Second
 	UpdateVolTicket     = 5 * time.Minute
 	BatchCounts         = 100
+	MarkDeleteInodeFile = "DELETE_INODE"
+	MarkDeleteOptFlag   = os.O_RDWR | os.O_APPEND | os.O_CREATE
 )
 
-func (mp *metaPartition) startFreeList() {
+func (mp *metaPartition) startFreeList() (err error) {
+	mp.deleteFp, err = os.OpenFile(path.Join(mp.config.RootDir,
+		MarkDeleteInodeFile), MarkDeleteOptFlag, 0644)
+	if err != nil {
+		return
+	}
 	// start vol update ticket
 	go mp.updateVolWorker()
 
 	go mp.deleteWorker()
 	go mp.checkFreelistWorker()
+	return
 }
 
 func (mp *metaPartition) updateVolWorker() {
@@ -93,6 +103,7 @@ Begin:
 		if len(buffSlice) == 0 {
 			goto Begin
 		}
+		mp.storeDeletedInode(buffSlice...)
 		mp.deleteDataPartitionMark(buffSlice)
 		if len(buffSlice) < BatchCounts {
 			goto Begin
@@ -132,7 +143,9 @@ func (mp *metaPartition) checkFreelistWorker() {
 		for _, ino := range buffSlice {
 			if mp.internalHasInode(ino) {
 				mp.freeList.Push(ino)
+				continue
 			}
+			mp.storeDeletedInode(ino)
 		}
 
 	}
@@ -212,4 +225,13 @@ func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
 		log.LogDebugf("[deleteInodeTree] inode list: %v", shouldCommit)
 	}
 
+}
+
+func (mp *metaPartition) storeDeletedInode(inos ...*Inode) {
+	for _, ino := range inos {
+		if _, err := mp.deleteFp.Write(ino.MarshalKey()); err != nil {
+			log.LogWarnf("[storeDeletedInode] failed store inode=%d", ino.Inode)
+			mp.freeList.Push(ino)
+		}
+	}
 }
