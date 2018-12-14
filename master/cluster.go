@@ -91,12 +91,12 @@ func (c *Cluster) startCheckAvailSpace() {
 func (c *Cluster) startCheckCreateDataPartitions() {
 	go func() {
 		//check vols after switching leader two minutes
-		time.Sleep(5 * time.Minute)
+		time.Sleep(2 * time.Minute)
 		for {
 			if c.partition.IsLeader() {
 				c.checkCreateDataPartitions()
 			}
-			time.Sleep(5 * time.Minute)
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 }
