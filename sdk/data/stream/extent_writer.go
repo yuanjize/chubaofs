@@ -169,9 +169,9 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	err = packet.writeTo(writer.connect) //if send packet,then signal recive goroutine for recive from connect
 	prefix := fmt.Sprintf("send inode %v_%v", writer.inode, packet.kernelOffset)
 	log.LogDebugf(prefix+" to extent(%v) pkg(%v) orgextentOffset(%v)"+
-		" packetGetPacketLength(%v) after jia(%v) crc(%v)",
+		" packetGetPacketLength(%v) after jia(%v) crc(%v) to (%v)",
 		writer.toString(), packet.GetUniqueLogId(), orgOffset, packet.getPacketLength(),
-		writer.offset, packet.Crc)
+		writer.offset, packet.Crc, writer.dp.Hosts[0])
 	if err == nil {
 		writer.handleCh <- struct{}{}
 		return
@@ -180,7 +180,7 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	}
 	writer.currentPacket = nil
 	err = errors.Annotatef(err, prefix+"sendCurrentPacket Failed")
-	log.LogWarn(err.Error())
+	log.LogErrorf(err.Error())
 
 	return err
 }
@@ -365,7 +365,7 @@ func (writer *ExtentWriter) receive() {
 			}
 			if err = writer.processReply(e, request, reply); err != nil {
 				writer.getConnect().Close()
-				log.LogWarn(err.Error())
+				log.LogErrorf(err.Error())
 				continue
 			}
 		case <-writer.ExitCh:

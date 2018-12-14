@@ -37,8 +37,9 @@ const (
 )
 
 var (
-	MasterHelper = util.NewMasterHelper()
-	LocalIP, _   = util.GetLocalIP()
+	MasterHelper  = util.NewMasterHelper()
+	LocalIP, _      = util.GetLocalIP()
+	GVolname     string
 )
 
 type DataPartitionView struct {
@@ -67,6 +68,7 @@ func NewDataPartitionWrapper(volName, masterHosts string) (w *Wrapper, err error
 		MasterHelper.AddNode(m)
 	}
 	w.volName = volName
+	GVolname = volName
 	w.rwPartition = make([]*DataPartition, 0)
 	w.partitions = make(map[uint32]*DataPartition)
 	if err = w.updateDataPartition(); err != nil {
@@ -132,7 +134,8 @@ func (w *Wrapper) updateDataPartition() error {
 		}
 	}
 	if len(rwPartitionGroups) <= MinWritableDataPartitionNum {
-		ump.Alarm(w.UmpWarningKey(), "master return readAndWrite datapartition so slow,then donnot trust it")
+		ump.Alarm(w.UmpWarningKey(), fmt.Sprintf("volname %v master return readAndWrite datapartition(%v) so slow,"+
+			"then donnot trust it", GVolname, len(rwPartitionGroups)))
 		return nil
 	}
 	for _, dp := range view.DataPartitions {
