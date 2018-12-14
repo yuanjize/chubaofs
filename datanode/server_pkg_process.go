@@ -134,12 +134,10 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 		msgH.Stop()
 		return
 	}
-	if !reply.IsMasterCommand() {
-		s.addMetrics(reply)
-		log.LogDebugf("action[doReplyCh] %v", reply.ActionMsg(ActionWriteToCli,
-			msgH.inConn.RemoteAddr().String(), reply.StartT, err))
-		s.statsFlow(reply, OutFlow)
-	}
+	s.addMetrics(reply)
+	log.LogDebugf("action[doReplyCh] %v", reply.ActionMsg(ActionWriteToCli,
+		msgH.inConn.RemoteAddr().String(), reply.StartT, err))
+	s.statsFlow(reply, OutFlow)
 
 }
 
