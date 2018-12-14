@@ -311,12 +311,19 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
 			stream.toString(), err.Error(), errCount)
 		err = stream.recoverExtent()
-		if err == nil {
-			return
-		}
 		if err == syscall.ENOENT {
 			return
 		}
+		if err == nil {
+			err = stream.flushData()
+			if err == syscall.ENOENT {
+				return
+			}
+			if err==nil {
+				return
+			}
+		}
+
 		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
 			stream.toString(), err.Error(), errCount)
 		errCount++
