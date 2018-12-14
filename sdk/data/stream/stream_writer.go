@@ -107,7 +107,11 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
 	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
 		storeMode := stream.currentWriter.storeMode
-		if err = stream.flushCurrExtentWriter(); err != nil {
+		err = stream.flushCurrExtentWriter()
+		if err == syscall.ENOENT {
+			return
+		}
+		if err != nil {
 			return errors.Annotatef(err, "Flush error WriteInit")
 		}
 		if storeMode == proto.TinyExtentMode {
@@ -194,6 +198,10 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 			total = size
 			return
 		}
+		if err == syscall.ENOENT {
+			total = 0
+			return
+		}
 		err = errors.Annotatef(err, "UserRequest{inode(%v) write "+
 			"KernelOffset(%v) KernelSize(%v) hasWrite(%v)}  stream{ (%v) occous error}",
 			stream.Inode, offset, size, total, stream.toString())
@@ -209,9 +217,14 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		if offset+total == 0 && size-total <= util.BlockSize {
 			useExtent = false
 		}
-		if err = stream.init(useExtent); err != nil {
-			if initRetry++; initRetry > MaxStreamInitRetry {
-				return total, err
+		err = stream.init(useExtent)
+		if err == syscall.ENOENT {
+			return
+		}
+		if err != nil {
+			initRetry++
+			if initRetry > MaxStreamInitRetry {
+				return
 			}
 			continue
 		}
