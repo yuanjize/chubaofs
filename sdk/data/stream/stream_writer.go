@@ -261,6 +261,7 @@ func (stream *StreamWriter) flushData() (err error) {
 	}
 	if err = writer.flush(); err != nil {
 		err = errors.Annotatef(err, "writer(%v) Flush Failed", writer.toString())
+		log.LogErrorf(err.Error())
 		return err
 	}
 	err = stream.updateToMetaNode()
@@ -269,6 +270,7 @@ func (stream *StreamWriter) flushData() (err error) {
 	}
 	if err != nil {
 		err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
+		log.LogErrorf(err.Error())
 		return err
 	}
 	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
@@ -280,6 +282,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		}
 		if err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
+			log.LogErrorf(err.Error())
 			return err
 		}
 		stream.currentWriter.notifyRecvThreadExit()
@@ -319,7 +322,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			if err == syscall.ENOENT {
 				return
 			}
-			if err==nil {
+			if err == nil {
 				return
 			}
 		}
