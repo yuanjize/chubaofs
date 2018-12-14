@@ -77,7 +77,7 @@ func (m *Master) startHttpService() (err error) {
 
 func (m *Master) handleFunctions() {
 	http.HandleFunc(AdminGetIp, m.getIpAndClusterName)
-	http.HandleFunc(AdminGetCluster, m.getCluster)
+	http.Handle(AdminGetCluster, m.handlerWithInterceptor())
 	http.Handle(AdminGetDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminCreateDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminLoadDataPartition, m.handlerWithInterceptor())
