@@ -426,7 +426,7 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartiti
 	if err != nil {
 		return
 	}
-	if dataNode.Sender.sendAdminTask(task, conn); err != nil {
+	if dataNode.Sender.createDataPartition(task, conn); err != nil {
 		return
 	}
 	dataNode.Sender.connPool.Put(conn, false)
@@ -597,7 +597,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	}
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {

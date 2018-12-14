@@ -47,8 +47,8 @@ type AdminTaskSender struct {
 	targetAddr string
 	TaskMap    map[string]*proto.AdminTask
 	sync.Mutex
-	exitCh   chan struct{}
-	connPool *pool.ConnectPool
+	exitCh     chan struct{}
+	connPool   *pool.ConnectPool
 }
 
 func NewAdminTaskSender(targetAddr, clusterID string) (sender *AdminTaskSender) {
@@ -173,6 +173,26 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 	}
 	log.LogDebugf(fmt.Sprintf("action[sendAdminTask] sender task:%v success", task.ToString()))
 	sender.updateTaskInfo(task, true)
+
+	return nil
+}
+
+func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn net.Conn) (err error) {
+	packet, err := sender.buildPacket(task)
+	if err != nil {
+		return errors.Annotatef(err, "action[createDataPartition build packet failed,task:%v]", task.ID)
+	}
+	if err = packet.WriteToConn(conn); err != nil {
+		return errors.Annotatef(err, "action[createDataPartition],WriteToConn failed,task:%v", task.ID)
+	}
+	if err = packet.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
+		return errors.Annotatef(err, "action[createDataPartition],ReadFromConn failed task:%v", task.ID)
+	}
+	if packet.ResultCode != proto.OpOk {
+		err = fmt.Errorf(packet.GetData())
+		return
+	}
+	log.LogDebugf(fmt.Sprintf("action[createDataPartition] sender task:%v success", task.ToString()))
 
 	return nil
 }
