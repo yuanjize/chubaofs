@@ -61,14 +61,16 @@ type MetaPartitionView struct {
 type VolView struct {
 	Name           string
 	VolType        string
+	Status         uint8
 	MetaPartitions []*MetaPartitionView
 	DataPartitions []*DataPartitionResponse
 }
 
-func NewVolView(name, volType string) (view *VolView) {
+func NewVolView(name, volType string, status uint8) (view *VolView) {
 	view = new(VolView)
 	view.Name = name
 	view.VolType = volType
+	view.Status = status
 	view.MetaPartitions = make([]*MetaPartitionView, 0)
 	view.DataPartitions = make([]*DataPartitionResponse, 0)
 	return
@@ -173,7 +175,7 @@ errDeal:
 }
 
 func (m *Master) getVolView(vol *Vol) (view *VolView, err error) {
-	view = NewVolView(vol.Name, vol.VolType)
+	view = NewVolView(vol.Name, vol.VolType, vol.Status)
 	setMetaPartitions(vol, view, m.cluster.getLiveMetaNodesRate())
 	err = setDataPartitions(vol, view, m.cluster.getLiveDataNodesRate())
 	return
