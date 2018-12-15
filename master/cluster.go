@@ -409,6 +409,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			}()
 			if err = c.syncCreateDataPartitionToDataNode(host, dp); err != nil {
 				errChannel <- err
+				return
 			}
 			dp.Lock()
 			defer dp.Unlock()
@@ -424,7 +425,6 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	default:
 
 	}
-	return
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
 		goto errDeal
 	}
@@ -614,7 +614,6 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	if err = dp.createDataPartitionSuccessTriggerOperator(newAddr, c); err != nil {
 		goto errDeal
 	}
-	goto errDeal
 errDeal:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
