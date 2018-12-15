@@ -410,6 +410,11 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			if err = c.syncCreateDataPartitionToDataNode(host, dp); err != nil {
 				errChannel <- err
 			}
+			dp.Lock()
+			defer dp.Unlock()
+			if err = dp.createDataPartitionSuccessTriggerOperator(host, c); err != nil {
+				errChannel <- err
+			}
 		}(host)
 	}
 	wg.Wait()
@@ -419,6 +424,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	default:
 
 	}
+	return
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
 		goto errDeal
 	}
@@ -446,12 +452,6 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartiti
 		return
 	}
 	dataNode.Sender.connPool.Put(conn, false)
-	replica := NewDataReplica(dataNode)
-	replica.Status = proto.ReadWrite
-	dp.Lock()
-	defer dp.Unlock()
-	dp.AddMember(replica)
-	dp.checkAndRemoveMissReplica(replica.Addr)
 	return
 }
 
@@ -611,9 +611,12 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	if err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
 		goto errDeal
 	}
+	if err = dp.createDataPartitionSuccessTriggerOperator(newAddr, c); err != nil {
+		goto errDeal
+	}
 	goto errDeal
 errDeal:
-	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
