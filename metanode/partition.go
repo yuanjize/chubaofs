@@ -222,24 +222,28 @@ func (mp *metaPartition) Stop() {
 }
 
 func (mp *metaPartition) onStart() (err error) {
+	defer func() {
+		if err == nil {
+			return
+		}
+		if mp.config.BeforeStop != nil {
+			mp.config.BeforeStop()
+		}
+		mp.onStop()
+	}()
 	if err = mp.load(); err != nil {
 		err = errors.Errorf("[onStart]:load partition id=%d: %s",
 			mp.config.PartitionId, err.Error())
 		return
 	}
 	mp.startSchedule(mp.applyID)
-	if err = mp.startRaft(); err != nil {
-		err = errors.Errorf("[onStart]start raft id=%d: %s",
-			mp.config.PartitionId,
-			err.Error())
+	if err = mp.startFreeList(); err != nil {
+		err = errors.Errorf("[onStart]start freelist id=%d: %s",
+			mp.config.PartitionId, err.Error())
 		return
 	}
-	if err = mp.startFreeList(); err != nil {
-		if mp.config.BeforeStop != nil {
-			mp.config.BeforeStop()
-		}
-		mp.onStop()
-		err = errors.Errorf("[onStart]start freelist id=%d: %s",
+	if err = mp.startRaft(); err != nil {
+		err = errors.Errorf("[onStart]start raft id=%d: %s",
 			mp.config.PartitionId, err.Error())
 		return
 	}
