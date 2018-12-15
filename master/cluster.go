@@ -693,6 +693,8 @@ func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int
 		vol.initDataPartitions(c)
 		readWriteDataPartitions = vol.checkDataPartitionStatus(c)
 	}
+	vol.dataPartitions.readWriteDataPartitions = readWriteDataPartitions
+	log.LogInfof("action[createVol] vol[%v],readWriteDataPartitions[%v]", name, readWriteDataPartitions)
 	return
 errDeal:
 	err = fmt.Errorf("action[createVol], clusterID[%v] name:%v, err:%v ", c.Name, name, err.Error())
