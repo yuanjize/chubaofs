@@ -639,6 +639,7 @@ func (c *Cluster) loadCompactStatus() (err error) {
 		}
 		c.compactStatus = status
 		encodedKey.Free()
+		log.LogInfof("action[loadCompactStatus] cluster[%v] status[%v]", c.Name, c.compactStatus)
 	}
 	return
 }
@@ -659,6 +660,7 @@ func (c *Cluster) loadDataNodes() (err error) {
 		dataNode := NewDataNode(keys[2], c.Name)
 		c.dataNodes.Store(dataNode.Addr, dataNode)
 		encodedKey.Free()
+		log.LogInfof("action[loadDataNodes],dataNode[%v]", dataNode.Addr)
 	}
 	return
 }
@@ -691,6 +693,7 @@ func (c *Cluster) loadMetaNodes() (err error) {
 		metaNode.ID = nodeID
 		c.metaNodes.Store(addr, metaNode)
 		encodedKey.Free()
+		log.LogInfof("action[loadMetaNodes],metaNode[%v]", metaNode.Addr)
 	}
 	return
 }
@@ -721,6 +724,7 @@ func (c *Cluster) loadVols() (err error) {
 		vol.Status = vv.Status
 		c.putVol(vol)
 		encodedKey.Free()
+		log.LogInfof("action[loadVols],vol[%v]", vol)
 	}
 	return
 }
@@ -758,6 +762,7 @@ func (c *Cluster) loadMetaPartitions() (err error) {
 		vol.AddMetaPartition(mp)
 		encodedKey.Free()
 		encodedValue.Free()
+		log.LogInfof("action[loadMetaPartitions],vol[%v],mp[%v]", vol.Name, mp.PartitionID)
 	}
 	return
 }
@@ -794,6 +799,7 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		vol.dataPartitions.putDataPartition(dp)
 		encodedKey.Free()
 		encodedValue.Free()
+		log.LogInfof("action[loadDataPartitions],vol[%v],dp[%v]", vol.Name, dp.PartitionID)
 	}
 	return
 }

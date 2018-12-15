@@ -50,6 +50,11 @@ func NewVol(name, volType string, replicaNum uint8, capacity uint64) (vol *Vol) 
 	return
 }
 
+func (vol *Vol) String() string {
+	return fmt.Sprintf("name[%v],dpNum[%v],mpNum[%v],cap[%v],status[%v]",
+		vol.Name, vol.dpReplicaNum, vol.mpReplicaNum, vol.Capacity, vol.Status)
+}
+
 func (vol *Vol) AddMetaPartition(mp *MetaPartition) {
 	vol.mpsLock.Lock()
 	defer vol.mpsLock.Unlock()
@@ -100,9 +105,7 @@ func (vol *Vol) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err
 func (vol *Vol) initDataPartitions(c *Cluster) {
 	//init ten data partitions
 	for i := 0; i < DefaultInitDataPartitions; i++ {
-		if _, err := c.createDataPartition(vol.Name, vol.VolType); err != nil {
-			log.LogErrorf("action[initDataPartitions] vol[%v] err[%v]", vol.Name, err)
-		}
+		c.createDataPartition(vol.Name, vol.VolType)
 	}
 	return
 }

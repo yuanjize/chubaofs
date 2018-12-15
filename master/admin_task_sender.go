@@ -190,7 +190,6 @@ func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn n
 		return errors.Annotatef(err, "action[createDataPartition],ReadFromConn failed task:%v", task.ID)
 	}
 	data := packet.GetData()
-	log.LogErrorf("action[createDataPartition],data[%v]", data)
 	if packet.ResultCode != proto.OpOk {
 		err = fmt.Errorf(data)
 		return

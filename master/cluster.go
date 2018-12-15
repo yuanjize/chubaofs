@@ -376,6 +376,7 @@ func (c *Cluster) markDeleteVol(name string) (err error) {
 		vol.Status = VolNormal
 		return
 	}
+	log.LogWarnf("action[markDeleteVol] delete vol[%v] success", name)
 	return
 }
 
@@ -411,9 +412,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			}
 		}(host)
 	}
-	log.LogErrorf("action[createDataPartition] before wait,partition[%v]", partitionID)
 	wg.Wait()
-	log.LogErrorf("action[createDataPartition] after wait,partition[%v]", partitionID)
 	select {
 	case err = <-errChannel:
 		goto errDeal
@@ -424,10 +423,10 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 		goto errDeal
 	}
 	vol.dataPartitions.putDataPartition(dp)
-	log.LogErrorf("action[createDataPartition] success,partition[%v]", partitionID)
+	log.LogInfof("action[createDataPartition] success,partition[%v]", partitionID)
 	return
 errDeal:
-	err = fmt.Errorf("action[createDataPartition],clusterID[%v] vol[%v] Err:%v ", c.Name, volName, err.Error())
+	err = fmt.Errorf("action[createDataPartition],clusterID[%v] vol[%v] partitonID[%v] Err:%v ", c.Name, volName, partitionID, err.Error())
 	log.LogError(errors.ErrorStack(err))
 	Warn(c.Name, err.Error())
 	return
