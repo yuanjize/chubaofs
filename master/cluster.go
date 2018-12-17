@@ -423,7 +423,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	case err = <-errChannel:
 		goto errDeal
 	default:
-
+		dp.Status = proto.ReadWrite
 	}
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
 		goto errDeal

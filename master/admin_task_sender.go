@@ -178,7 +178,7 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 }
 
 func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn net.Conn) (err error) {
-	log.LogDebugf(fmt.Sprintf("action[createDataPartition] sender task:%v begin", task.ToString()))
+	log.LogInfof(fmt.Sprintf("action[createDataPartition] sender task:%v begin", task.ToString()))
 	packet, err := sender.buildPacket(task)
 	if err != nil {
 		return errors.Annotatef(err, "action[createDataPartition build packet failed,task:%v]", task.ID)
@@ -194,7 +194,7 @@ func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn n
 		err = fmt.Errorf(data)
 		return
 	}
-	log.LogDebugf(fmt.Sprintf("action[createDataPartition] sender task:%v success", task.ToString()))
+	log.LogInfof(fmt.Sprintf("action[createDataPartition] sender task:%v success", task.ToString()))
 
 	return nil
 }
