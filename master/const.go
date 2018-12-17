@@ -56,11 +56,11 @@ const (
 	DefaultInitDataPartitions               = 10
 	EmptyCrcValue                   uint32  = 4045511210
 	DefaultVolCapacity                      = 200
-	LoadDataPartitionPeriod                 = 12 * 60 //24 *60 *60/LoadDataPartitionWaitTime
+	LoadDataPartitionPeriod                 = 12 * 60 * 60
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 
