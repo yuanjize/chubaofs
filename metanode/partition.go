@@ -27,6 +27,7 @@ import (
 	"github.com/tiglabs/containerfs/third_party/pool"
 	"github.com/tiglabs/containerfs/util/log"
 	raftproto "github.com/tiglabs/raft/proto"
+	"os"
 )
 
 var (
@@ -168,12 +169,13 @@ type MetaPartition interface {
 type metaPartition struct {
 	config        *MetaPartitionConfig
 	size          uint64 // For partition all file size
-	applyID       uint64 // For store Inode/Dentry max applyID, this index will be update after restore from dump data.
+	applyID       uint64 // store the applyID
 	dentryTree    *BTree
 	inodeTree     *BTree              // B-Tree for Inode.
 	raftPartition raftstore.Partition // RaftStore partition instance of this meta partition.
 	stopC         chan bool
 	storeChan     chan *storeMsg
+	deleteFp      *os.File
 	state         uint32
 	freeList      *freeList // Free inode list
 	vol           *Vol
@@ -220,25 +222,41 @@ func (mp *metaPartition) Stop() {
 }
 
 func (mp *metaPartition) onStart() (err error) {
+	defer func() {
+		if err == nil {
+			return
+		}
+		if mp.config.BeforeStop != nil {
+			mp.config.BeforeStop()
+		}
+		mp.onStop()
+	}()
 	if err = mp.load(); err != nil {
 		err = errors.Errorf("[onStart]:load partition id=%d: %s",
 			mp.config.PartitionId, err.Error())
 		return
 	}
 	mp.startSchedule(mp.applyID)
-	if err = mp.startRaft(); err != nil {
-		err = errors.Errorf("[onStart]start raft id=%d: %s",
-			mp.config.PartitionId,
-			err.Error())
+	if err = mp.startFreeList(); err != nil {
+		err = errors.Errorf("[onStart]start freelist id=%d: %s",
+			mp.config.PartitionId, err.Error())
 		return
 	}
-	mp.startFreeList()
+	if err = mp.startRaft(); err != nil {
+		err = errors.Errorf("[onStart]start raft id=%d: %s",
+			mp.config.PartitionId, err.Error())
+		return
+	}
 	return
 }
 
 func (mp *metaPartition) onStop() {
 	mp.stopRaft()
 	mp.stop()
+	if mp.deleteFp != nil {
+		mp.deleteFp.Sync()
+		mp.deleteFp.Close()
+	}
 }
 
 func (mp *metaPartition) startRaft() (err error) {
@@ -319,6 +337,9 @@ func NewMetaPartition(conf *MetaPartitionConfig) MetaPartition {
 }
 
 func (mp *metaPartition) IsLeader() (leaderAddr string, ok bool) {
+	if mp.raftPartition == nil {
+		return
+	}
 	leaderID, _ := mp.raftPartition.LeaderTerm()
 	if leaderID == 0 {
 		return
