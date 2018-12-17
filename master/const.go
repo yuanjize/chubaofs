@@ -57,6 +57,8 @@ const (
 	EmptyCrcValue                   uint32  = 4045511210
 	DefaultVolCapacity                      = 200
 	LoadDataPartitionPeriod                 = 12 * 60 * 60
+	VolExpandDataPartitionStepRatio         = 0.1
+	VolMaxExpandDataPartitionCount          = 100
 )
 
 const (

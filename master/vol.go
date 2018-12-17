@@ -249,10 +249,24 @@ func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 
 func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions {
-		for i := 0; i < MinReadWriteDataPartitions; i++ {
+		count := vol.calculateExpandNum()
+		for i := 0; i < count; i++ {
 			c.createDataPartition(vol.Name, vol.VolType)
 		}
 	}
+}
+
+func (vol *Vol) calculateExpandNum() (count int) {
+	calCount := float64(vol.Capacity) * float64(VolExpandDataPartitionStepRatio) * float64(util.GB) / float64(util.DefaultDataPartitionSize)
+	switch {
+	case calCount < MinReadWriteDataPartitions:
+		count = MinReadWriteDataPartitions
+	case calCount > VolMaxExpandDataPartitionCount:
+		count = VolMaxExpandDataPartitionCount
+	default:
+		count = int(calCount)
+	}
+	return
 }
 
 func (vol *Vol) setAllDataPartitionsToReadOnly() {
