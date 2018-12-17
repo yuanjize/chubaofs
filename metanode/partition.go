@@ -254,6 +254,7 @@ func (mp *metaPartition) onStop() {
 	mp.stopRaft()
 	mp.stop()
 	if mp.deleteFp != nil {
+		mp.deleteFp.Sync()
 		mp.deleteFp.Close()
 	}
 }
