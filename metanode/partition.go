@@ -337,6 +337,9 @@ func NewMetaPartition(conf *MetaPartitionConfig) MetaPartition {
 }
 
 func (mp *metaPartition) IsLeader() (leaderAddr string, ok bool) {
+	if mp.raftPartition == nil {
+		return
+	}
 	leaderID, _ := mp.raftPartition.LeaderTerm()
 	if leaderID == 0 {
 		return
