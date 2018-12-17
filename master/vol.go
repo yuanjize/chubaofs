@@ -250,6 +250,7 @@ func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions {
 		count := vol.calculateExpandNum()
+		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v]", vol.Name, count)
 		for i := 0; i < count; i++ {
 			c.createDataPartition(vol.Name, vol.VolType)
 		}
