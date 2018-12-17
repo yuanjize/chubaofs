@@ -114,10 +114,11 @@ const (
 )
 
 const (
-	WriteDeadlineTime      = 5
-	ReadDeadlineTime       = 5
-	NoReadDeadlineTime     = -1
-	StreamReadDeadLineTime = 2
+	WriteDeadlineTime               = 5
+	ReadDeadlineTime                = 5
+	CreateDataPartitionDeadlineTime = 20
+	NoReadDeadlineTime              = -1
+	StreamReadDeadLineTime          = 2
 )
 
 const (

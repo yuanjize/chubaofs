@@ -186,7 +186,7 @@ func (sender *AdminTaskSender) createDataPartition(task *proto.AdminTask, conn n
 	if err = packet.WriteToConn(conn); err != nil {
 		return errors.Annotatef(err, "action[createDataPartition],WriteToConn failed,task:%v", task.ID)
 	}
-	if err = packet.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
+	if err = packet.ReadFromConn(conn, proto.CreateDataPartitionDeadlineTime); err != nil {
 		return errors.Annotatef(err, "action[createDataPartition],ReadFromConn failed task:%v", task.ID)
 	}
 	data := packet.GetData()

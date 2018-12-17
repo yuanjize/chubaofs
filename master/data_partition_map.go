@@ -150,7 +150,11 @@ func (dpMap *DataPartitionMap) getNeedReleaseDataPartitions(everyReleaseDataPart
 		return
 	}
 	startIndex = dpMap.lastReleaseIndex
-	for i := 0; i < everyReleaseDataPartitionCount; i++ {
+	needReleaseCount := everyReleaseDataPartitionCount
+	if dpLen < everyReleaseDataPartitionCount {
+		needReleaseCount = dpLen
+	}
+	for i := 0; i < needReleaseCount; i++ {
 		if dpMap.lastReleaseIndex >= uint64(dpLen) {
 			dpMap.lastReleaseIndex = 0
 		}
