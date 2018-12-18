@@ -242,7 +242,7 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 	}
 
 	defer func() {
-		if err != nil {
+		if err != nil && err != io.EOF {
 			ump.Alarm(gDataWrapper.UmpWarningKey(), fmt.Sprintf("volname %v readError %v", wrapper.GVolname, err.Error()))
 		}
 	}()
