@@ -429,10 +429,10 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 		goto errDeal
 	}
 	vol.dataPartitions.putDataPartition(dp)
-	log.LogInfof("action[createDataPartition] success,volName[%v],partition[%v]", volName, partitionID)
+	log.LogInfof("action[syncCreatePartition] success,volName[%v],partition[%v]", volName, partitionID)
 	return
 errDeal:
-	err = fmt.Errorf("action[createDataPartition],clusterID[%v] vol[%v] partitonID[%v] Err:%v ", c.Name, volName, partitionID, err.Error())
+	err = fmt.Errorf("action[syncCreatePartition],clusterID[%v] vol[%v] partitonID[%v] Err:%v ", c.Name, volName, partitionID, err.Error())
 	log.LogError(errors.ErrorStack(err))
 	Warn(c.Name, err.Error())
 	return
@@ -448,7 +448,7 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartiti
 	if err != nil {
 		return
 	}
-	if dataNode.Sender.createDataPartition(task, conn); err != nil {
+	if dataNode.Sender.syncCreatePartition(task, conn); err != nil {
 		return
 	}
 	dataNode.Sender.connPool.Put(conn, false)
@@ -758,11 +758,13 @@ func (c *Cluster) CreateMetaPartition(volName string, start, end uint64) (err er
 		hosts       []string
 		partitionID uint64
 		peers       []proto.Peer
+		wg          sync.WaitGroup
 	)
 	if vol, err = c.getVol(volName); err != nil {
-		return errors.Annotatef(err, "get vol [%v] err", volName)
+		log.LogWarnf("action[CreateMetaPartition] get vol [%v] err", volName)
+		return
 	}
-
+	errChannel := make(chan error, vol.mpReplicaNum)
 	if hosts, peers, err = c.ChooseTargetMetaHosts(int(vol.mpReplicaNum)); err != nil {
 		return errors.Trace(err)
 	}
@@ -773,13 +775,57 @@ func (c *Cluster) CreateMetaPartition(volName string, start, end uint64) (err er
 	mp = NewMetaPartition(partitionID, start, end, vol.mpReplicaNum, volName)
 	mp.setPersistenceHosts(hosts)
 	mp.setPeers(peers)
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer func() {
+				wg.Done()
+			}()
+			if err = c.syncCreateMetaPartitionToMataNode(host, mp); err != nil {
+				errChannel <- err
+				return
+			}
+			mp.Lock()
+			defer mp.Unlock()
+			if err = mp.createPartitionSuccessTriggerOperator(host, c); err != nil {
+				errChannel <- err
+			}
+		}(host)
+	}
+	wg.Wait()
+	select {
+	case err = <-errChannel:
+		return errors.Trace(err)
+	default:
+		mp.Status = proto.ReadWrite
+	}
 	if err = c.syncAddMetaPartition(volName, mp); err != nil {
 		return errors.Trace(err)
 	}
 	vol.AddMetaPartition(mp)
-	c.putMetaNodeTasks(mp.generateCreateMetaPartitionTasks(nil, mp.Peers, volName))
+	log.LogInfof("action[CreateMetaPartition] success,volName[%v],partition[%v]", volName, partitionID)
 	return
 }
+
+func (c *Cluster) syncCreateMetaPartitionToMataNode(host string, mp *MetaPartition) (err error) {
+	hosts := make([]string, 0)
+	hosts = append(hosts, host)
+	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.volName)
+	metaNode, err := c.getMetaNode(host)
+	if err != nil {
+		return
+	}
+	conn, err := metaNode.Sender.connPool.Get(metaNode.Addr)
+	if err != nil {
+		return
+	}
+	if metaNode.Sender.syncCreatePartition(tasks[0], conn); err != nil {
+		return
+	}
+	metaNode.Sender.connPool.Put(conn, false)
+	return
+}
+
 
 func (c *Cluster) hasEnoughWritableMetaHosts(replicaNum int) bool {
 	maxTotal := c.GetMetaNodeMaxTotal()
