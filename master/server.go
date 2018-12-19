@@ -79,7 +79,7 @@ func (m *Master) Start(cfg *config.Config) (err error) {
 	}
 	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition)
 	m.cluster.retainLogs = m.retainLogs
-	m.loadMetadata()
+	//m.loadMetadata()
 	m.startHttpService()
 	m.wg.Add(1)
 	return nil
