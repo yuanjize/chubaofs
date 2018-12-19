@@ -41,7 +41,6 @@ type WriteRequest struct {
 	canWrite     int
 	err          error
 	kernelOffset int
-	cutSize      int
 	done         chan struct{}
 }
 
@@ -157,15 +156,6 @@ func (stream *StreamWriter) server() {
 func (stream *StreamWriter) handleRequest(request interface{}) {
 	switch request := request.(type) {
 	case *WriteRequest:
-		if request.kernelOffset < int(stream.getHasWriteSize()) {
-			cutSize := int(stream.getHasWriteSize()) - request.kernelOffset
-			if cutSize < len(request.data) {
-				request.kernelOffset += cutSize
-				request.data = request.data[cutSize:]
-				request.size -= cutSize
-				request.cutSize = cutSize
-			}
-		}
 		if stream.inodeHasDelete {
 			request.err = syscall.ENOENT
 			request.done <- struct{}{}
