@@ -448,7 +448,7 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartiti
 	if err != nil {
 		return
 	}
-	if dataNode.Sender.syncCreatePartition(task, conn); err != nil {
+	if err = dataNode.Sender.syncCreatePartition(task, conn); err != nil {
 		return
 	}
 	dataNode.Sender.connPool.Put(conn, false)
@@ -819,13 +819,12 @@ func (c *Cluster) syncCreateMetaPartitionToMataNode(host string, mp *MetaPartiti
 	if err != nil {
 		return
 	}
-	if metaNode.Sender.syncCreatePartition(tasks[0], conn); err != nil {
+	if err = metaNode.Sender.syncCreatePartition(tasks[0], conn); err != nil {
 		return
 	}
 	metaNode.Sender.connPool.Put(conn, false)
 	return
 }
-
 
 func (c *Cluster) hasEnoughWritableMetaHosts(replicaNum int) bool {
 	maxTotal := c.GetMetaNodeMaxTotal()
