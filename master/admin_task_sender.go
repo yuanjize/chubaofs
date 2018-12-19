@@ -192,6 +192,7 @@ func (sender *AdminTaskSender) syncCreatePartition(task *proto.AdminTask, conn n
 	data := packet.GetData()
 	if packet.ResultCode != proto.OpOk {
 		err = fmt.Errorf(data)
+		log.LogErrorf("action[syncCreatePartition] get task:%v response err[%v] ", task.ToString(), err)
 		return
 	}
 	log.LogInfof(fmt.Sprintf("action[syncCreatePartition] sender task:%v success", task.ToString()))
