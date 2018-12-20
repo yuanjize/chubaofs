@@ -186,6 +186,10 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 
 func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) (err error) {
 	reqlen := len(req.Data)
+
+	log.LogDebugf("TRACE Write enter: ino(%v) offset(%v) len(%v) req(%v)",
+		f.inode.ino, req.Offset, reqlen, req)
+
 	if uint64(req.Offset) > f.inode.size && reqlen == 1 {
 		// The fuse package is probably doing truncate size up, which is not supported yet. So Just return.
 		log.LogDebugf("Write: not support, ino(%v) req(%v)", f.inode.ino, req)
@@ -208,8 +212,8 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	}
 
 	elapsed := time.Since(start)
-	log.LogDebugf("TRACE Write: ino(%v) offset(%v) len(%v) flags(%v) fileflags(%v) (%v)ns ",
-		f.inode.ino, req.Offset, reqlen, req.Flags, req.FileFlags, elapsed.Nanoseconds())
+	log.LogDebugf("TRACE Write exit: ino(%v) offset(%v) len(%v) req(%v) (%v)ns ",
+		f.inode.ino, req.Offset, reqlen, req, elapsed.Nanoseconds())
 	return nil
 }
 
