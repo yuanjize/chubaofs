@@ -510,7 +510,9 @@ func (stream *StreamWriter) createExtent(dp *wrapper.DataPartition) (extentId ui
 		return
 	}
 	if p.ResultCode != proto.OpOk {
-		err = errors.Annotatef(err, "receive CreateExtent(%v) failed datapartionHosts(%v) ", p.GetUniqueLogId(), dp.Hosts[0])
+		err = errors.Annotatef(fmt.Errorf("unavali resultcode %v errmsg %v",
+			p.ResultCode,string(p.Data[:p.Size])), "receive CreateExtent(%v) failed datapartionHosts(%v) ",
+				p.GetUniqueLogId(), dp.Hosts[0])
 		return
 	}
 	extentId = p.FileID
