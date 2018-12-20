@@ -80,22 +80,22 @@ func interceptSignal(s Server) {
 	}()
 }
 
-func modifyOpenFiles()(err error) {
+func modifyOpenFiles() (err error) {
 	var rLimit syscall.Rlimit
 	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
-		return fmt.Errorf("Error Getting Rlimit %v",err.Error())
+		return fmt.Errorf("Error Getting Rlimit %v", err.Error())
 	}
 	fmt.Println(rLimit)
 	rLimit.Max = 6553500
 	rLimit.Cur = 6553500
 	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
-		return fmt.Errorf("Error Setting Rlimit %v",err.Error())
+		return fmt.Errorf("Error Setting Rlimit %v", err.Error())
 	}
 	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
-		return fmt.Errorf("Error Getting Rlimit %v",err.Error())
+		return fmt.Errorf("Error Getting Rlimit %v", err.Error())
 	}
 	fmt.Println("Rlimit Final", rLimit)
 }
@@ -109,8 +109,8 @@ func main() {
 		}
 	}()
 	flag.Parse()
-	err:=modifyOpenFiles()
-	if err!=nil {
+	err := modifyOpenFiles()
+	if err != nil {
 		panic(err.Error())
 	}
 	cfg := config.LoadConfigFile(*configFile)
