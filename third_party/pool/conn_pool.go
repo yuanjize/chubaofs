@@ -94,9 +94,6 @@ func (p *Pool) AutoRelease() {
 		case c := <-p.pool:
 			if time.Now().UnixNano()-int64(c.idle) > p.timeout {
 				c.conn.Close()
-				c.conn.CloseWrite()
-				c.conn.CloseRead()
-				c.conn.Close()
 			} else {
 				p.putconnect(c)
 			}
@@ -110,8 +107,6 @@ func (p *Pool) ForceReleaseAllConnect() {
 	for {
 		select {
 		case c := <-p.pool:
-			c.conn.CloseWrite()
-			c.conn.CloseRead()
 			c.conn.Close()
 		default:
 			return
@@ -169,8 +164,6 @@ func (connectPool *ConnectPool) Put(c *net.TCPConn, forceClose bool) {
 		return
 	}
 	if forceClose {
-		c.CloseWrite()
-		c.CloseRead()
 		c.Close()
 		return
 	}
@@ -179,8 +172,6 @@ func (connectPool *ConnectPool) Put(c *net.TCPConn, forceClose bool) {
 	pool, ok := connectPool.pools[addr]
 	connectPool.RUnlock()
 	if !ok {
-		c.CloseWrite()
-		c.CloseRead()
 		c.Close()
 		return
 	}
@@ -197,14 +188,10 @@ func (connectPool *ConnectPool) CheckErrorForceClose(c *net.TCPConn, target stri
 
 	if err != nil {
 		if strings.Contains(err.Error(), "use of closed network connection") {
-			c.CloseWrite()
-			c.CloseRead()
 			c.Close()
 			connectPool.ReleaseAllConnect(target)
 			return
 		} else {
-			c.CloseWrite()
-			c.CloseRead()
 			c.Close()
 			return
 		}
@@ -218,14 +205,10 @@ func (connectPool *ConnectPool) CheckErrorForPutConnect(c *net.TCPConn, target s
 
 	if err != nil {
 		if strings.Contains(err.Error(), "use of closed network connection") {
-			c.CloseWrite()
-			c.CloseRead()
 			c.Close()
 			connectPool.ReleaseAllConnect(target)
 			return
 		} else {
-			c.CloseWrite()
-			c.CloseRead()
 			c.Close()
 			return
 		}
