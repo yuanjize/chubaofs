@@ -95,6 +95,7 @@ func modifyOpenFiles() (err error) {
 		return fmt.Errorf("Error Getting Rlimit %v", err.Error())
 	}
 	fmt.Println("Rlimit Final", rLimit)
+	return
 }
 
 func main() {
