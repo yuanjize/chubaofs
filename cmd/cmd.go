@@ -163,7 +163,6 @@ func main() {
 		os.Exit(1)
 		return
 	}
-	exec.Command("ulimit -n 1024000")
 	interceptSignal(server)
 	err = server.Start(cfg)
 	if err != nil {
