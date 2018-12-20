@@ -163,7 +163,7 @@ func (stream *StreamWriter) handleRequest(request interface{}) {
 			request.done <- struct{}{}
 			return
 		}
-		request.actualOffset=int(stream.getHasWriteSize())
+		request.actualOffset = int(stream.getHasWriteSize())
 		request.canWrite, request.err = stream.write(request.data, request.actualOffset, request.size)
 		stream.addHasWriteSize(request.canWrite)
 		request.done <- struct{}{}

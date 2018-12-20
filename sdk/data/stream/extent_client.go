@@ -90,11 +90,11 @@ func (client *ExtentClient) getStreamWriterForRead(inode uint64) (stream *Stream
 	return
 }
 
-func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write int,actualOffset int, err error) {
+func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write int, actualOffset int, err error) {
 	stream := client.getStreamWriter(inode)
 	if stream == nil {
 		prefix := fmt.Sprintf("inodewrite %v_%v_%v", inode, offset, len(data))
-		return 0, 0,fmt.Errorf("Prefix(%v) cannot init write stream", prefix)
+		return 0, 0, fmt.Errorf("Prefix(%v) cannot init write stream", prefix)
 	}
 
 	request := writeRequestPool.Get().(*WriteRequest)
@@ -104,7 +104,7 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 	request.done = make(chan struct{}, 1)
 	stream.requestCh <- request
 	<-request.done
-	actualOffset=request.actualOffset
+	actualOffset = request.actualOffset
 	err = request.err
 	write = request.canWrite
 	if err != nil {

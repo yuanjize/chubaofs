@@ -28,11 +28,11 @@ import (
 	"runtime"
 	"syscall"
 
+	"bytes"
 	"fmt"
 	"github.com/tiglabs/containerfs/util/config"
 	"net/http"
 	"os/exec"
-	"bytes"
 )
 
 const (

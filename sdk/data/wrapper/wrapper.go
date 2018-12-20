@@ -37,8 +37,8 @@ const (
 )
 
 var (
-	MasterHelper  = util.NewMasterHelper()
-	LocalIP, _      = util.GetLocalIP()
+	MasterHelper = util.NewMasterHelper()
+	LocalIP, _   = util.GetLocalIP()
 	GVolname     string
 )
 

@@ -539,4 +539,3 @@ func (mp *MetaPartition) createPartitionSuccessTriggerOperator(nodeAddr string, 
 	mp.checkAndRemoveMissMetaReplica(mr.Addr)
 	return
 }
-
