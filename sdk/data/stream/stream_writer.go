@@ -41,6 +41,7 @@ type WriteRequest struct {
 	canWrite     int
 	err          error
 	kernelOffset int
+	actualOffset int
 	done         chan struct{}
 }
 
@@ -70,6 +71,7 @@ type StreamWriter struct {
 	hasUpdateToMetaNodeSize uint64
 	recoverPackages         []*Packet
 	inodeHasDelete          bool
+	kernelOffset            uint64
 }
 
 func NewStreamWriter(inode, start uint64, appendExtentKey AppendExtentKeyFunc) (stream *StreamWriter) {
@@ -161,7 +163,8 @@ func (stream *StreamWriter) handleRequest(request interface{}) {
 			request.done <- struct{}{}
 			return
 		}
-		request.canWrite, request.err = stream.write(request.data, request.kernelOffset, request.size)
+		request.actualOffset=int(stream.getHasWriteSize())
+		request.canWrite, request.err = stream.write(request.data, request.actualOffset, request.size)
 		stream.addHasWriteSize(request.canWrite)
 		request.done <- struct{}{}
 	case *FlushRequest:
