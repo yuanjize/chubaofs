@@ -96,7 +96,6 @@ func main() {
 			panic(r)
 		}
 	}()
-	log.LogInfo("Hello, Baud Storage")
 	flag.Parse()
 	log.LogInfof("Hello, Cfs Storage, Current Version: %s", Version)
 	out, err := exec_shell("ulimit -n 1024000")
