@@ -84,8 +84,8 @@ func modifyOpenFiles() (err error) {
 		return fmt.Errorf("Error Getting Rlimit %v", err.Error())
 	}
 	fmt.Println(rLimit)
-	rLimit.Max = 6553500
-	rLimit.Cur = 6553500
+	rLimit.Max = 1024000
+	rLimit.Cur = 1024000
 	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
 		return fmt.Errorf("Error Setting Rlimit %v", err.Error())
