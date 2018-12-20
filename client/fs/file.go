@@ -201,19 +201,19 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	}()
 
 	start := time.Now()
-	size, err := f.super.ec.Write(f.inode.ino, int(req.Offset), req.Data)
+	size,actualOffset, err := f.super.ec.Write(f.inode.ino, int(req.Offset), req.Data)
 	if err != nil {
-		log.LogErrorf("Write: ino(%v) offset(%v) len(%v) err(%v)", f.inode.ino, req.Offset, reqlen, err)
+		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) err(%v)", f.inode.ino, req.Offset, actualOffset,reqlen, err)
 		return fuse.EIO
 	}
 	resp.Size = size
 	if size != reqlen {
-		log.LogErrorf("Write: ino(%v) offset(%v) len(%v) size(%v)", f.inode.ino, req.Offset, reqlen, size)
+		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) size(%v)", f.inode.ino, req.Offset, actualOffset,reqlen, size)
 	}
 
 	elapsed := time.Since(start)
-	log.LogDebugf("TRACE Write exit: ino(%v) offset(%v) len(%v) req(%v) (%v)ns ",
-		f.inode.ino, req.Offset, reqlen, req, elapsed.Nanoseconds())
+	log.LogDebugf("TRACE Write exit: ino(%v) offset(%v) actualOffset(%v) len(%v) req(%v) (%v)ns ",
+		f.inode.ino, req.Offset,actualOffset, reqlen, req, elapsed.Nanoseconds())
 	return nil
 }
 
