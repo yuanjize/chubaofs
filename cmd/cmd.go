@@ -27,12 +27,9 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-
-	"bytes"
 	"fmt"
 	"github.com/tiglabs/containerfs/util/config"
 	"net/http"
-	"os/exec"
 )
 
 const (
