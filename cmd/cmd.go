@@ -80,12 +80,24 @@ func interceptSignal(s Server) {
 	}()
 }
 
-func exec_shell(s string) (string, error) {
-	cmd := exec.Command("/bin/bash", "-c", s)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	return out.String(), err
+func modifyOpenFiles()(err error) {
+	var rLimit syscall.Rlimit
+	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		return fmt.Errorf("Error Getting Rlimit %v",err.Error())
+	}
+	fmt.Println(rLimit)
+	rLimit.Max = 6553500
+	rLimit.Cur = 6553500
+	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		return fmt.Errorf("Error Setting Rlimit %v",err.Error())
+	}
+	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		return fmt.Errorf("Error Getting Rlimit %v",err.Error())
+	}
+	fmt.Println("Rlimit Final", rLimit)
 }
 
 func main() {
@@ -97,13 +109,10 @@ func main() {
 		}
 	}()
 	flag.Parse()
-	log.LogInfof("Hello, Cfs Storage, Current Version: %s", Version)
-	out, err := exec_shell("ulimit -n 1024000")
-	if err != nil {
-		fmt.Printf("ulimit -n 1024000  error %v out %v\n", err, out)
-		os.Exit(0)
+	err:=modifyOpenFiles()
+	if err!=nil {
+		panic(err.Error())
 	}
-	fmt.Println(out)
 	cfg := config.LoadConfigFile(*configFile)
 	role := cfg.GetString(ConfigKeyRole)
 	logDir := cfg.GetString(ConfigKeyLogDir)
