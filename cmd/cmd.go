@@ -158,7 +158,7 @@ func main() {
 		}()
 	}
 
-	if _, err := log.InitLog(logDir, module, level); err != nil {
+	if _, err = log.InitLog(logDir, module, level); err != nil {
 		fmt.Println("Fatal: failed to start the baud storage daemon - ", err)
 		os.Exit(1)
 		return
