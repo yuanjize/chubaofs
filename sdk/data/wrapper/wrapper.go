@@ -218,7 +218,7 @@ func (w *Wrapper) GetWriteDataPartition(exclude []uint32) (*DataPartition, error
 	}
 	rwPartitionGroups := w.rwPartition
 	if len(rwPartitionGroups) == 0 {
-		return nil, fmt.Errorf("no writable data partition")
+		return nil, fmt.Errorf("no writable data partition,writeDataPartionGroup %v", len(rwPartitionGroups))
 	}
 	var (
 		partition *DataPartition
@@ -237,7 +237,7 @@ func (w *Wrapper) GetWriteDataPartition(exclude []uint32) (*DataPartition, error
 			return partition, nil
 		}
 	}
-	return nil, fmt.Errorf("no writable data partition")
+	return nil, fmt.Errorf("no writable data partition,writeDataPartionGroup %v", len(rwPartitionGroups))
 }
 
 func (w *Wrapper) GetDataPartition(partitionID uint32) (*DataPartition, error) {

@@ -409,6 +409,8 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 	var writer *ExtentWriter
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = nil
+		stream.excludePartition = make([]uint32, 0)
+		stream.excludePartitionId(stream.currentPartitionId)
 		if writer, err = stream.allocateNewExtentWriter(true); err != nil { //allocate new extent
 			err = errors.Annotatef(err, "RecoverExtent Failed")
 			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
