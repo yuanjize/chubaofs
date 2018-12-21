@@ -37,7 +37,6 @@ var (
 
 const (
 	HasReturnToStore = 1
-	NoReturnToStore  = -1
 )
 
 type Packet struct {
@@ -93,15 +92,9 @@ func (p *Packet) UnmarshalAddrs() (addrs []string, err error) {
 	return
 }
 
-func (p *Packet) forceDestoryAllConnect() {
+func (p *Packet) forceDestoryCheckUsedClosedConnect() {
 	for i := 0; i < len(p.NextConns); i++ {
-		gConnPool.Put(p.NextConns[i], ForceCloseConnect)
-	}
-}
-
-func (p *Packet) forceDestoryCheckUsedClosedConnect(err error) {
-	for i := 0; i < len(p.NextConns); i++ {
-		gConnPool.CheckErrorForceClose(p.NextConns[i], p.NextAddrs[i], err)
+		gConnPool.CheckErrorForceClose(p.NextConns[i], p.NextAddrs[i])
 	}
 }
 

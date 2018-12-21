@@ -22,14 +22,14 @@ import (
 	"strings"
 
 	"flag"
+	"fmt"
+	"github.com/tiglabs/containerfs/util/config"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"fmt"
-	"github.com/tiglabs/containerfs/util/config"
-	"net/http"
 )
 
 const (

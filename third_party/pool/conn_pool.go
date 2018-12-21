@@ -181,50 +181,12 @@ func (connectPool *ConnectPool) Put(c *net.TCPConn, forceClose bool) {
 	return
 }
 
-func (connectPool *ConnectPool) CheckErrorForceClose(c *net.TCPConn, target string, err error) {
+func (connectPool *ConnectPool) CheckErrorForceClose(c *net.TCPConn, target string) {
 	if c == nil {
 		return
 	}
-
-	if err != nil {
-		if strings.Contains(err.Error(), "use of closed network connection") {
-			c.Close()
-			connectPool.ReleaseAllConnect(target)
-			return
-		} else {
-			c.Close()
-			return
-		}
-	}
-}
-
-func (connectPool *ConnectPool) CheckErrorForPutConnect(c *net.TCPConn, target string, err error) {
-	if c == nil {
-		return
-	}
-
-	if err != nil {
-		if strings.Contains(err.Error(), "use of closed network connection") {
-			c.Close()
-			connectPool.ReleaseAllConnect(target)
-			return
-		} else {
-			c.Close()
-			return
-		}
-	}
-	addr := c.RemoteAddr().String()
-	connectPool.RLock()
-	pool, ok := connectPool.pools[addr]
-	connectPool.RUnlock()
-	if !ok {
-		c.CloseWrite()
-		c.CloseRead()
-		c.Close()
-		return
-	}
-	object := &ConnectObject{conn: c, idle: time.Now().UnixNano()}
-	pool.putconnect(object)
+	c.Close()
+	connectPool.ReleaseAllConnect(target)
 }
 
 func (connectPool *ConnectPool) ReleaseAllConnect(target string) {
