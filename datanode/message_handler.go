@@ -145,7 +145,7 @@ func (msgH *MessageHandler) ClearReqs(s *DataNode) {
 	msgH.listMux.Lock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
 		request := e.Value.(*Packet)
-		request.forceDestoryCheckUsedClosedConnect()
+		request.PutConnectsToPool()
 		s.leaderPutTinyExtentToStore(request)
 
 	}
@@ -172,7 +172,7 @@ func (msgH *MessageHandler) DelListElement(reply *Packet) (success bool) {
 		request := e.Value.(*Packet)
 		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
 			reply.Offset != request.Offset || reply.Crc != request.Crc || reply.FileID != request.FileID {
-			request.forceDestoryCheckUsedClosedConnect()
+			request.forceDestoryFollowersConnect()
 			request.PackErrorBody(ActionReceiveFromNext, fmt.Sprintf("unknow expect reply"))
 			break
 		}

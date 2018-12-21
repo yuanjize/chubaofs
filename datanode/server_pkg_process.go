@@ -110,7 +110,7 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	if _, err = s.sendToAllReplicates(req, msgH); err == nil {
 		s.operatePacket(req, msgH.inConn)
 	} else {
-		req.forceDestoryCheckUsedClosedConnect()
+		req.forceDestoryCheckUsedClosedConnect(err)
 	}
 	msgH.handleCh <- single
 
@@ -123,14 +123,14 @@ func (s *DataNode) doReplyCh(reply *Packet, msgH *MessageHandler) {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, fmt.Errorf(string(reply.Data[:reply.Size]))))
 		log.LogErrorf("action[doReplyCh] %v", err)
-		reply.forceDestoryCheckUsedClosedConnect()
+		reply.forceDestoryCheckUsedClosedConnect(err)
 	}
 	s.cleanup(reply)
 	if err = reply.WriteToConn(msgH.inConn); err != nil {
 		err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, msgH.inConn.RemoteAddr().String(),
 			reply.StartT, err))
 		log.LogErrorf("action[doReplyCh] %v", err)
-		reply.forceDestoryCheckUsedClosedConnect()
+		reply.forceDestoryFollowersConnect()
 		msgH.Stop()
 		return
 	}
@@ -197,7 +197,7 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		_, err := s.receiveFromNext(request, index)
 		if err != nil {
 			request.PackErrorBody(ActionReceiveFromNext, err.Error())
-			request.forceDestoryCheckUsedClosedConnect()
+			request.forceDestoryCheckUsedClosedConnect(err)
 			return
 		}
 	}
