@@ -24,7 +24,6 @@ package pool
 
 import (
 	"net"
-	"strings"
 	"sync"
 	"time"
 )
