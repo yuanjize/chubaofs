@@ -92,25 +92,21 @@ func (p *Packet) UnmarshalAddrs() (addrs []string, err error) {
 	return
 }
 
+func (p *Packet) forceDestoryAllConnect() {
+	for i := 0; i < len(p.NextConns); i++ {
+		gConnPool.Put(p.NextConns[i], ForceCloseConnect)
+	}
+}
+
 func (p *Packet) forceDestoryCheckUsedClosedConnect(err error) {
 	for i := 0; i < len(p.NextConns); i++ {
-		if err != nil && strings.Contains(err.Error(), "use of closed network") {
-			gConnPool.CheckErrorForceClose(p.NextConns[i], p.NextAddrs[i])
-		} else {
-			gConnPool.Put(p.NextConns[i], ForceCloseConnect)
-		}
+		gConnPool.CheckErrorForceClose(p.NextConns[i], p.NextAddrs[i], err)
 	}
 }
 
 func (p *Packet) PutConnectsToPool() {
 	for i := 0; i < len(p.NextConns); i++ {
 		gConnPool.Put(p.NextConns[i], NoCloseConnect)
-	}
-}
-
-func (p *Packet) forceDestoryFollowersConnect() {
-	for i := 0; i < len(p.NextConns); i++ {
-		gConnPool.Put(p.NextConns[i], ForceCloseConnect)
 	}
 }
 
