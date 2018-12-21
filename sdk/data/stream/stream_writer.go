@@ -258,7 +258,7 @@ func (stream *StreamWriter) flushData() (err error) {
 	}
 	if err = writer.flush(); err != nil {
 		err = errors.Annotatef(err, "writer(%v) Flush Failed", writer.toString())
-		log.LogErrorf(err.Error())
+		log.LogWarnf(err.Error())
 		return err
 	}
 	err = stream.updateToMetaNode()
@@ -267,7 +267,7 @@ func (stream *StreamWriter) flushData() (err error) {
 	}
 	if err != nil {
 		err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
-		log.LogErrorf(err.Error())
+		log.LogWarnf(err.Error())
 		return err
 	}
 	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
@@ -279,7 +279,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		}
 		if err != nil {
 			err = errors.Annotatef(err, "update to MetaNode failed(%v)", err.Error())
-			log.LogErrorf(err.Error())
+			log.LogWarnf(err.Error())
 			return err
 		}
 		stream.currentWriter.notifyRecvThreadExit()
@@ -308,7 +308,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 		if err == syscall.ENOENT {
 			return
 		}
-		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
+		log.LogWarnf("FlushCurrentExtent %v failed,err %v errCnt %v",
 			stream.toString(), err.Error(), errCount)
 		err = stream.recoverExtent()
 		if err == syscall.ENOENT {
@@ -324,7 +324,7 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			}
 		}
 
-		log.LogErrorf("FlushCurrentExtent %v failed,err %v errCnt %v",
+		log.LogWarnf("FlushCurrentExtent %v failed,err %v errCnt %v",
 			stream.toString(), err.Error(), errCount)
 		errCount++
 		if errCount > MaxSelectDataPartionForWrite {
@@ -365,7 +365,7 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 		}
 		if err != nil {
 			err = errors.Annotatef(err, "update extent(%v) to MetaNode Failed", ek.Size)
-			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
+			log.LogWarnf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
 		}
 		writer.clearDirty(ek.Size)
@@ -378,12 +378,12 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 
 func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPackets []*Packet) (err error) {
 	for _, p := range retryPackets {
-		log.LogInfof("recover packet (%v) kernelOffset(%v) to extent(%v)",
+		log.LogWarnf("recover packet (%v) kernelOffset(%v) to extent(%v)",
 			p.GetUniqueLogId(), p.kernelOffset, writer.toString())
 		_, err = writer.write(p.Data[:p.Size], p.kernelOffset, int(p.Size))
 		if err != nil {
 			err = errors.Annotatef(err, "pkg(%v) RecoverExtent write failed", p.GetUniqueLogId())
-			log.LogErrorf("stream(%v) err(%v)", stream.toStringWithWriter(writer), err.Error())
+			log.LogWarnf("stream(%v) err(%v)", stream.toStringWithWriter(writer), err.Error())
 			stream.excludePartitionId(writer.dp.PartitionID)
 			return err
 		}
@@ -413,7 +413,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 		stream.excludePartitionId(stream.currentPartitionId)
 		if writer, err = stream.allocateNewExtentWriter(true); err != nil { //allocate new extent
 			err = errors.Annotatef(err, "RecoverExtent Failed")
-			log.LogErrorf("stream(%v) err(%v)", stream.toString(), err.Error())
+			log.LogWarnf("stream(%v) err(%v)", stream.toString(), err.Error())
 			continue
 		}
 		if err = stream.writeRecoverPackets(writer, stream.recoverPackages); err == nil {
@@ -458,20 +458,20 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		extentId = 0
 		if dp, err = gDataWrapper.GetWriteDataPartition(stream.excludePartition); err != nil {
-			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
+			log.LogWarnf(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"failed on getWriteDataPartion,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
 			continue
 		}
 		if useNormalExtent == true {
 			if extentId, err = stream.createExtent(dp); err != nil {
-				log.LogWarn(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
+				log.LogWarnf(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
 					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
 				stream.excludePartitionId(dp.PartitionID)
 				continue
 			}
 		}
 		if writer, err = NewExtentWriter(stream.Inode, dp, extentId); err != nil {
-			log.LogWarn(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
+			log.LogWarnf(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
 			stream.excludePartitionId(dp.PartitionID)
 			continue
@@ -480,7 +480,7 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 		break
 	}
 	if useNormalExtent == true && extentId <= 0 || err != nil {
-		log.LogErrorf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
+		log.LogWarnf("allocateNewExtentWriter: err(%v) extentId(%v)", err, extentId)
 		return nil, err
 	}
 	stream.currentPartitionId = dp.PartitionID

@@ -180,7 +180,7 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	}
 	writer.currentPacket = nil
 	err = errors.Annotatef(err, prefix+"sendCurrentPacket Failed")
-	log.LogErrorf(err.Error())
+	log.LogWarnf(err.Error())
 
 	return err
 }
@@ -365,7 +365,7 @@ func (writer *ExtentWriter) receive() {
 			}
 			if err = writer.processReply(e, request, reply); err != nil {
 				writer.getConnect().Close()
-				log.LogErrorf(err.Error())
+				log.LogWarnf(err.Error())
 				continue
 			}
 		case <-writer.ExitCh:

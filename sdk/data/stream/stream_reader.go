@@ -146,7 +146,7 @@ func (stream *StreamReader) read(data []byte, offset int, size int) (canRead int
 				"Offset(%v) Size(%v)} readers{ (%v) Offset(%v) Size(%v) occous error}",
 				stream.inode, stream.fileSize, offset, size, r.toString(), readerOffset[index],
 				readerSize[index])
-			log.LogErrorf(err.Error())
+			log.LogWarnf(err.Error())
 			return canRead, err
 		}
 		canRead += readerSize[index]

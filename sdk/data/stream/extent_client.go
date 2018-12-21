@@ -112,6 +112,8 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 		err = errors.Annotatef(err, prefix)
 		log.LogError(errors.ErrorStack(err))
 		if !strings.Contains(err.Error(), io.EOF.Error()) {
+			mesg := fmt.Sprintf("volname %v Write error %v", wrapper.GVolname, err.Error())
+			log.LogErrorf(mesg)
 			ump.Alarm(gDataWrapper.UmpWarningKey(), fmt.Sprintf("volname(%v) write error", wrapper.GVolname, err.Error()))
 		}
 	}
@@ -189,6 +191,10 @@ func (client *ExtentClient) Flush(inode uint64) (err error) {
 	stream.requestCh <- request
 	<-request.done
 	err = request.err
+	if err != nil {
+		mesg := fmt.Sprintf("volname %v Flush %v", wrapper.GVolname, err.Error())
+		log.LogErrorf(mesg)
+	}
 	flushRequestPool.Put(request)
 	return err
 }
@@ -243,6 +249,8 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 
 	defer func() {
 		if err != nil && err != io.EOF {
+			mesg := fmt.Sprintf("volname %v readError %v", wrapper.GVolname, err.Error())
+			log.LogErrorf(mesg)
 			ump.Alarm(gDataWrapper.UmpWarningKey(), fmt.Sprintf("volname %v readError %v", wrapper.GVolname, err.Error()))
 		}
 	}()
