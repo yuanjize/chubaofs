@@ -82,7 +82,7 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 	allData := make([]byte, 0)
 	verifyInfo = make([]*VerifyInfo, 0)
 	var offset int64
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10000; i++ {
 		rand.Seed(time.Now().UnixNano())
 		n := rand.Intn(1024)
 		if n <= 1 {
