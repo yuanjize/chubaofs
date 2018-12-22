@@ -409,6 +409,8 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 	var writer *ExtentWriter
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = nil
+		stream.excludePartition = make([]uint32, 0)
+		stream.excludePartitionId(stream.currentPartitionId)
 		if writer, err = stream.allocateNewExtentWriter(true); err != nil { //allocate new extent
 			err = errors.Annotatef(err, "RecoverExtent Failed")
 			log.LogWarnf("stream(%v) err(%v)", stream.toString(), err.Error())
@@ -471,7 +473,6 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 		if writer, err = NewExtentWriter(stream.Inode, dp, extentId); err != nil {
 			log.LogWarnf(fmt.Sprintf("stream (%v) ActionAllocNewExtentWriter "+
 				"NewExtentWriter(%v),error(%v) execludeDataPartion(%v)", stream.toString(), extentId, err.Error(), stream.excludePartition))
-			stream.excludePartitionId(dp.PartitionID)
 			continue
 		}
 		err = nil
