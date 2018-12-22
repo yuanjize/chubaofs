@@ -293,8 +293,8 @@ func (writer *ExtentWriter) close() (err error) {
 func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet) (err error) {
 	if reply.ResultCode != proto.OpOk {
 		return errors.Annotatef(fmt.Errorf("reply status code(%v) is not ok,request (%v) "+
-			"but reply (%v) ", reply.ResultCode, request.GetUniqueLogId(), reply.GetUniqueLogId()),
-			fmt.Sprintf("writer(%v)", writer.toString()))
+			"but reply (%v) error(%v) ", reply.ResultCode, request.GetUniqueLogId(), reply.GetUniqueLogId()),
+			fmt.Sprintf("writer(%v)", writer.toString()), string(reply.Data[:reply.Size]))
 	}
 	if !request.IsEqualWriteReply(reply) {
 		return errors.Annotatef(fmt.Errorf("request not equare reply , request (%v) "+
