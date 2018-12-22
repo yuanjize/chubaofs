@@ -265,7 +265,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		log.LogWarnf(err.Error())
 		return err
 	}
-	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent(0) {
+	if writer.isTinyExtent() {
 		writer.close()
 		writer.getConnect().Close()
 		err = stream.updateToMetaNode()

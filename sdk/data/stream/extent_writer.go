@@ -73,7 +73,6 @@ func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (
 	writer.extentId = extentId
 	writer.dp = dp
 	writer.inode = inode
-	writer.storeMode = proto.NormalExtentMode
 	var connect *net.TCPConn
 	conn, err := net.DialTimeout("tcp", dp.Hosts[0], time.Second)
 	if err == nil {
@@ -311,7 +310,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 	}
 	writer.addByteAck(uint64(request.Size))
 	writer.removeRquest(e)
-	if writer.storeMode == proto.TinyExtentMode {
+	if writer.isTinyExtent() {
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
