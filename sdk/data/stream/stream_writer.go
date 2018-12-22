@@ -266,7 +266,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		log.LogWarnf(err.Error())
 		return err
 	}
-	if writer.isTinyExtent() {
+	if writer.isTinyExtent() || writer.isFullExtent(0) {
 		writer.close()
 		writer.getConnect().Close()
 		err = stream.updateToMetaNode()
