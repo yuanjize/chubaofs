@@ -106,20 +106,6 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
-	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent() || stream.currentWriter.storeMode == proto.TinyExtentMode) {
-		storeMode := stream.currentWriter.storeMode
-		err = stream.flushCurrExtentWriter()
-		if err == syscall.ENOENT {
-			return
-		}
-		if err != nil {
-			return errors.Annotatef(err, "Flush error WriteInit")
-		}
-		if storeMode == proto.TinyExtentMode {
-			useNormalExtent = true
-		}
-	}
-
 	if stream.currentWriter != nil {
 		return
 	}
@@ -207,7 +193,7 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 	)
 	for total < size {
 		var useExtent = true
-		if offset+total == 0 && size-total <= util.BlockSize {
+		if offset+total <= util.MB {
 			useExtent = false
 		}
 		err = stream.init(useExtent)
@@ -394,7 +380,7 @@ func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPacke
 func (stream *StreamWriter) recoverExtent() (err error) {
 	stream.excludePartitionId(stream.currentWriter.dp.PartitionID)
 	stream.currentWriter.notifyRecvThreadExit()
-	stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry recove
+	stream.recoverPackages = stream.currentWriter.getNeedRetrySendPackets() //get need retry
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		if err = stream.updateToMetaNode(); err == nil {
 			break
