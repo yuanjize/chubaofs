@@ -83,6 +83,8 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 	allData := make([]byte, 0)
 	verifyInfo = make([]*VerifyInfo, 0)
 	var offset int64
+	rand.Seed(time.Now().UnixNano())
+	fileSize := rand.Intn(*sumSize)
 	for {
 		rand.Seed(time.Now().UnixNano())
 		n := rand.Intn(1024)
@@ -96,7 +98,7 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 		data := []byte(RandStringBytesMaskImpr(n))
 		v.WriteContents = string(data)
 		v.WriteCrc = crc32.ChecksumIEEE(data)
-		if int(offset)+len(data) > *sumSize {
+		if int(offset)+len(data) > fileSize {
 			break
 		}
 		if writeCount, err := fp.WriteAt(data, offset); err != nil || writeCount != len(data) {
