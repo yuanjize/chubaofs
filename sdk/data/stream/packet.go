@@ -47,7 +47,11 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.ReqID = proto.GetReqID()
 	p.Opcode = proto.OpWrite
 	p.kernelOffset = kernelOffset
-	p.Data, _ = proto.Buffers.Get(util.BlockSize)
+	if p.kernelOffset == 0 {
+		p.Data = make([]byte, util.MB)
+	} else {
+		p.Data, _ = proto.Buffers.Get(util.BlockSize)
+	}
 
 	return
 }
@@ -151,11 +155,11 @@ func (p *Packet) IsEqualStreamReadReply(q *Packet) bool {
 }
 
 func (p *Packet) fill(data []byte, size int) (canWrite int) {
-	if p.Size+uint32(size) > util.BlockSize {
+	if int(p.Size)+size > len(p.Data) {
 		return
 	}
-	blockSpace := util.BlockSize
-	remain := int(blockSpace) - int(p.Size)
+	blockSpace := len(p.Data)
+	remain := blockSpace - int(p.Size)
 	canWrite = util.Min(remain, size)
 	if canWrite <= 0 {
 		return
@@ -167,7 +171,7 @@ func (p *Packet) fill(data []byte, size int) (canWrite int) {
 }
 
 func (p *Packet) isFullPacket() bool {
-	return p.Size-util.BlockSize == 0
+	return p.Size-uint32(len(p.Data)) == 0
 }
 
 func (p *Packet) getPacketLength() int {
