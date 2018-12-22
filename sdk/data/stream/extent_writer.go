@@ -136,13 +136,13 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		total += canWrite
-		writer.hasWriteSize += canWrite
 		if writer.IsFullCurrentPacket() || canWrite == 0 {
 			err = writer.sendCurrPacket()
 			if err != nil { //if failed,recover it
 				return total, err
 			}
 		}
+		writer.hasWriteSize += canWrite
 	}
 
 	return
@@ -208,7 +208,7 @@ func (writer *ExtentWriter) isFullExtent(prepareWriteSize int) bool {
 	if writer.storeMode == proto.TinyExtentMode {
 		return writer.hasWriteSize+prepareWriteSize >= util.MB
 	} else {
-		return writer.hasWriteSize+prepareWriteSize >= util.MB
+		return writer.hasWriteSize+prepareWriteSize >= util.ExtentSize
 	}
 	return true
 }
