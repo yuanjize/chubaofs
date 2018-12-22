@@ -13,13 +13,13 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"github.com/tiglabs/raft/util"
 )
 
 var (
 	fileCnt    = flag.Int("count", 10000000, "create file count")
 	para       = flag.Int("para", 300, "parallel processes")
 	rootPath   = flag.String("root", "/mnt/intest", "rootPath")
+	sumSize    = flag.Int("size", 1024*1200, "default max size")
 	fileType   = flag.Bool("isdir", false, "create is dir")
 	prefix     = flag.String("prefix", "1", "default prefix")
 	currentCnt uint64
@@ -83,7 +83,7 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 	allData := make([]byte, 0)
 	verifyInfo = make([]*VerifyInfo, 0)
 	var offset int64
-	sumSize := rand.Intn(util.KB * 1300)
+	sumSize := rand.Intn(1024 * 1300)
 	for i := 0; i < 10000; i++ {
 		rand.Seed(time.Now().UnixNano())
 		n := rand.Intn(1024)
