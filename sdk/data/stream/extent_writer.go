@@ -314,7 +314,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 	}
 	atomic.StoreInt32(&writer.dirty, 1)
 	writer.updateSizeLock.Unlock()
-	log.LogDebugf("recive inode(%v) kerneloffset(%v) to extent(%v) pkg(%v) recive(%v)",
+	log.LogDebugf("recive ino(%v) kerneloffset(%v) to extent(%v) pkg(%v) recive(%v)",
 		writer.inode, request.kernelOffset, writer.toString(), request.GetUniqueLogId(), reply.GetUniqueLogId())
 	proto.Buffers.Put(request.Data)
 

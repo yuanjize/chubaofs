@@ -94,13 +94,13 @@ func (stream *StreamWriter) toString() (m string) {
 	if stream.currentWriter != nil {
 		currentWriterMsg = stream.currentWriter.toString()
 	}
-	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)",
+	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v)",
 		stream.Inode, stream.currentPartitionId, currentWriterMsg)
 }
 
 func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) {
 	currentWriterMsg := writer.toString()
-	return fmt.Sprintf("inode(%v) currentDataPartion(%v) currentExtentId(%v)",
+	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v)",
 		stream.Inode, stream.currentPartitionId, currentWriterMsg)
 }
 
@@ -145,7 +145,7 @@ func (stream *StreamWriter) server() {
 			stream.flushCurrExtentWriter()
 			return
 		case <-t.C:
-			log.LogDebugf("inode(%v) update to metanode filesize To(%v) user has Write to (%v)",
+			log.LogDebugf("ino(%v) update to metanode filesize To(%v) user has Write to (%v)",
 				stream.Inode, stream.metaNodeStreamKey.Size(), stream.getHasWriteSize())
 			if stream.getCurrentWriter() == nil {
 				continue
@@ -195,7 +195,7 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 			total = 0
 			return
 		}
-		err = errors.Annotatef(err, "UserRequest{inode(%v) write "+
+		err = errors.Annotatef(err, "UserRequest{ino(%v) write "+
 			"KernelOffset(%v) KernelSize(%v) hasWrite(%v)}  stream{ (%v) occous error}",
 			stream.Inode, offset, size, total, stream.toString())
 		log.LogError(err.Error())
@@ -294,8 +294,8 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 			return
 		}
 		if len(stream.recoverPackages) != 0 {
-			err = fmt.Errorf("MaxFlushCurrentExtent failed,packet(%v) not flush %v",
-				stream.toString(), len(stream.recoverPackages))
+			err = fmt.Errorf("MaxFlushCurrentExtent failed,packet(%v) not flush %v err(%v)",
+				stream.toString(), len(stream.recoverPackages), err)
 			log.LogErrorf(err.Error())
 		}
 	}()

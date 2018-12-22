@@ -56,7 +56,7 @@ func NewStreamReader(inode uint64, getExtents GetExtentsFunc) (stream *StreamRea
 	var reader *ExtentReader
 	for _, key := range stream.extents.Extents {
 		if reader, err = NewExtentReader(inode, offset, key); err != nil {
-			return nil, errors.Annotatef(err, "NewStreamReader inode(%v) "+
+			return nil, errors.Annotatef(err, "NewStreamReader ino(%v) "+
 				"key(%v) dp not found error", inode, key)
 		}
 		stream.readers = append(stream.readers, reader)
@@ -67,7 +67,7 @@ func NewStreamReader(inode uint64, getExtents GetExtentsFunc) (stream *StreamRea
 }
 
 func (stream *StreamReader) toString() (m string) {
-	return fmt.Sprintf("inode(%v) fileSize(%v) extents(%v) ",
+	return fmt.Sprintf("ino(%v) fileSize(%v) extents(%v) ",
 		stream.inode, stream.fileSize, stream.extents)
 }
 
@@ -116,7 +116,7 @@ func (stream *StreamReader) updateLocalReader(newStreamKey *proto.StreamKey) (er
 			continue
 		} else if index > oldReaderCnt-1 {
 			if r, err = NewExtentReader(stream.inode, newOffSet, key); err != nil {
-				return errors.Annotatef(err, "NewStreamReader inode(%v) key(%v) "+
+				return errors.Annotatef(err, "NewStreamReader ino(%v) key(%v) "+
 					"dp not found error", stream.inode, key)
 			}
 			readers = append(readers, r)
@@ -142,7 +142,7 @@ func (stream *StreamReader) read(data []byte, offset int, size int) (canRead int
 		r := readers[index]
 		err = r.read(data[canRead:canRead+readerSize[index]], readerOffset[index], readerSize[index], offset, size)
 		if err != nil {
-			err = errors.Annotatef(err, "UserRequest{inode(%v) FileSize(%v) "+
+			err = errors.Annotatef(err, "UserRequest{ino(%v) FileSize(%v) "+
 				"Offset(%v) Size(%v)} readers{ (%v) Offset(%v) Size(%v) occous error}",
 				stream.inode, stream.fileSize, offset, size, r.toString(), readerOffset[index],
 				readerSize[index])

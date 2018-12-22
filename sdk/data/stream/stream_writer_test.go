@@ -123,11 +123,11 @@ func prepare(inode uint64, t *testing.T) (localWriteFp *os.File, localReadFp *os
 	var err error
 	localWriteFp, err = openFileForWrite(inode, "write")
 	if err != nil {
-		OccoursErr(fmt.Errorf("write localFile inode(%v) err(%v)\n", inode, err), t)
+		OccoursErr(fmt.Errorf("write localFile ino(%v) err(%v)\n", inode, err), t)
 	}
 	localReadFp, err = openFileForWrite(inode, "read")
 	if err != nil {
-		OccoursErr(fmt.Errorf("read localFile inode(%v) err(%v)\n", inode, err), t)
+		OccoursErr(fmt.Errorf("read localFile ino(%v) err(%v)\n", inode, err), t)
 	}
 	return
 }
@@ -336,7 +336,7 @@ func TestExtentClient_MultiRoutineWrite(t *testing.T) {
 		go func(seqNo int) {
 			write, err := writeFlushReadTest(t, inode, seqNo, client, writeData, localWriteFp)
 			if err != nil {
-				OccoursErr(fmt.Errorf("write inode(%v) seqNO(%v)  err(%v)\n", inode, seqNo, err), t)
+				OccoursErr(fmt.Errorf("write ino(%v) seqNO(%v)  err(%v)\n", inode, seqNo, err), t)
 			}
 			writeBytes += write
 		}(seqNo)
@@ -362,7 +362,7 @@ func TestExtentClient_MultiRoutineWrite(t *testing.T) {
 
 		_, err = localReadFp.Write(rdata)
 		if err != nil {
-			OccoursErr(fmt.Errorf("write localFile read inode(%v) err(%v)\n", inode, err), t)
+			OccoursErr(fmt.Errorf("write localFile read ino(%v) err(%v)\n", inode, err), t)
 		}
 
 		//check crc
