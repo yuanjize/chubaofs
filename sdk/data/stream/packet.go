@@ -158,6 +158,7 @@ func (p *Packet) IsEqualStreamReadReply(q *Packet) bool {
 	return false
 }
 
+//notify, if p.size==0 and return canWrite=0,forloop not exit
 func (p *Packet) fill(data []byte, size int) (canWrite int) {
 	if p.Size != 0 && int(p.Size)+size > len(p.Data) {
 		return
