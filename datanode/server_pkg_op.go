@@ -109,11 +109,6 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 			pkg.PackOkReply()
 		}
 	}()
-	if pkg.DataPartition.Status() == proto.ReadOnly {
-		err = storage.ErrorPartitionReadOnly
-		log.LogInfof("createFile %v ERROR %v ", pkg.GetUniqueLogId(), err)
-		return
-	}
 	if pkg.DataPartition.Available() <= 0 {
 		err = storage.ErrSyscallNoSpace
 		return
@@ -319,10 +314,7 @@ func (s *DataNode) handleWrite(pkg *Packet) {
 			pkg.PackOkReply()
 		}
 	}()
-	if pkg.DataPartition.Status() == proto.ReadOnly {
-		err = storage.ErrorPartitionReadOnly
-		return
-	}
+
 	if pkg.DataPartition.Available() <= 0 {
 		err = storage.ErrSyscallNoSpace
 		return
