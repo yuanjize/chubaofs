@@ -470,7 +470,11 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 	}
 	stream.currentPartitionId = dp.PartitionID
 	err = nil
-
+	if useNormalExtent {
+		writer.storeMode = proto.NormalExtentMode
+	} else {
+		writer.storeMode = proto.TinyExtentMode
+	}
 	return writer, nil
 }
 

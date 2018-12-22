@@ -131,11 +131,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 	}
 	for total < size {
 		if writer.currentPacket == nil {
-			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset)
-			if kernelOffset == 0 {
-				writer.currentPacket.StoreMode = uint8(proto.TinyExtentMode)
-				writer.storeMode = proto.TinyExtentMode
-			}
+			writer.currentPacket = NewWritePacket(writer.dp, writer.extentId, writer.offset, kernelOffset, writer.storeMode)
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		total += canWrite

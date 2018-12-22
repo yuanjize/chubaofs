@@ -37,7 +37,7 @@ const (
 	MaxTinyExtentSize = util.MB
 )
 
-func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kernelOffset int) (p *Packet) {
+func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kernelOffset int, storeMode int) (p *Packet) {
 	p = new(Packet)
 	p.PartitionID = dp.PartitionID
 	p.Magic = proto.ProtoMagic
@@ -51,7 +51,7 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.ReqID = proto.GetReqID()
 	p.Opcode = proto.OpWrite
 	p.kernelOffset = kernelOffset
-	if p.kernelOffset == 0 {
+	if storeMode == proto.TinyExtentMode {
 		p.Data = make([]byte, MaxTinyExtentSize)
 	} else {
 		p.Data, _ = proto.Buffers.Get(util.BlockSize)
