@@ -42,7 +42,6 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.PartitionID = dp.PartitionID
 	p.Magic = proto.ProtoMagic
 	p.Data = make([]byte, 0)
-	p.StoreMode = proto.NormalExtentMode
 	p.FileID = extentId
 	p.Offset = int64(offset)
 	p.Arg = ([]byte)(dp.GetAllAddrs())
@@ -53,8 +52,10 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.kernelOffset = kernelOffset
 	if storeMode == proto.TinyExtentMode {
 		p.Data = make([]byte, MaxTinyExtentSize)
+		p.StoreMode = proto.TinyExtentMode
 	} else {
 		p.Data, _ = proto.Buffers.Get(util.BlockSize)
+		p.StoreMode = proto.NormalExtentMode
 	}
 
 	return
