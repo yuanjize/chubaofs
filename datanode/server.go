@@ -313,8 +313,10 @@ func (s *DataNode) serveConn(conn net.Conn) {
 	)
 
 	defer func() {
-		if err != nil {
-			log.LogErrorf("action[serveConn] err[%v inConnect(%v) ].", err, c.RemoteAddr().String())
+		if err != nil && err != io.EOF &&
+			!strings.Contains(err.Error(), "closed connection") &&
+			!strings.Contains(err.Error(), "reset by peer") {
+			log.LogErrorf("action[serveConn] err[%v] inconn[%v].", err, conn.RemoteAddr().String())
 		}
 		space.Stats().RemoveConnection()
 		conn.Close()
