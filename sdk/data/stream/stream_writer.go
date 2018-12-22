@@ -104,7 +104,17 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 }
 
 //stream init,alloc a extent ,select dp and extent
-func (stream *StreamWriter) init(useNormalExtent bool) (err error) {
+func (stream *StreamWriter) init(useNormalExtent bool, prepareWriteSize int) (err error) {
+	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent(prepareWriteSize) && stream.currentWriter.isTinyExtent()) {
+		err = stream.flushCurrExtentWriter()
+		if err == syscall.ENOENT {
+			return
+		}
+		if err != nil {
+			return errors.Annotatef(err, "Flush error WriteInit")
+		}
+		useNormalExtent = true
+	}
 	if stream.currentWriter != nil {
 		return
 	}
@@ -195,7 +205,7 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 		if offset+size <= MaxTinyExtentSize {
 			useExtent = false
 		}
-		err = stream.init(useExtent)
+		err = stream.init(useExtent, size)
 		if err == syscall.ENOENT {
 			return
 		}
@@ -255,7 +265,7 @@ func (stream *StreamWriter) flushData() (err error) {
 		log.LogWarnf(err.Error())
 		return err
 	}
-	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent() {
+	if writer.storeMode == proto.TinyExtentMode || writer.isFullExtent(0) {
 		writer.close()
 		writer.getConnect().Close()
 		err = stream.updateToMetaNode()

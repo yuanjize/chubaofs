@@ -62,6 +62,7 @@ type ExtentWriter struct {
 	extentOffset     uint64
 	storeMode        int
 	dirty            int32
+	hasWriteSize     int
 }
 
 func NewExtentWriter(inode uint64, dp *wrapper.DataPartition, extentId uint64) (writer *ExtentWriter, err error) {
@@ -125,7 +126,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 			err = errors.Annotatef(err, "writer(%v) write failed", writer.toString())
 		}
 	}()
-	if writer.offset+util.BlockSize*10 >= util.ExtentSize {
+	if writer.isFullExtent(size) {
 		err = FullExtentErr
 		return 0, err
 	}
@@ -135,6 +136,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 		}
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		total += canWrite
+		writer.hasWriteSize += canWrite
 		if writer.IsFullCurrentPacket() || canWrite == 0 {
 			err = writer.sendCurrPacket()
 			if err != nil { //if failed,recover it
@@ -202,8 +204,13 @@ func (writer *ExtentWriter) cleanHandleCh() {
 }
 
 //every extent is FULL,must is 64MB
-func (writer *ExtentWriter) isFullExtent() bool {
-	return writer.offset+util.BlockSize*10 >= util.ExtentSize
+func (writer *ExtentWriter) isFullExtent(prepareWriteSize int) bool {
+	if writer.storeMode == proto.TinyExtentMode {
+		return writer.hasWriteSize+prepareWriteSize >= util.MB
+	} else {
+		return writer.hasWriteSize+prepareWriteSize >= util.MB
+	}
+	return true
 }
 
 //check allPacket has Ack
@@ -225,10 +232,18 @@ func (writer *ExtentWriter) toString() string {
 }
 
 func (writer *ExtentWriter) checkIsStopReciveGoRoutine() {
-	if writer.isAllFlushed() && writer.isFullExtent() {
+	if writer.isAllFlushed() && writer.isFullExtent(0) {
 		writer.notifyRecvThreadExit()
 	}
 	return
+}
+
+func (write *ExtentWriter) isTinyExtent() bool {
+	return write.storeMode == proto.TinyExtentMode
+}
+
+func (write *ExtentWriter) isNormalExtent() bool {
+	return write.storeMode == proto.NormalExtentMode
 }
 
 func (writer *ExtentWriter) flushWait() (err error) {
