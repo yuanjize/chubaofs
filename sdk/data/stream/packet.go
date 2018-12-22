@@ -33,6 +33,10 @@ type Packet struct {
 	orgData      []byte
 }
 
+const (
+	MaxTinyExtentSize = util.MB
+)
+
 func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kernelOffset int) (p *Packet) {
 	p = new(Packet)
 	p.PartitionID = dp.PartitionID
@@ -48,7 +52,7 @@ func NewWritePacket(dp *wrapper.DataPartition, extentId uint64, offset int, kern
 	p.Opcode = proto.OpWrite
 	p.kernelOffset = kernelOffset
 	if p.kernelOffset == 0 {
-		p.Data = make([]byte, util.MB)
+		p.Data = make([]byte, MaxTinyExtentSize)
 	} else {
 		p.Data, _ = proto.Buffers.Get(util.BlockSize)
 	}

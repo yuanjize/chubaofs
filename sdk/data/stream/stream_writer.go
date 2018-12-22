@@ -193,7 +193,7 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 	)
 	for total < size {
 		var useExtent = true
-		if offset+total <= util.MB {
+		if offset+total <= MaxTinyExtentSize {
 			useExtent = false
 		}
 		err = stream.init(useExtent)
