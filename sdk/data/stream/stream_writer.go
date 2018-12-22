@@ -217,7 +217,6 @@ func (stream *StreamWriter) write(data []byte, offset, size int) (total int, err
 			initRetry++
 			continue
 		}
-		log.LogInfof("steam(%v)  init filinsh ", stream.toString())
 		write, err = stream.currentWriter.write(data[total:size], offset, size-total)
 		if err == nil {
 			write = size - total
