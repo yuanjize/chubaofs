@@ -378,8 +378,8 @@ func (stream *StreamWriter) updateToMetaNode() (err error) {
 
 func (stream *StreamWriter) writeRecoverPackets(writer *ExtentWriter, retryPackets []*Packet) (err error) {
 	for _, p := range retryPackets {
-		log.LogWarnf("recover packet (%v) kernelOffset(%v) to extent(%v)",
-			p.GetUniqueLogId(), p.kernelOffset, writer.toString())
+		log.LogWarnf("stream(%v) recover packet (%v) kernelOffset(%v) to extent(%v)",
+			stream.toString(), p.GetUniqueLogId(), p.kernelOffset, writer.toString())
 		_, err = writer.write(p.Data[:p.Size], p.kernelOffset, int(p.Size))
 		if err != nil {
 			err = errors.Annotatef(err, "pkg(%v) RecoverExtent write failed", p.GetUniqueLogId())
@@ -409,8 +409,6 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 	var writer *ExtentWriter
 	for i := 0; i < MaxSelectDataPartionForWrite; i++ {
 		err = nil
-		stream.excludePartition = make([]uint32, 0)
-		stream.excludePartitionId(stream.currentPartitionId)
 		if writer, err = stream.allocateNewExtentWriter(true); err != nil { //allocate new extent
 			err = errors.Annotatef(err, "RecoverExtent Failed")
 			log.LogWarnf("stream(%v) err(%v)", stream.toString(), err.Error())
