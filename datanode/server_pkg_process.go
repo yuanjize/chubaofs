@@ -110,7 +110,7 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	if _, err = s.sendToAllReplicates(req, msgH); err == nil {
 		s.operatePacket(req, msgH.inConn)
 	} else {
-		req.forceDestoryAllConnect()
+		req.forceDestoryCheckUsedClosedConnect(err)
 	}
 	msgH.handleCh <- single
 
@@ -197,7 +197,7 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		_, err := s.receiveFromNext(request, index)
 		if err != nil {
 			request.PackErrorBody(ActionReceiveFromNext, err.Error())
-			request.forceDestoryAllConnect()
+			request.forceDestoryCheckUsedClosedConnect(err)
 			return
 		}
 	}
