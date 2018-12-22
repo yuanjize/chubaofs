@@ -224,8 +224,16 @@ func (writer *ExtentWriter) checkWriterIsAllFlushed() bool {
 	return !(writer.getQueueListLen() > 0 || writer.currentPacket != nil || len(writer.handleCh) != 0)
 }
 
+func (writer *ExtentWriter) writeType() string {
+	if writer.storeMode == proto.TinyExtentMode {
+		return "tiny"
+	} else {
+		return "normal"
+	}
+}
+
 func (writer *ExtentWriter) toString() string {
-	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
+	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentType(%v) extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
 		writer.inode, writer.dp.PartitionID, writer.extentId, writer.extentOffset,
 		len(writer.handleCh), writer.getQueueListLen())
 }
