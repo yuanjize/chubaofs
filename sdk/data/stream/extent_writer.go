@@ -136,6 +136,7 @@ func (writer *ExtentWriter) write(data []byte, kernelOffset, size int) (total in
 		canWrite = writer.currentPacket.fill(data[total:size], size-total) //fill this packet
 		total += canWrite
 		if writer.IsFullCurrentPacket() || canWrite == 0 {
+			log.LogInfof("writer(%v) ", writer.toString())
 			err = writer.sendCurrPacket()
 			if err != nil { //if failed,recover it
 				return total, err
