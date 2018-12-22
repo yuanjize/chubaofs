@@ -233,8 +233,8 @@ func (writer *ExtentWriter) writeType() string {
 }
 
 func (writer *ExtentWriter) toString() string {
-	return fmt.Sprintf("extent{inode=%v dp=%v extentId=%v extentType(%v) extentOffset=%v handleCh(%v) requestQueueLen(%v) }",
-		writer.inode, writer.dp.PartitionID, writer.extentId, writer.writeType(), writer.extentOffset,
+	return fmt.Sprintf("extent{%v_%v_%v_%v_%v_%v_%v}", writer.dp.PartitionID, writer.extentId,
+		writer.writeType(), writer.extentOffset, writer.hasWriteSize,
 		len(writer.handleCh), writer.getQueueListLen())
 }
 
