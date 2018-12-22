@@ -312,10 +312,6 @@ func (s *DataNode) checkAction(pkg *Packet) (err error) {
 	}
 	pkg.DataPartition = dp
 	if pkg.Opcode == proto.OpWrite || pkg.Opcode == proto.OpCreateFile {
-		if pkg.DataPartition.Status() == proto.ReadOnly {
-			err = storage.ErrorPartitionReadOnly
-			return
-		}
 		if pkg.DataPartition.Available() <= 0 {
 			err = storage.ErrSyscallNoSpace
 			return
