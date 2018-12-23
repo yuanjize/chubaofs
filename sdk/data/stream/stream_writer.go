@@ -125,7 +125,6 @@ func (stream *StreamWriter) init(useNormalExtent bool, prepareWriteSize int) (er
 		err = errors.Annotatef(err, "WriteInit AllocNewExtentFailed")
 		return err
 	}
-
 	stream.setCurrentWriter(writer)
 	return
 }
@@ -332,6 +331,10 @@ func (stream *StreamWriter) flushCurrExtentWriter() (err error) {
 }
 
 func (stream *StreamWriter) setCurrentWriter(writer *ExtentWriter) {
+	oldWriter := stream.currentWriter
+	if oldWriter != nil {
+		oldWriter.notifyRecvThreadExit()
+	}
 	stream.currentWriter = writer
 }
 
