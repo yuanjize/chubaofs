@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"github.com/tiglabs/raft/util"
 )
 
 var (
@@ -89,12 +88,13 @@ func write(name string, isFixSizeWrite bool) (verifyInfo []*VerifyInfo, err erro
 	for {
 		rand.Seed(time.Now().UnixNano())
 		n := rand.Intn(1024)
+		if isFixSizeWrite {
+			n = rand.Intn(3) * 1024 * 1024
+		}
 		if n <= 1 {
 			n = 2
 		}
-		if isFixSizeWrite {
-			n = 2 * util.MB
-		}
+
 		v := new(VerifyInfo)
 		v.Name = name
 		v.Offset = offset
