@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"github.com/tiglabs/raft/util"
 )
 
 var (
@@ -20,8 +21,8 @@ var (
 	para       = flag.Int("para", 300, "parallel processes")
 	rootPath   = flag.String("root", "/mnt/intest", "rootPath")
 	sumSize    = flag.Int("size", 1024*1200, "default max size")
-	fileType   = flag.Bool("isdir", false, "create is dir")
 	prefix     = flag.String("prefix", "1", "default prefix")
+	isFixSize  = flag.Bool("isfix", false, "is fixSize write")
 	currentCnt uint64
 )
 
@@ -74,7 +75,7 @@ func RandStringBytesMaskImpr(n int) string {
 	return string(b)
 }
 
-func write(name string) (verifyInfo []*VerifyInfo, err error) {
+func write(name string, isFixSizeWrite bool) (verifyInfo []*VerifyInfo, err error) {
 	fp, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0664)
 	if err != nil {
 		return nil, err
@@ -90,6 +91,9 @@ func write(name string) (verifyInfo []*VerifyInfo, err error) {
 		n := rand.Intn(1024)
 		if n <= 1 {
 			n = 2
+		}
+		if isFixSizeWrite {
+			n = 2 * util.MB
 		}
 		v := new(VerifyInfo)
 		v.Name = name
@@ -187,22 +191,18 @@ func create(wg *sync.WaitGroup) {
 		var (
 			err error
 		)
-		if *fileType {
-			err = os.MkdirAll(filename, 0755)
-		} else {
-			verifys, err := write(filename)
-			if err != nil {
-				err = fmt.Errorf("filename %v write %v error", filename, err)
-				fmt.Println(err.Error())
-				continue
-				panic(err.Error())
-			}
-			err = read(filename)
-			if err != nil {
-				err = fmt.Errorf("filename %v read %v error", filename, err)
-				fmt.Println(err.Error())
-				readVerify(verifys)
-			}
+		verifys, err := write(filename, *isFixSize)
+		if err != nil {
+			err = fmt.Errorf("filename %v write %v error", filename, err)
+			fmt.Println(err.Error())
+			continue
+			panic(err.Error())
+		}
+		err = read(filename)
+		if err != nil {
+			err = fmt.Errorf("filename %v read %v error", filename, err)
+			fmt.Println(err.Error())
+			readVerify(verifys)
 		}
 
 		if err != nil {
