@@ -103,6 +103,9 @@ func (writer *ExtentWriter) waitFlushSignle() {
 	defer func() {
 		atomic.StoreInt32(&writer.isflushIng, ExtentHasFlushed)
 		ticker.Stop()
+		writer.updateSizeLock.Lock()
+		close(writer.flushSignleCh)
+		writer.updateSizeLock.Unlock()
 	}()
 
 	for {
@@ -189,6 +192,7 @@ func (writer *ExtentWriter) notifyRecvThreadExit() {
 	writer.cleanHandleCh()
 	atomic.StoreInt32(&writer.hasExitRecvThead, HasExitRecvThread)
 	close(writer.ExitCh)
+	close(writer.handleCh)
 }
 
 func (writer *ExtentWriter) cleanHandleCh() {
