@@ -117,6 +117,7 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 			ump.Alarm(gDataWrapper.UmpWarningKey(), fmt.Sprintf("volname(%v) write error", wrapper.GVolname, err.Error()))
 		}
 	}
+	close(request.done)
 	writeRequestPool.Put(request)
 	return
 }
@@ -195,6 +196,7 @@ func (client *ExtentClient) Flush(inode uint64) (err error) {
 		mesg := fmt.Sprintf("volname %v Flush %v", wrapper.GVolname, err.Error())
 		log.LogErrorf(mesg)
 	}
+	close(request.done)
 	flushRequestPool.Put(request)
 	return err
 }
@@ -227,6 +229,7 @@ func (client *ExtentClient) CloseForWrite(inode uint64) (err error) {
 	streamWriter.requestCh <- request
 	<-request.done
 	defer func() {
+		close(request.done)
 		closeRequestPool.Put(request)
 	}()
 	if err = request.err; err != nil {
@@ -261,6 +264,7 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 		request.done = make(chan struct{}, 1)
 		wstream.requestCh <- request
 		<-request.done
+		close(request.done)
 		err = request.err
 		flushRequestPool.Put(request)
 		if err != nil {
