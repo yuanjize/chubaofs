@@ -693,9 +693,6 @@ func (s *ExtentStore) BackEndLoadExtent() {
 			continue
 		}
 		extentInfo.FromExtent(e)
-		s.extentInfoMux.Lock()
-		s.extentInfoMap[extentInfo.FileId] = extentInfo
-		s.extentInfoMux.Unlock()
 		time.Sleep(time.Millisecond * 5)
 	}
 	log.LogInfof("BackEnd Load datapartition (%v) success", s.dataDir)
