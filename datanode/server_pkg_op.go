@@ -113,6 +113,10 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 		err = storage.ErrSyscallNoSpace
 		return
 	}
+	if pkg.DataPartition.Disk().Status == proto.ReadOnly {
+		err = storage.ErrSyscallNoSpace
+		return
+	}
 	var ino uint64
 	if len(pkg.Data) >= 8 && pkg.Size >= 8 {
 		ino = binary.BigEndian.Uint64(pkg.Data)
@@ -316,6 +320,10 @@ func (s *DataNode) handleWrite(pkg *Packet) {
 	}()
 
 	if pkg.DataPartition.Available() <= 0 {
+		err = storage.ErrSyscallNoSpace
+		return
+	}
+	if pkg.DataPartition.Disk().Status == proto.ReadOnly {
 		err = storage.ErrSyscallNoSpace
 		return
 	}
