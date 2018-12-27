@@ -549,6 +549,9 @@ func (s *ExtentStore) FlushDelete() (err error) {
 			continue
 		}
 		s.cache.Del(extentId)
+		s.extentInfoMux.Lock()
+		delete(s.extentInfoMap, extentId)
+		s.extentInfoMux.Unlock()
 		extentFilePath := path.Join(s.dataDir, strconv.FormatUint(extentId, 10))
 		if opErr = os.Remove(extentFilePath); opErr != nil {
 			continue
