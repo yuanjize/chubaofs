@@ -355,13 +355,6 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 	var (
 		err error
 	)
-	defer func() {
-		if err != nil {
-			request.PackErrorBody(ActionStreamRead, err.Error())
-		} else {
-			request.PackOkReply()
-		}
-	}()
 	needReplySize := request.Size
 	offset := request.Offset
 	store := request.DataPartition.GetExtentStore()
@@ -385,6 +378,7 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 		ump.AfterTP(tpObject, err)
 		if err != nil {
 			reply.PackErrorBody(ActionStreamRead, err.Error())
+			request.PackErrorBody(ActionStreamRead, err.Error())
 			if err = reply.WriteToConn(connect); err != nil {
 				err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
 					reply.StartT, err))
@@ -399,6 +393,7 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 				reply.StartT, err))
 			log.LogErrorf(err.Error())
 			connect.Close()
+			request.PackErrorBody(ActionStreamRead, err.Error())
 			return
 		}
 		needReplySize -= currReadSize
@@ -407,7 +402,7 @@ func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
 			proto.Buffers.Put(reply.Data)
 		}
 	}
-	request.ResultCode = reply.ResultCode
+	request.PackOkReply()
 	return
 }
 
