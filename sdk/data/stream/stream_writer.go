@@ -465,7 +465,9 @@ func (stream *StreamWriter) allocateNewExtentWriter(useNormalExtent bool) (write
 			if extentId, err = stream.createExtent(dp); err != nil {
 				log.LogWarnf(fmt.Sprintf("stream (%v)ActionAllocNewExtentWriter "+
 					"create Extent,error(%v) execludeDataPartion(%v)", stream.toString(), err.Error(), stream.excludePartition))
-				stream.excludePartitionId(dp.PartitionID)
+				if !strings.Contains(err.Error(), "use of closed network connection") {
+					stream.excludePartitionId(dp.PartitionID)
+				}
 				continue
 			}
 		}
