@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-
-	"github.com/tiglabs/containerfs/proto"
 )
 
 var single = struct{}{}
