@@ -83,30 +83,22 @@ func (msgH *MessageHandler) ExitSign() {
 }
 
 func (msgH *MessageHandler) AllocateNextConn(pkg *Packet, index int) (err error) {
-	var conn *net.TCPConn
-	if pkg.StoreMode == proto.NormalExtentMode && pkg.IsWriteOperation() {
-		key := fmt.Sprintf("%v_%v_%v", pkg.PartitionID, pkg.FileID, pkg.NextAddrs[index])
-		msgH.connectLock.RLock()
-		conn := msgH.connectMap[key]
-		msgH.connectLock.RUnlock()
-		if conn == nil {
-			conn, err = gConnPool.Get(pkg.NextAddrs[index])
-			if err != nil {
-				return
-			}
-			msgH.connectLock.Lock()
-			msgH.connectMap[key] = conn
-			msgH.connectLock.Unlock()
-		}
-		pkg.useConnectMap = true
-		pkg.NextConns[index] = conn
-	} else {
+	key := fmt.Sprintf("%v_%v_%v", pkg.PartitionID, pkg.FileID, pkg.NextAddrs[index])
+	msgH.connectLock.RLock()
+	conn := msgH.connectMap[key]
+	msgH.connectLock.RUnlock()
+	if conn == nil {
 		conn, err = gConnPool.Get(pkg.NextAddrs[index])
 		if err != nil {
 			return
 		}
-		pkg.NextConns[index] = conn
+		msgH.connectLock.Lock()
+		msgH.connectMap[key] = conn
+		msgH.connectLock.Unlock()
 	}
+	pkg.useConnectMap = true
+	pkg.NextConns[index] = conn
+
 	return nil
 }
 
