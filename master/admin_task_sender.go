@@ -58,7 +58,7 @@ func NewAdminTaskSender(targetAddr, clusterID string) (sender *AdminTaskSender) 
 		clusterID:  clusterID,
 		TaskMap:    make(map[string]*proto.AdminTask),
 		exitCh:     make(chan struct{}),
-		connPool:   pool.NewConnPool(),
+		connPool:   pool.NewConnectPool(),
 	}
 	go sender.process()
 

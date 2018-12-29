@@ -77,7 +77,7 @@ func NewMetaWrapper(volname, masterHosts string) (*MetaWrapper, error) {
 	for _, ip := range master {
 		mw.master.AddNode(ip)
 	}
-	mw.conns = pool.NewConnPool()
+	mw.conns = pool.NewConnectPool()
 	mw.partitions = make(map[uint64]*MetaPartition)
 	mw.ranges = btree.New(32)
 	mw.UpdateClusterInfo()

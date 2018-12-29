@@ -48,7 +48,7 @@ var (
 	ErrBadConfFile              = errors.New("bad config file")
 
 	LocalIP      string
-	gConnPool    = pool.NewConnPool()
+	gConnPool    = pool.NewConnectPool()
 	MasterHelper = util.NewMasterHelper()
 )
 

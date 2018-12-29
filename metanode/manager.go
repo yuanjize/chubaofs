@@ -147,7 +147,7 @@ func (m *metaManager) Stop() {
 }
 
 func (m *metaManager) onStart() (err error) {
-	m.connPool = pool.NewConnPool()
+	m.connPool = pool.NewConnectPool()
 	err = m.loadPartitions()
 	return
 }
