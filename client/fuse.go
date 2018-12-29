@@ -80,7 +80,17 @@ func Mount(cfg *config.Config) error {
 	icacheTimeout := ParseConfigString(cfg, "icacheTimeout")
 	lookupValid := ParseConfigString(cfg, "lookupValid")
 	attrValid := ParseConfigString(cfg, "attrValid")
+	level := ParseLogLevel(loglvl)
+	_, err := log.InitLog(path.Join(logpath, LoggerDir), LoggerPrefix, level)
+	if err != nil {
+		return err
+	}
+	defer log.LogFlush()
 
+	super, err := bdfs.NewSuper(volname, master, icacheTimeout, lookupValid, attrValid)
+	if err != nil {
+		return err
+	}
 	c, err := fuse.Mount(
 		mnt,
 		fuse.AllowOther(),
@@ -94,19 +104,6 @@ func Mount(cfg *config.Config) error {
 		return err
 	}
 	defer c.Close()
-
-	level := ParseLogLevel(loglvl)
-	_, err = log.InitLog(path.Join(logpath, LoggerDir), LoggerPrefix, level)
-	if err != nil {
-		return err
-	}
-	defer log.LogFlush()
-
-	super, err := bdfs.NewSuper(volname, master, icacheTimeout, lookupValid, attrValid)
-	if err != nil {
-		return err
-	}
-
 	go func() {
 		fmt.Println(http.ListenAndServe(":"+profport, nil))
 	}()
