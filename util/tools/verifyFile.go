@@ -33,6 +33,7 @@ type VerifyInfo struct {
 	ReadCrc       uint32
 	WriteContents string
 	ReadContents  string
+	HasWrite      int64
 }
 
 func main() {
@@ -102,11 +103,12 @@ func write(name string, isFixSizeWrite bool) (verifyInfo []*VerifyInfo, err erro
 		data := []byte(RandStringBytesMaskImpr(n))
 		v.WriteContents = string(data)
 		v.WriteCrc = crc32.ChecksumIEEE(data)
+		v.HasWrite = offset
 		if int(offset)+len(data) > fileSize {
 			break
 		}
 		if writeCount, err := fp.WriteAt(data, offset); err != nil || writeCount != len(data) {
-			return nil, fmt.Errorf("write: err(%v) len(%v) writeCount(%v)", err, len(data), writeCount)
+			return nil, fmt.Errorf("write: err(%v) len(%v) hasWrite (%v) writeCount(%v)", err, len(data), offset, writeCount)
 		}
 		verifyInfo = append(verifyInfo, v)
 		allData = append(allData, data...)
