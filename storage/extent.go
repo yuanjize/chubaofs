@@ -324,6 +324,9 @@ func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err e
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
+	if offset > e.dataSize {
+		return ErrorUnavaliExtent
+	}
 	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
 		return
 	}
@@ -339,6 +342,9 @@ func (e *fsExtent) WriteTinyRecover(data []byte, offset, size int64, crc uint32)
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if !IsTinyExtent(e.extentId) {
+		return ErrorUnavaliExtent
+	}
+	if offset > e.dataSize {
 		return ErrorUnavaliExtent
 	}
 	if offset+size >= math.MaxUint32 {
