@@ -66,6 +66,13 @@ var (
 		}
 	}
 
+	GetAllExtentFilter = func() ExtentFilter {
+		now := time.Now()
+		return func(info *FileInfo) bool {
+			return !IsTinyExtent(info.FileId) || (now.Unix()-info.ModTime.Unix() > 10*60 && info.Deleted == false && info.Size > 0)
+		}
+	}
+
 	GetStableTinyExtentFilter = func(filters []uint64) ExtentFilter {
 		return func(info *FileInfo) bool {
 			if !IsTinyExtent(info.FileId) {
@@ -155,14 +162,11 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetAllExtentFilter()); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
 	for _, extentInfo := range extentInfoSlice {
-		if extentInfo.Size == 0 || time.Now().Unix()-extentInfo.ModTime.Unix() < 5*60 {
-			continue
-		}
 		file := &proto.File{
 			Name:     strconv.FormatUint(extentInfo.FileId, 10),
 			Crc:      extentInfo.Crc,
