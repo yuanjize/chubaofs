@@ -293,7 +293,9 @@ func (dp *DataPartition) notifyFollower(wg *sync.WaitGroup, index int, members [
 	conn, err = gConnPool.Get(target)
 	defer func() {
 		wg.Done()
-		log.LogErrorf(ActionNotifyFollowerRepair, fmt.Sprintf(" to %v task %v failed %v", target, string(p.Data), err.Error()))
+		if err != nil {
+			log.LogErrorf(ActionNotifyFollowerRepair, fmt.Sprintf(" to %v task %v failed %v", target, string(p.Data), err.Error()))
+		}
 	}()
 	if err != nil {
 		return err
