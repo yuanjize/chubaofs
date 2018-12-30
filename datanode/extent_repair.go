@@ -308,6 +308,7 @@ func (dp *DataPartition) notifyFollower(wg *sync.WaitGroup, index int, members [
 		return err
 	}
 	gConnPool.Put(conn, true)
+	return nil
 }
 
 /*notify follower to repair DataPartition extentStore*/

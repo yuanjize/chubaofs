@@ -70,7 +70,7 @@ const (
 )
 
 type DataNode struct {
-	space          SpaceManager
+	space          *SpaceManager
 	port           string
 	rackName       string
 	clusterId      string
