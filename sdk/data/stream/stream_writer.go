@@ -422,6 +422,7 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			stream.excludePartition = make([]uint32, 0)
 			stream.recoverPackages = make([]*Packet, 0)
 			stream.setCurrentWriter(writer)
+			stream.updateToMetaNode()
 			return nil
 		} else {
 			writer.forbirdUpdateToMetanode()
