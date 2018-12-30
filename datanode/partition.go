@@ -43,44 +43,9 @@ const (
 var (
 	AdminGetDataPartition     = master.AdminGetDataPartition
 	ErrNotLeader              = errors.New("not leader")
-	LeastGoalNum              = 2
-	ErrLackOfGoal             = errors.New("dataPartitionGoal is not equal dataPartitionHosts")
-	ErrDataPartitionOnBadDisk = errors.New("error bad disk")
 )
 
-type DataPartition interface {
-	ID() uint32
-	Path() string
-	IsLeader() bool
-	ReplicaHosts() []string
-	Disk() *Disk
-
-	Size() int
-	Used() int
-	Available() int
-
-	Status() int
-	ChangeStatus(status int)
-
-	GetExtentStore() *storage.ExtentStore
-	GetExtentCount() int
-
-	ForceLoadHeader()
-
-	LaunchRepair(fixExtentType uint8)
-	MergeExtentStoreRepair(metas *MembersFileMetas)
-
-	FlushDelete() error
-
-	AddWriteMetrics(latency uint64)
-	AddReadMetrics(latency uint64)
-
-	LoadExtentHeaderStatus() int
-
-	Stop()
-}
-
-type dataPartitionMeta struct {
+type DataPartitionMeta struct {
 	VolumeId      string
 	PartitionType string
 	PartitionId   uint32
@@ -88,7 +53,7 @@ type dataPartitionMeta struct {
 	CreateTime    string
 }
 
-func (meta *dataPartitionMeta) Validate() (err error) {
+func (meta *DataPartitionMeta) Validate() (err error) {
 	meta.VolumeId = strings.TrimSpace(meta.VolumeId)
 	meta.PartitionType = strings.TrimSpace(meta.PartitionType)
 	if len(meta.VolumeId) == 0 || len(meta.PartitionType) == 0 ||
@@ -99,7 +64,7 @@ func (meta *dataPartitionMeta) Validate() (err error) {
 	return
 }
 
-type dataPartition struct {
+type DataPartition struct {
 	volumeId        string
 	partitionId     uint32
 	partitionStatus int
@@ -122,7 +87,7 @@ type dataPartition struct {
 	loadExtentHeaderStatus int
 }
 
-func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp DataPartition, err error) {
+func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp *DataPartition, err error) {
 
 	if dp, err = newDataPartition(volId, partitionId, disk, size); err != nil {
 		return
@@ -137,7 +102,7 @@ func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int,
 		return
 	}
 	defer metaFile.Close()
-	meta := &dataPartitionMeta{
+	meta := &DataPartitionMeta{
 		VolumeId:      volId,
 		PartitionId:   partitionId,
 		PartitionType: partitionType,
@@ -159,14 +124,14 @@ func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int,
 // LoadDataPartition load and returns partition instance from specified directory.
 // This method will read the partition meta file stored under the specified directory
 // and create partition instance.
-func LoadDataPartition(partitionDir string, disk *Disk) (dp DataPartition, err error) {
+func LoadDataPartition(partitionDir string, disk *Disk) (dp *DataPartition, err error) {
 	var (
 		metaFileData []byte
 	)
 	if metaFileData, err = ioutil.ReadFile(path.Join(partitionDir, DataPartitionMetaFileName)); err != nil {
 		return
 	}
-	meta := &dataPartitionMeta{}
+	meta := &DataPartitionMeta{}
 	if err = json.Unmarshal(metaFileData, meta); err != nil {
 		return
 	}
@@ -177,8 +142,8 @@ func LoadDataPartition(partitionDir string, disk *Disk) (dp DataPartition, err e
 	return
 }
 
-func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int) (dp DataPartition, err error) {
-	partition := &dataPartition{
+func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int) (dp *DataPartition, err error) {
+	partition := &DataPartition{
 		volumeId:               volumeId,
 		partitionId:            partitionId,
 		disk:                   disk,
@@ -200,31 +165,31 @@ func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int)
 	return
 }
 
-func (dp *dataPartition) ID() uint32 {
+func (dp *DataPartition) ID() uint32 {
 	return dp.partitionId
 }
 
-func (dp *dataPartition) GetExtentCount() int {
+func (dp *DataPartition) GetExtentCount() int {
 	return dp.extentStore.GetExtentCount()
 }
 
-func (dp *dataPartition) Path() string {
+func (dp *DataPartition) Path() string {
 	return dp.path
 }
 
-func (dp *dataPartition) IsLeader() bool {
+func (dp *DataPartition) IsLeader() bool {
 	return dp.isLeader
 }
 
-func (dp *dataPartition) ReplicaHosts() []string {
+func (dp *DataPartition) ReplicaHosts() []string {
 	return dp.replicaHosts
 }
 
-func (dp *dataPartition) LoadExtentHeaderStatus() int {
+func (dp *DataPartition) LoadExtentHeaderStatus() int {
 	return dp.loadExtentHeaderStatus
 }
 
-func (dp *dataPartition) ReloadSnapshot() {
+func (dp *DataPartition) ReloadSnapshot() {
 	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
 		return
 	}
@@ -237,14 +202,14 @@ func (dp *dataPartition) ReloadSnapshot() {
 	dp.snapshotLock.Unlock()
 }
 
-func (dp *dataPartition) GetSnapShot() (files []*proto.File) {
+func (dp *DataPartition) GetSnapShot() (files []*proto.File) {
 	dp.snapshotLock.RLock()
 	defer dp.snapshotLock.RUnlock()
 
 	return dp.snapshot
 }
 
-func (dp *dataPartition) Stop() {
+func (dp *DataPartition) Stop() {
 	if dp.stopC != nil {
 		close(dp.stopC)
 	}
@@ -253,44 +218,44 @@ func (dp *dataPartition) Stop() {
 
 }
 
-func (dp *dataPartition) FlushDelete() (err error) {
+func (dp *DataPartition) FlushDelete() (err error) {
 	err = dp.extentStore.FlushDelete()
 	return
 }
 
-func (dp *dataPartition) Disk() *Disk {
+func (dp *DataPartition) Disk() *Disk {
 	return dp.disk
 }
 
-func (dp *dataPartition) Status() int {
+func (dp *DataPartition) Status() int {
 	return dp.partitionStatus
 }
 
-func (dp *dataPartition) Size() int {
+func (dp *DataPartition) Size() int {
 	return dp.partitionSize
 }
 
-func (dp *dataPartition) Used() int {
+func (dp *DataPartition) Used() int {
 	return dp.used
 }
 
-func (dp *dataPartition) Available() int {
+func (dp *DataPartition) Available() int {
 	return dp.partitionSize - dp.used
 }
 
-func (dp *dataPartition) ChangeStatus(status int) {
+func (dp *DataPartition) ChangeStatus(status int) {
 	switch status {
 	case proto.ReadOnly, proto.ReadWrite, proto.Unavaliable:
 		dp.partitionStatus = status
 	}
 }
 
-func (dp *dataPartition) ForceLoadHeader() {
+func (dp *DataPartition) ForceLoadHeader() {
 	dp.extentStore.BackEndLoadExtent()
 	dp.loadExtentHeaderStatus = FinishLoadDataPartitionExtentHeader
 }
 
-func (dp *dataPartition) statusUpdateScheduler() {
+func (dp *DataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
 	var index int
@@ -318,7 +283,7 @@ func (dp *dataPartition) statusUpdateScheduler() {
 	}
 }
 
-func (dp *dataPartition) statusUpdate() {
+func (dp *DataPartition) statusUpdate() {
 	status := proto.ReadWrite
 	dp.computeUsage()
 	if dp.used >= dp.partitionSize {
@@ -345,7 +310,7 @@ func ParseExtentId(filename string) (extentId uint64, isExtent bool) {
 	return
 }
 
-func (dp *dataPartition) getRealSize(path string, finfo os.FileInfo) (size int64) {
+func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64) {
 	name := finfo.Name()
 	extentid, isExtent := ParseExtentId(name)
 	if !isExtent {
@@ -365,7 +330,7 @@ func (dp *dataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 
 }
 
-func (dp *dataPartition) computeUsage() {
+func (dp *DataPartition) computeUsage() {
 	var (
 		used  int64
 		files []os.FileInfo
@@ -384,15 +349,15 @@ func (dp *dataPartition) computeUsage() {
 	dp.updatePartitionSizeTime = time.Now().Unix()
 }
 
-func (dp *dataPartition) GetExtentStore() *storage.ExtentStore {
+func (dp *DataPartition) GetExtentStore() *storage.ExtentStore {
 	return dp.extentStore
 }
 
-func (dp *dataPartition) String() (m string) {
+func (dp *DataPartition) String() (m string) {
 	return fmt.Sprintf(DataPartitionPrefix+"_%v_%v", dp.partitionId, dp.partitionSize)
 }
 
-func (dp *dataPartition) LaunchRepair(fixExtentType uint8) {
+func (dp *DataPartition) LaunchRepair(fixExtentType uint8) {
 	if dp.partitionStatus == proto.Unavaliable {
 		return
 	}
@@ -414,7 +379,7 @@ func (dp *dataPartition) LaunchRepair(fixExtentType uint8) {
 	dp.extentFileRepair(fixExtentType)
 }
 
-func (dp *dataPartition) updateReplicaHosts() (err error) {
+func (dp *DataPartition) updateReplicaHosts() (err error) {
 	if time.Now().Unix()-dp.updateReplicationTime <= UpdateReplicationHostsTime {
 		return
 	}
@@ -435,7 +400,7 @@ func (dp *dataPartition) updateReplicaHosts() (err error) {
 	return
 }
 
-func (dp *dataPartition) compareReplicaHosts(v1, v2 []string) (equals bool) {
+func (dp *DataPartition) compareReplicaHosts(v1, v2 []string) (equals bool) {
 	// Compare fetched replica hosts with local stored hosts.
 	equals = true
 	if len(v1) == len(v2) {
@@ -452,7 +417,7 @@ func (dp *dataPartition) compareReplicaHosts(v1, v2 []string) (equals bool) {
 	return
 }
 
-func (dp *dataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []string, err error) {
+func (dp *DataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []string, err error) {
 	var (
 		HostsBuf []byte
 	)
@@ -482,7 +447,7 @@ func (dp *dataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []stri
 	return
 }
 
-func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
+func (dp *DataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response = &proto.LoadDataPartitionResponse{}
 	response.PartitionId = uint64(dp.partitionId)
 	response.PartitionStatus = dp.partitionStatus
@@ -501,7 +466,7 @@ func (dp *dataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	return
 }
 
-func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
+func (dp *DataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	store := dp.extentStore
 	for _, addExtent := range metas.NeedAddExtentsTasks {
 		if storage.IsTinyExtent(addExtent.FileId) {
@@ -539,10 +504,10 @@ func (dp *dataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 	wg.Wait()
 }
 
-func (dp *dataPartition) AddWriteMetrics(latency uint64) {
+func (dp *DataPartition) AddWriteMetrics(latency uint64) {
 	dp.runtimeMetrics.AddWriteMetrics(latency)
 }
 
-func (dp *dataPartition) AddReadMetrics(latency uint64) {
+func (dp *DataPartition) AddReadMetrics(latency uint64) {
 	dp.runtimeMetrics.AddReadMetrics(latency)
 }

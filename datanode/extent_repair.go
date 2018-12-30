@@ -32,7 +32,7 @@ func NewMemberFileMetas() (mf *MembersFileMetas) {
 }
 
 //files repair check
-func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
+func (dp *DataPartition) extentFileRepair(fixExtentsType uint8) {
 	startTime := time.Now().UnixNano()
 	log.LogInfof("action[extentFileRepair] partition(%v) start.",
 		dp.partitionId)
@@ -78,14 +78,14 @@ func (dp *dataPartition) extentFileRepair(fixExtentsType uint8) {
 
 }
 
-func (dp *dataPartition) putTinyExtentToUnavliCh(fixExtentType uint8, extents []uint64) {
+func (dp *DataPartition) putTinyExtentToUnavliCh(fixExtentType uint8, extents []uint64) {
 	if fixExtentType == proto.TinyExtentMode {
 		dp.extentStore.PutTinyExtentsToUnAvaliCh(extents)
 	}
 	return
 }
 
-func (dp *dataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix, needFix []uint64) {
+func (dp *DataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix, needFix []uint64) {
 	if fixExtentType != proto.TinyExtentMode {
 		return
 	}
@@ -101,7 +101,7 @@ func (dp *dataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix
 	}
 }
 
-func (dp *dataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
+func (dp *DataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
 	unavaliTinyExtents = make([]uint64, 0)
 	fixTinyExtents := MinFixTinyExtents
 	if dp.isFirstFixTinyExtents {
@@ -119,7 +119,7 @@ func (dp *dataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
 }
 
 // Get all data partition group ,about all files meta
-func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExtents []uint64) (allMemberFileMetas []*MembersFileMetas, err error) {
+func (dp *DataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExtents []uint64) (allMemberFileMetas []*MembersFileMetas, err error) {
 	allMemberFileMetas = make([]*MembersFileMetas, len(dp.replicaHosts))
 	var (
 		extentFiles []*storage.FileInfo
@@ -132,14 +132,14 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 		extentFiles, err = dp.extentStore.GetAllWatermark(storage.GetStableTinyExtentFilter(needFixExtents))
 	}
 	if err != nil {
-		err = errors.Annotatef(err, "getAllMemberExtentMetas extent dataPartition(%v) GetAllWaterMark", dp.partitionId)
+		err = errors.Annotatef(err, "getAllMemberExtentMetas extent DataPartition(%v) GetAllWaterMark", dp.partitionId)
 		return
 	}
 	// write blob files meta to extent files meta
 	files = append(files, extentFiles...)
 	leaderFileMetas := NewMemberFileMetas()
 	if err != nil {
-		err = errors.Annotatef(err, "getAllMemberExtentMetas dataPartition(%v) GetAllWaterMark", dp.partitionId)
+		err = errors.Annotatef(err, "getAllMemberExtentMetas DataPartition(%v) GetAllWaterMark", dp.partitionId)
 		return
 	}
 	for _, fi := range files {
@@ -154,7 +154,7 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 	if fixExtentMode == proto.TinyExtentMode {
 		p.Data, err = json.Marshal(needFixExtents)
 		if err != nil {
-			err = errors.Annotatef(err, "getAllMemberExtentMetas dataPartition(%v) GetAllWaterMark", dp.partitionId)
+			err = errors.Annotatef(err, "getAllMemberExtentMetas DataPartition(%v) GetAllWaterMark", dp.partitionId)
 			return
 		}
 		p.Size = uint32(len(p.Data))
@@ -164,27 +164,27 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 		target := dp.replicaHosts[i]
 		conn, err = gConnPool.Get(target) //get remote connect
 		if err != nil {
-			err = errors.Annotatef(err, "getAllMemberExtentMetas  dataPartition(%v) get host(%v) connect", dp.partitionId, target)
+			err = errors.Annotatef(err, "getAllMemberExtentMetas  DataPartition(%v) get host(%v) connect", dp.partitionId, target)
 			return
 		}
 		err = p.WriteToConn(conn) //write command to remote host
 		if err != nil {
 			gConnPool.Put(conn, true)
-			err = errors.Annotatef(err, "getAllMemberExtentMetas dataPartition(%v) write to host(%v)", dp.partitionId, target)
+			err = errors.Annotatef(err, "getAllMemberExtentMetas DataPartition(%v) write to host(%v)", dp.partitionId, target)
 			return
 		}
 		reply := new(Packet)
 		err = reply.ReadFromConn(conn, 60) //read it response
 		if err != nil {
 			gConnPool.Put(conn, true)
-			err = errors.Annotatef(err, "getAllMemberExtentMetas dataPartition(%v) read from host(%v)", dp.partitionId, target)
+			err = errors.Annotatef(err, "getAllMemberExtentMetas DataPartition(%v) read from host(%v)", dp.partitionId, target)
 			return
 		}
 		fileInfos := make([]*storage.FileInfo, 0)
 		err = json.Unmarshal(reply.Data[:reply.Size], &fileInfos)
 		if err != nil {
 			gConnPool.Put(conn, true)
-			err = errors.Annotatef(err, "getAllMemberExtentMetas dataPartition(%v) unmarshal json(%v)", dp.partitionId, string(p.Data[:p.Size]))
+			err = errors.Annotatef(err, "getAllMemberExtentMetas DataPartition(%v) unmarshal json(%v)", dp.partitionId, string(p.Data[:p.Size]))
 			return
 		}
 		gConnPool.Put(conn, true)
@@ -199,7 +199,7 @@ func (dp *dataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 }
 
 //generator file task
-func (dp *dataPartition) generatorExtentRepairTasks(allMembers []*MembersFileMetas) (noNeedFix []uint64, needFix []uint64) {
+func (dp *DataPartition) generatorExtentRepairTasks(allMembers []*MembersFileMetas) (noNeedFix []uint64, needFix []uint64) {
 	maxSizeExtentMap := dp.mapMaxSizeExtentToIndex(allMembers) //map maxSize extentId to allMembers index
 	dp.generatorAddExtentsTasks(allMembers, maxSizeExtentMap)  //add extentTask
 	noNeedFix, needFix = dp.generatorFixExtentSizeTasks(allMembers, maxSizeExtentMap)
@@ -208,7 +208,7 @@ func (dp *dataPartition) generatorExtentRepairTasks(allMembers []*MembersFileMet
 
 /* pasre all extent,select maxExtentSize to member index map
  */
-func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas) (maxSizeExtentMap map[uint64]*storage.FileInfo) {
+func (dp *DataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas) (maxSizeExtentMap map[uint64]*storage.FileInfo) {
 	maxSizeExtentMap = make(map[uint64]*storage.FileInfo)
 	for index := 0; index < len(allMembers); index++ {
 		member := allMembers[index]
@@ -231,7 +231,7 @@ func (dp *dataPartition) mapMaxSizeExtentToIndex(allMembers []*MembersFileMetas)
 }
 
 /*generator add extent if follower not have this extent*/
-func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) {
+func (dp *DataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) {
 	for fileId, maxFileInfo := range maxSizeExtentMap {
 		if storage.IsTinyExtent(fileId) {
 			continue
@@ -252,7 +252,7 @@ func (dp *dataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas
 }
 
 /*generator fix extent Size ,if all members  Not the same length*/
-func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) (noNeedFix []uint64, needFix []uint64) {
+func (dp *DataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMetas, maxSizeExtentMap map[uint64]*storage.FileInfo) (noNeedFix []uint64, needFix []uint64) {
 	noNeedFix = make([]uint64, 0)
 	needFix = make([]uint64, 0)
 	for fileId, maxFileInfo := range maxSizeExtentMap {
@@ -285,7 +285,7 @@ func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMe
 	return
 }
 
-func (dp *dataPartition) notifyFollower(wg *sync.WaitGroup, index int, members []*MembersFileMetas) (err error) {
+func (dp *DataPartition) notifyFollower(wg *sync.WaitGroup, index int, members []*MembersFileMetas) (err error) {
 	p := NewNotifyExtentRepair(dp.partitionId) //notify all follower to repairt task,send opnotifyRepair command
 	var conn *net.TCPConn
 	target := dp.replicaHosts[index]
@@ -310,8 +310,8 @@ func (dp *dataPartition) notifyFollower(wg *sync.WaitGroup, index int, members [
 	gConnPool.Put(conn, true)
 }
 
-/*notify follower to repair dataPartition extentStore*/
-func (dp *dataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err error) {
+/*notify follower to repair DataPartition extentStore*/
+func (dp *DataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err error) {
 	wg := new(sync.WaitGroup)
 	for i := 1; i < len(members); i++ {
 		wg.Add(1)
@@ -324,7 +324,7 @@ func (dp *dataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err er
 
 // DoStreamExtentFixRepair executed on follower node of data partition.
 // It receive from leader notifyRepair command extent file repair.
-func (dp *dataPartition) doStreamExtentFixRepair(wg *sync.WaitGroup, remoteExtentInfo *storage.FileInfo) {
+func (dp *DataPartition) doStreamExtentFixRepair(wg *sync.WaitGroup, remoteExtentInfo *storage.FileInfo) {
 	defer wg.Done()
 	err := dp.streamRepairExtent(remoteExtentInfo)
 
@@ -340,12 +340,12 @@ func (dp *dataPartition) doStreamExtentFixRepair(wg *sync.WaitGroup, remoteExten
 	}
 }
 
-func (dp *dataPartition) applyRepairKey(fileId int) (m string) {
+func (dp *DataPartition) applyRepairKey(fileId int) (m string) {
 	return fmt.Sprintf("ApplyRepairKey(%v_%v)", dp.ID(), fileId)
 }
 
 //extent file repair function,do it on follower host
-func (dp *dataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) (err error) {
+func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) (err error) {
 	store := dp.GetExtentStore()
 	if !store.IsExistExtent(remoteExtentInfo.FileId) {
 		return

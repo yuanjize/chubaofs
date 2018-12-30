@@ -42,9 +42,9 @@ import (
 
 var (
 	ErrStoreTypeMismatch        = errors.New("store type error")
-	ErrPartitionNotExist        = errors.New("dataPartition not exists")
+	ErrPartitionNotExist        = errors.New("DataPartition not exists")
 	ErrChunkOffsetMismatch      = errors.New("chunk offset not mismatch")
-	ErrNoDiskForCreatePartition = errors.New("no disk for create dataPartition")
+	ErrNoDiskForCreatePartition = errors.New("no disk for create DataPartition")
 	ErrBadConfFile              = errors.New("bad config file")
 
 	LocalIP      string

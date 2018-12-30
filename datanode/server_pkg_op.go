@@ -234,7 +234,7 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 	data, _ := json.Marshal(task)
 	_, err := MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
 	if err != nil {
-		err = errors.Annotatef(err, "delete dataPartition failed,partitionId[%v]", request.PartitionId)
+		err = errors.Annotatef(err, "delete DataPartition failed,partitionId[%v]", request.PartitionId)
 		log.LogErrorf("action[handleDeleteDataPartition] err[%v].", err)
 	}
 	log.LogInfof(fmt.Sprintf("action[handleDeleteDataPartition] %v error(%v)", request.PartitionId, string(data)))
@@ -254,10 +254,10 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 		if dp == nil {
 			response.Status = proto.TaskFail
 			response.PartitionId = uint64(request.PartitionId)
-			response.Result = fmt.Sprintf("dataPartition[%v] not found", request.PartitionId)
+			response.Result = fmt.Sprintf("DataPartition[%v] not found", request.PartitionId)
 			log.LogErrorf("from master Task[%v] failed,error[%v]", task.ToString(), response.Result)
 		} else {
-			response = dp.(*dataPartition).Load()
+			response = dp.Load()
 			response.PartitionId = uint64(request.PartitionId)
 			response.Status = proto.TaskSuccess
 		}
@@ -277,7 +277,7 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 	}
 	_, err = MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
 	if err != nil {
-		err = errors.Annotatef(err, "load dataPartition failed,partitionId[%v]", request.PartitionId)
+		err = errors.Annotatef(err, "load DataPartition failed,partitionId[%v]", request.PartitionId)
 		log.LogError(errors.ErrorStack(err))
 	}
 }
@@ -349,6 +349,63 @@ func (s *DataNode) handleRead(pkg *Packet) {
 
 	return
 }
+
+// Handle OpStreamRead packet.
+func (s *DataNode) handleExtentRecover(request *Packet, connect net.Conn) {
+	var (
+		err error
+	)
+	needReplySize := request.Size
+	offset := request.Offset
+	store := request.DataPartition.GetExtentStore()
+	umpKey := fmt.Sprintf("%s_datanode_%s", s.clusterId, "Read")
+	reply := NewStreamReadResponsePacket(request.ReqID, request.PartitionID, request.FileID)
+	reply.StartT = time.Now().UnixNano()
+	for {
+		if needReplySize <= 0 {
+			break
+		}
+		err = nil
+		currReadSize := uint32(util.Min(int(needReplySize), util.ReadBlockSize))
+		if currReadSize == util.ReadBlockSize {
+			reply.Data, _ = proto.Buffers.Get(util.ReadBlockSize)
+		} else {
+			reply.Data = make([]byte, currReadSize)
+		}
+		tpObject := ump.BeforeTP(umpKey)
+		reply.Offset = offset
+		reply.Crc, err = store.RepairRead(reply.FileID, offset, int64(currReadSize), reply.Data)
+		ump.AfterTP(tpObject, err)
+		if err != nil {
+			reply.PackErrorBody(ActionStreamRead, err.Error())
+			request.PackErrorBody(ActionStreamRead, err.Error())
+			if err = reply.WriteToConn(connect); err != nil {
+				err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
+					reply.StartT, err))
+				log.LogErrorf(err.Error())
+			}
+			return
+		}
+		reply.Size = uint32(currReadSize)
+		reply.ResultCode = proto.OpOk
+		if err = reply.WriteToConn(connect); err != nil {
+			err = fmt.Errorf(reply.ActionMsg(ActionWriteToCli, connect.RemoteAddr().String(),
+				reply.StartT, err))
+			log.LogErrorf(err.Error())
+			connect.Close()
+			request.PackErrorBody(ActionStreamRead, err.Error())
+			return
+		}
+		needReplySize -= currReadSize
+		offset += int64(currReadSize)
+		if currReadSize == util.ReadBlockSize {
+			proto.Buffers.Put(reply.Data)
+		}
+	}
+	request.PackOkReply()
+	return
+}
+
 
 // Handle OpStreamRead packet.
 func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {
@@ -468,7 +525,7 @@ func (s *DataNode) handleNotifyExtentRepair(pkg *Packet) {
 }
 
 func (s *DataNode) handleGetDataPartitionMetrics(pkg *Packet) {
-	dp := pkg.DataPartition.(*dataPartition)
+	dp := pkg.DataPartition
 	data, err := json.Marshal(dp.runtimeMetrics)
 	if err != nil {
 		err = errors.Annotatef(err, "dataPartionMetrics[%v] json mashal failed", dp.ID())

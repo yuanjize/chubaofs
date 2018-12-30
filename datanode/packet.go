@@ -44,7 +44,7 @@ type Packet struct {
 	NextConns     []*net.TCPConn
 	NextAddrs     []string
 	IsReturn      int32
-	DataPartition DataPartition
+	DataPartition *DataPartition
 	goals         uint8
 	addrs         []string
 	tpObject      *ump.TpObject

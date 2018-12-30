@@ -100,7 +100,7 @@ type ExtentStore struct {
 	baseExtentId        uint64
 	extentInfoMap       map[uint64]*FileInfo
 	extentInfoMux       sync.RWMutex
-	cache               ExtentCache
+	cache               *LruExtentCache
 	lock                sync.Mutex
 	storeSize           int
 	metaFp              *os.File
@@ -187,7 +187,7 @@ func (s *ExtentStore) getExtentKey(extent uint64) string {
 }
 
 func (s *ExtentStore) Create(extentId uint64, inode uint64) (err error) {
-	var extent Extent
+	var extent *Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	if s.IsExistExtent(extentId) {
 		err = ErrorExtentHasExsit
@@ -227,7 +227,7 @@ func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 	return
 }
 
-func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
+func (s *ExtentStore) getExtent(extentId uint64) (e *Extent, err error) {
 	if e, err = s.loadExtentFromDisk(extentId, false); err != nil {
 		err = fmt.Errorf("load extent from disk: %v", err)
 		return nil, err
@@ -235,7 +235,7 @@ func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
 	return
 }
 
-func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e Extent, err error) {
+func (s *ExtentStore) getExtentWithHeader(extentId uint64) (e *Extent, err error) {
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
 		if e, err = s.loadExtentFromDisk(extentId, true); err != nil {
@@ -259,7 +259,7 @@ func (s *ExtentStore) GetExtentCount() (count int) {
 	return len(s.extentInfoMap)
 }
 
-func (s *ExtentStore) loadExtentFromDisk(extentId uint64, loadHeader bool) (e Extent, err error) {
+func (s *ExtentStore) loadExtentFromDisk(extentId uint64, loadHeader bool) (e *Extent, err error) {
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)
 	if err = e.RestoreFromFS(loadHeader); err != nil {
@@ -288,7 +288,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 	var (
 		extentId   uint64
 		isExtent   bool
-		extent     Extent
+		extent     *Extent
 		extentInfo *FileInfo
 		loadErr    error
 	)
@@ -324,7 +324,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
 	var (
 		has    bool
-		extent Extent
+		extent *Extent
 	)
 	s.extentInfoMux.RLock()
 	_, has = s.extentInfoMap[extentId]
@@ -356,7 +356,7 @@ func (s *ExtentStore) WriteTinyRecover(extentId uint64, offset, size int64, data
 	var (
 		extentInfo *FileInfo
 		has        bool
-		extent     Extent
+		extent     *Extent
 	)
 	if !IsTinyExtent(extentId) {
 		return fmt.Errorf("extent %v not tinyExtent", extentId)
@@ -407,7 +407,7 @@ func IsTinyExtent(extentId uint64) bool {
 }
 
 func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (crc uint32, err error) {
-	var extent Extent
+	var extent *Extent
 	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return
 	}
@@ -422,9 +422,25 @@ func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (cr
 	return
 }
 
+func (s *ExtentStore) RepairRead(extentId uint64, offset, size int64, nbuf []byte) (crc uint32, err error) {
+	var extent *Extent
+	if extent, err = s.getExtentWithHeader(extentId); err != nil {
+		return
+	}
+	if err = s.checkOffsetAndSize(extentId, offset, size); err != nil {
+		return
+	}
+	if extent.IsMarkDelete() {
+		err = ErrorHasDelete
+		return
+	}
+	crc, err = extent.RepairRead(nbuf, offset, size)
+	return
+}
+
 func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error) {
 	var (
-		extent     Extent
+		extent     *Extent
 		extentInfo *FileInfo
 		has        bool
 	)
@@ -572,7 +588,7 @@ func (s *ExtentStore) FlushDelete() (err error) {
 }
 
 func (s *ExtentStore) Sync(extentId uint64) (err error) {
-	var extent Extent
+	var extent *Extent
 	if extent, err = s.getExtentWithHeader(extentId); err != nil {
 		return
 	}
@@ -603,7 +619,7 @@ func (s *ExtentStore) Close() {
 
 func (s *ExtentStore) ModifyInode(newIndoe uint64, extentId uint64) {
 	var (
-		extent Extent
+		extent *Extent
 		err    error
 	)
 	s.extentInfoMux.RLock()
@@ -626,7 +642,7 @@ func (s *ExtentStore) ModifyInode(newIndoe uint64, extentId uint64) {
 func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *FileInfo, err error) {
 	var (
 		has    bool
-		extent Extent
+		extent *Extent
 	)
 	s.extentInfoMux.RLock()
 	extentInfo, has = s.extentInfoMap[extentId]
@@ -720,7 +736,7 @@ func (s *ExtentStore) ParseExtentId(filename string) (extentId uint64, isExtent 
 
 func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	var (
-		extent     Extent
+		extent     *Extent
 		extentInfo *FileInfo
 		has        bool
 	)
