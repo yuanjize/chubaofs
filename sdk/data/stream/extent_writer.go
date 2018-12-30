@@ -54,7 +54,6 @@ type ExtentWriter struct {
 	handleCh         chan struct{} //a Chan for signal recive goroutine recive packet from connect
 	ExitCh           chan struct{}
 	forbidUpdate     int64
-	requestLock      sync.Mutex
 	isflushIng       int32
 	flushSignleCh    chan bool
 	hasExitRecvThead int32
@@ -161,7 +160,9 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	if writer.currentPacket.getPacketLength() == 0 {
 		return
 	}
-	writer.pushRequestToQueue(writer.currentPacket)
+	writer.updateSizeLock.Lock()
+	writer.requestQueue.PushBack(writer.currentPacket)
+	writer.updateSizeLock.Unlock()
 	packet := writer.currentPacket
 	writer.currentPacket = nil
 	orgOffset := writer.offset
@@ -237,6 +238,8 @@ func (writer *ExtentWriter) writeType() string {
 }
 
 func (writer *ExtentWriter) toString() string {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	return fmt.Sprintf("extent{%v_%v_%v_%v_%v_%v}", writer.dp.PartitionID, writer.extentId,
 		writer.writeType(), writer.hasWriteSize,
 		len(writer.handleCh), writer.getQueueListLen())
@@ -321,7 +324,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		return fmt.Errorf("forbid update extent key (%v) to metanode", writer.toString())
 	}
 	writer.addByteAck(uint64(request.Size))
-	writer.removeRquest(e)
+	writer.requestQueue.Remove(e)
 	if writer.isTinyExtent() {
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
@@ -346,8 +349,6 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 func (writer *ExtentWriter) toKey() (k proto.ExtentKey) {
 	writer.updateSizeLock.Lock()
 	defer writer.updateSizeLock.Unlock()
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
 	k = proto.ExtentKey{}
 	k.PartitionId = writer.dp.PartitionID
 	k.Size = uint32(writer.getByteAck())
@@ -370,7 +371,9 @@ func (writer *ExtentWriter) receive() {
 	for {
 		select {
 		case <-writer.handleCh:
-			e := writer.getFrontRequest()
+			writer.updateSizeLock.Lock()
+			e := writer.requestQueue.Front()
+			writer.updateSizeLock.Unlock()
 			if e == nil {
 				continue
 			}
@@ -419,27 +422,7 @@ func (writer *ExtentWriter) setConnect(connect *net.TCPConn) {
 	writer.connect = connect
 }
 
-func (writer *ExtentWriter) getFrontRequest() (e *list.Element) {
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
-	return writer.requestQueue.Front()
-}
-
-func (writer *ExtentWriter) pushRequestToQueue(request *Packet) {
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
-	writer.requestQueue.PushBack(request)
-}
-
-func (writer *ExtentWriter) removeRquest(e *list.Element) {
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
-	writer.requestQueue.Remove(e)
-}
-
 func (writer *ExtentWriter) getQueueListLen() (length int) {
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
 	if writer.requestQueue == nil {
 		return 0
 	}
@@ -453,8 +436,6 @@ func (writer *ExtentWriter) getNeedRetrySendPackets() (requests []*Packet) {
 	writer.updateSizeLock.Lock()
 	defer writer.updateSizeLock.Unlock()
 	atomic.StoreInt64(&writer.forbidUpdate, ForBidUpdateExtentKey)
-	writer.requestLock.Lock()
-	defer writer.requestLock.Unlock()
 	requests = make([]*Packet, 0)
 	for e := writer.requestQueue.Front(); e != nil; e = e.Next() {
 		requests = append(requests, e.Value.(*Packet))
