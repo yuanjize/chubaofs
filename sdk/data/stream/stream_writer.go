@@ -402,6 +402,9 @@ func (stream *StreamWriter) recoverExtent() (err error) {
 			return err
 		}
 	}
+	if err != nil {
+		return err
+	}
 	if len(stream.recoverPackages) == 0 {
 		return nil
 	}
