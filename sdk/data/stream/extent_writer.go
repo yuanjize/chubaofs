@@ -402,6 +402,8 @@ func (writer *ExtentWriter) addByteAck(size uint64) {
 }
 
 func (writer *ExtentWriter) forbirdUpdateToMetanode() {
+	writer.updateSizeLock.Lock()
+	defer writer.updateSizeLock.Unlock()
 	atomic.StoreInt64(&writer.forbidUpdate, ForBidUpdateMetaNode)
 }
 
