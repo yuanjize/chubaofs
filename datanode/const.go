@@ -33,9 +33,9 @@ const (
 	ActionWriteToCli              = "ActionWriteToCli"
 	ActionGetDataPartitionMetrics = "ActionGetDataPartitionMetrics"
 	ActionCheckAndAddInfos        = "ActionCheckAndAddInfos"
-
-	ActionCheckReplyAvail     = "ActionCheckReplyAvail"
-	ActionCreateDataPartition = "ActionCreateDataPartition"
+	ActionNotifyFollowerRepair    = "ActionNotifyFollowerRepair"
+	ActionCheckReplyAvail         = "ActionCheckReplyAvail"
+	ActionCreateDataPartition     = "ActionCreateDataPartition"
 )
 
 const (

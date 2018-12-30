@@ -285,32 +285,37 @@ func (dp *dataPartition) generatorFixExtentSizeTasks(allMembers []*MembersFileMe
 	return
 }
 
+func (dp *dataPartition) notifyFollower(wg *sync.WaitGroup, index int, members []*MembersFileMetas) (err error) {
+	p := NewNotifyExtentRepair(dp.partitionId) //notify all follower to repairt task,send opnotifyRepair command
+	var conn *net.TCPConn
+	target := dp.replicaHosts[index]
+	p.Data, _ = json.Marshal(members[index])
+	conn, err = gConnPool.Get(target)
+	defer func() {
+		wg.Done()
+		log.LogErrorf(ActionNotifyFollowerRepair, fmt.Sprintf(" to %v task %v failed %v", target, string(p.Data), err.Error()))
+	}()
+	if err != nil {
+		return err
+	}
+	p.Size = uint32(len(p.Data))
+	if err = p.WriteToConn(conn); err != nil {
+		gConnPool.Put(conn, true)
+		return err
+	}
+	if err = p.ReadFromConn(conn, proto.NoReadDeadlineTime); err != nil {
+		gConnPool.Put(conn, true)
+		return err
+	}
+	gConnPool.Put(conn, true)
+}
+
 /*notify follower to repair dataPartition extentStore*/
 func (dp *dataPartition) NotifyExtentRepair(members []*MembersFileMetas) (err error) {
-	var wg sync.WaitGroup
+	wg := new(sync.WaitGroup)
 	for i := 1; i < len(members); i++ {
 		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			p := NewNotifyExtentRepair(dp.partitionId) //notify all follower to repairt task,send opnotifyRepair command
-			var conn *net.TCPConn
-			target := dp.replicaHosts[index]
-			conn, err = gConnPool.Get(target)
-			if err != nil {
-				return
-			}
-			p.Data, err = json.Marshal(members[index])
-			p.Size = uint32(len(p.Data))
-			if err = p.WriteToConn(conn); err != nil {
-				gConnPool.Put(conn, true)
-				return
-			}
-			if err = p.ReadFromConn(conn, proto.NoReadDeadlineTime); err != nil {
-				gConnPool.Put(conn, true)
-				return
-			}
-			gConnPool.Put(conn, true)
-		}(i)
+		go dp.notifyFollower(wg, i, members)
 	}
 	wg.Wait()
 
