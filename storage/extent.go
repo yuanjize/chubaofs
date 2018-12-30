@@ -258,7 +258,11 @@ func (e *fsExtent) RestoreFromFS(loadHeader bool) (err error) {
 		return
 	}
 	if IsTinyExtent(e.extentId) {
-		e.dataSize = info.Size()
+		watermark := info.Size()
+		if watermark%PageSize != 0 {
+			watermark = watermark + (PageSize - watermark%PageSize)
+		}
+		e.dataSize = watermark
 		return
 	}
 	if info.Size() < util.BlockHeaderSize {
@@ -315,18 +319,25 @@ func (e *fsExtent) ModTime() time.Time {
 }
 
 func (e *fsExtent) WriteTiny(data []byte, offset, size int64, crc uint32) (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
 	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
 		return
 	}
-	e.dataSize = offset + size
-
+	watermark := offset + size
+	if watermark%PageSize != 0 {
+		watermark = watermark + (PageSize - watermark%PageSize)
+	}
+	e.dataSize = watermark
 	return
 }
 
 func (e *fsExtent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if !IsTinyExtent(e.extentId) {
 		return ErrorUnavaliExtent
 	}
@@ -420,7 +431,9 @@ func (e *fsExtent) Read(data []byte, offset, size int64) (crc uint32, err error)
 }
 
 func (e *fsExtent) ReadTiny(data []byte, offset, size int64) (crc uint32, err error) {
-	if _, err = e.file.ReadAt(data[:size], offset); err != nil {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	if _, err = e.file.ReadAt(data[:size], offset); err != nil && err != io.EOF {
 		return
 	}
 	crc = crc32.ChecksumIEEE(data[:size])
