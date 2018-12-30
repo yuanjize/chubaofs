@@ -183,6 +183,21 @@ func NewStreamReadPacket(partitionId uint32, extentId uint64, offset, size int) 
 	return
 }
 
+func NewExtentRepairReadPacket(partitionId uint32, extentId uint64, offset, size int) (p *Packet) {
+	p = new(Packet)
+	p.FileID = extentId
+	p.PartitionID = partitionId
+	p.Magic = proto.ProtoMagic
+	p.Offset = int64(offset)
+	p.Size = uint32(size)
+	p.Opcode = proto.OpExtentRepairRead
+	p.StoreMode = proto.NormalExtentMode
+	p.ReqID = proto.GetReqID()
+
+	return
+}
+
+
 func NewStreamReadResponsePacket(requestId int64, partitionId uint32, extentId uint64) (p *Packet) {
 	p = new(Packet)
 	p.FileID = extentId

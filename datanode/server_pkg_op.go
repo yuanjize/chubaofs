@@ -73,6 +73,8 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 		s.handleRead(pkg)
 	case proto.OpStreamRead:
 		s.handleStreamRead(pkg, c)
+	case proto.OpExtentRepairRead:
+		s.handleExtentRepairRead(pkg, c)
 	case proto.OpMarkDelete:
 		s.handleMarkDelete(pkg)
 	case proto.OpNotifyExtentRepair:
@@ -351,7 +353,7 @@ func (s *DataNode) handleRead(pkg *Packet) {
 }
 
 // Handle OpStreamRead packet.
-func (s *DataNode) handleExtentRecover(request *Packet, connect net.Conn) {
+func (s *DataNode) handleExtentRepairRead(request *Packet, connect net.Conn) {
 	var (
 		err error
 	)
