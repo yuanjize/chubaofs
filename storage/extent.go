@@ -461,6 +461,8 @@ func (e *Extent) checkOffsetAndSize(offset, size int64) error {
 
 // Flush synchronize data to disk immediately.
 func (e *Extent) Flush() (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	err = e.file.Sync()
 	return
 }
