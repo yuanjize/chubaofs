@@ -35,13 +35,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total         uint64
-	used          uint64
-	VolName       string
-	modifyTime    int64
-	createTime    int64
-	FileInCoreMap map[string]*FileInCore
-	MissNodes     map[string]int64
+	total            uint64
+	used             uint64
+	VolName          string
+	modifyTime       int64
+	createTime       int64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	FileMissReplica  map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -53,6 +54,7 @@ func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string
 	partition.Replicas = make([]*DataReplica, 0)
 	partition.FileInCoreMap = make(map[string]*FileInCore, 0)
 	partition.MissNodes = make(map[string]int64)
+	partition.FileMissReplica = make(map[string]int64)
 	partition.Status = proto.ReadOnly
 	partition.VolName = volName
 	partition.modifyTime = time.Now().Unix()
@@ -288,7 +290,7 @@ func (partition *DataPartition) getFileCount() {
 	}
 
 	for _, replica := range partition.Replicas {
-		msg = fmt.Sprintf(GetDataReplicaFileCountInfo+"partitionID:%v  replicaAddr:%v  FileCount:%v  "+
+		msg = fmt.Sprintf(GetDataReplicaFileCountInfo + "partitionID:%v  replicaAddr:%v  FileCount:%v  "+
 			"NodeIsActive:%v  replicaIsActive:%v  .replicaStatusOnNode:%v ", partition.PartitionID, replica.Addr, replica.FileCount,
 			replica.GetReplicaNode().isActive, replica.IsActive(DefaultDataPartitionTimeOutSec), replica.Status)
 		log.LogInfo(msg)
@@ -308,6 +310,11 @@ func (partition *DataPartition) ReleaseDataPartition() {
 		delete(partition.FileInCoreMap, name)
 	}
 	partition.FileInCoreMap = make(map[string]*FileInCore, 0)
+	for name, fileMissReplicaTime := range partition.FileMissReplica {
+		if time.Now().Unix()-fileMissReplicaTime > 2*LoadDataPartitionPeriod {
+			delete(partition.FileMissReplica, name)
+		}
+	}
 
 }
 
@@ -472,6 +479,7 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 	replica.Used = vr.Used
 	replica.FileCount = uint32(vr.ExtentCount)
 	replica.NeedCompare = vr.NeedCompare
+	replica.DiskPath = vr.DiskPath
 	replica.SetAlive()
 	partition.checkAndRemoveMissReplica(dataNode.Addr)
 }
@@ -496,6 +504,9 @@ func (partition *DataPartition) getMaxUsedSize() uint64 {
 func (partition *DataPartition) isNeedCompareData() (needCompare bool) {
 	partition.Lock()
 	defer partition.Unlock()
+	if partition.isRecover {
+		return false
+	}
 	needCompare = true
 	for _, replica := range partition.Replicas {
 		if !replica.NeedCompare {
