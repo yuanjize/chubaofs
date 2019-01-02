@@ -504,6 +504,9 @@ func (partition *DataPartition) getMaxUsedSize() uint64 {
 func (partition *DataPartition) isNeedCompareData() (needCompare bool) {
 	partition.Lock()
 	defer partition.Unlock()
+	if partition.isRecover {
+		return false
+	}
 	needCompare = true
 	for _, replica := range partition.Replicas {
 		if !replica.NeedCompare {
