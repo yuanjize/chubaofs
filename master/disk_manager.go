@@ -46,6 +46,7 @@ func (c *Cluster) checkBadDiskRecovery() {
 			}
 			if minus < util.GB {
 				Warn(c.Name, fmt.Sprintf("clusterID[%v],partitionID[%v] has recovered success", c.Name, partitionID))
+				partition.isRecover = false
 			} else {
 				newBadDpIds = append(newBadDpIds, partitionID)
 			}

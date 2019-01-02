@@ -30,6 +30,7 @@ type DataReplica struct {
 	Total                   uint64 `json:"TotalSize"`
 	Used                    uint64 `json:"UsedSize"`
 	NeedCompare             bool
+	DiskPath                string
 }
 
 func NewDataReplica(dataNode *DataNode) (replica *DataReplica) {

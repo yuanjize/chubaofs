@@ -479,6 +479,7 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 	replica.Used = vr.Used
 	replica.FileCount = uint32(vr.ExtentCount)
 	replica.NeedCompare = vr.NeedCompare
+	replica.DiskPath = vr.DiskPath
 	replica.SetAlive()
 	partition.checkAndRemoveMissReplica(dataNode.Addr)
 }
