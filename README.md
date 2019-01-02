@@ -16,7 +16,7 @@ ContainerFS is a container-native distributed filesystem as a unified platform f
 
 * POSIX-compatible
 
-Containerfs has been built and deployed in production since 2013.
+CFS has been built and deployed in production since 2013.
 
 ## Concepts
 

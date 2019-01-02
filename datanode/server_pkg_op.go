@@ -1,4 +1,4 @@
-// Copyright 2018 The Containerfs Authors.
+// Copyright 2018 The CFS Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -407,7 +407,6 @@ func (s *DataNode) handleExtentRepairRead(request *Packet, connect net.Conn) {
 	request.PackOkReply()
 	return
 }
-
 
 // Handle OpStreamRead packet.
 func (s *DataNode) handleStreamRead(request *Packet, connect net.Conn) {

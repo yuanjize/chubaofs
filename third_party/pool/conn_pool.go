@@ -1,5 +1,5 @@
 // Copyright 2018 The Silenceper Authors
-// Modified work copyright (C) 2018 The Containerfs Authors.
+// Modified work copyright (C) 2018 The CFS Authors.
 //
 // The MIT License (MIT)
 // Permission is hereby granted, free of charge, to any person obtaining a copy
