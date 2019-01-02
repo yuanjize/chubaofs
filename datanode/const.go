@@ -64,7 +64,7 @@ const (
 	ConnIsNullErr              = "ConnIsNullErr"
 	UpdateReplicationHostsTime = 60
 	SimultaneouslyRecoverFiles = 7
-	UpdatePartitionSizeTime    = 300
+	UpdatePartitionSizeTime    = 10
 )
 
 const (
