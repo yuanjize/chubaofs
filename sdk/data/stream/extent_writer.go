@@ -193,7 +193,6 @@ func (writer *ExtentWriter) notifyRecvThreadExit() {
 	writer.cleanHandleCh()
 	atomic.StoreInt32(&writer.hasExitRecvThead, HasExitRecvThread)
 	close(writer.ExitCh)
-	close(writer.handleCh)
 }
 
 func (writer *ExtentWriter) cleanHandleCh() {
