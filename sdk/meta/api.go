@@ -261,7 +261,7 @@ func (mw *MetaWrapper) AppendExtentKey(inode uint64, ek proto.ExtentKey) error {
 		log.LogErrorf("AppendExtentKey: inode(%v) ek(%v) err(%v) status(%v)", inode, ek, err, status)
 		return statusToErrno(status)
 	}
-	log.LogDebugf("AppendExtentKey: ino(%v) ek(%v)", inode, ek)
+	log.LogInfof("AppendExtentKey: ino(%v) ek(%v)", inode, ek)
 	return nil
 }
 
