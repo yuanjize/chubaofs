@@ -105,7 +105,10 @@ func (stream *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) 
 
 //stream init,alloc a extent ,select dp and extent
 func (stream *StreamWriter) init(useNormalExtent bool, prepareWriteSize int) (err error) {
-	if stream.currentWriter != nil && stream.currentWriter.isFullExtent(prepareWriteSize) {
+	if stream.currentWriter != nil && (stream.currentWriter.isFullExtent(prepareWriteSize) || stream.currentWriter.isTinyExtent()) {
+		if stream.currentWriter.isFullExtent(prepareWriteSize) {
+			useNormalExtent = true
+		}
 		err = stream.flushCurrExtentWriter()
 		if err == syscall.ENOENT {
 			return
@@ -113,7 +116,7 @@ func (stream *StreamWriter) init(useNormalExtent bool, prepareWriteSize int) (er
 		if err != nil {
 			return errors.Annotatef(err, "Flush error WriteInit")
 		}
-		useNormalExtent = true
+
 		stream.setCurrentWriter(nil)
 	}
 	if stream.currentWriter != nil {
