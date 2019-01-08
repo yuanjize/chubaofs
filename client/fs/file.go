@@ -191,9 +191,9 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	log.LogDebugf("TRACE Write enter: ino(%v) offset(%v) len(%v) req(%v)",
 		f.inode.ino, req.Offset, reqlen, req)
 
-	if uint64(req.Offset) > filesize && reqlen == 1 {
+	if uint64(req.Offset) > filesize && reqlen == 1 && req.Data[0] == 0 {
 		// The fuse package is probably doing truncate size up, which is not supported yet. So Just return.
-		log.LogDebugf("Write: not support, ino(%v) req(%v)", f.inode.ino, req)
+		log.LogWarnf("Write: fallocate not supported, ino(%v) req(%v) filesize(%v)", f.inode.ino, req, filesize)
 		return nil
 	}
 
