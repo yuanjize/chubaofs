@@ -371,6 +371,9 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 
 	//this code is used for ,when datanode is killed ,the extent body has write,but header not write
 	// then auto repair 128KB
+	if localExtentInfo.Size >= remoteExtentInfo.Size {
+		return nil
+	}
 	if !storage.IsTinyExtent(remoteExtentInfo.FileId){
 		if localExtentInfo.Size <= util.BlockSize {
 			localExtentInfo.Size = 0
