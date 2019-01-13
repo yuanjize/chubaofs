@@ -315,7 +315,7 @@ func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 	name := finfo.Name()
 	extentid, isExtent := ParseExtentId(name)
 	if !isExtent {
-		return finfo.Size()
+		return 0
 	}
 	if storage.IsTinyExtent(extentid) {
 		stat := new(syscall.Stat_t)
