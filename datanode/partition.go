@@ -32,6 +32,7 @@ import (
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"github.com/tiglabs/containerfs/util/log"
 	"syscall"
+	"github.com/tiglabs/containerfs/util"
 )
 
 const (
@@ -325,7 +326,7 @@ func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 		return stat.Blocks * DiskSectorSize
 
 	} else {
-		return finfo.Size()
+		return finfo.Size() - util.BlockHeaderSize
 	}
 
 }
