@@ -96,6 +96,10 @@ func (f *File) Forget() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
 
+	if refcnt := f.super.ec.GetRefcnt(ino); refcnt != 0 {
+		return
+	}
+
 	if !f.super.orphan.Evict(ino) {
 		return
 	}
