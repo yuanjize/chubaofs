@@ -275,3 +275,14 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 
 	return
 }
+
+func (client *ExtentClient) GetRefcnt(inode uint64) uint64 {
+	client.referLock.Lock()
+	defer client.referLock.Unlock()
+
+	refcnt, ok := client.referCnt[inode]
+	if !ok {
+		return 0
+	}
+	return refcnt
+}
