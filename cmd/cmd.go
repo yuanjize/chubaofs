@@ -56,7 +56,8 @@ const (
 )
 
 var (
-	configFile = flag.String("c", "", "config file path")
+	configFile    = flag.String("c", "", "config file path")
+	configVersion = flag.Bool("v", false, "show version")
 )
 
 type Server interface {
@@ -106,7 +107,14 @@ func main() {
 			panic(r)
 		}
 	}()
+
 	flag.Parse()
+
+	if *configVersion {
+		fmt.Printf("CFS server version: %s\n", Version)
+		os.Exit(0)
+	}
+
 	err := modifyOpenFiles()
 	if err != nil {
 		panic(err.Error())
