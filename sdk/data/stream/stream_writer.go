@@ -158,6 +158,8 @@ func (s *StreamWriter) release(flag uint32) error {
 	if s.openWriteCnt <= 0 {
 		s.client.release(s.inode)
 		s.close()
+		s.exit()
+
 	}
 	log.LogDebugf("release: streamer(%v) openWriteCnt(%v) authid(%v)", s, s.openWriteCnt)
 	return err

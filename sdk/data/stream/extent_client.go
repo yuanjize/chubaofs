@@ -121,7 +121,7 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 	delete(client.writers, inode)
 	client.writerLock.Unlock()
 
-	s.exitCh <- struct{}{}
+	s.exit()
 	return nil
 }
 
@@ -181,6 +181,7 @@ func (client *ExtentClient) release(inode uint64) {
 	client.writerLock.Lock()
 	defer client.writerLock.Unlock()
 	delete(client.writers, inode)
+
 }
 
 func (client *ExtentClient) Flush(inode uint64) (err error) {
