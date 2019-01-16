@@ -129,7 +129,6 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 	s.exit()
 	client.writerLock.Unlock()
 
-	s.exit()
 	return nil
 }
 
