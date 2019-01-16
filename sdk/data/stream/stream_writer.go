@@ -159,9 +159,8 @@ func (s *StreamWriter) release(flag uint32) error {
 		s.client.release(s.inode)
 		s.close()
 		s.exit()
-
 	}
-	log.LogDebugf("release: streamer(%v) openWriteCnt(%v) authid(%v)", s, s.openWriteCnt)
+	log.LogDebugf("release: streamer(%v) openWriteCnt(%v)", s.toString(), s.openWriteCnt)
 	return err
 }
 
@@ -210,14 +209,14 @@ func (s *StreamWriter) toString() (m string) {
 	if s.currentWriter != nil {
 		currentWriterMsg = s.currentWriter.toString()
 	}
-	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v)",
-		s.inode, s.currentPartitionId, currentWriterMsg)
+	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v) exitCh(%v) openCnt(%v)",
+		s.inode, s.currentPartitionId, currentWriterMsg,len(s.exitCh),s.openWriteCnt)
 }
 
 func (s *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) {
 	currentWriterMsg := writer.toString()
-	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v)",
-		s.inode, s.currentPartitionId, currentWriterMsg)
+	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v) exitCh(%v) openCnt(%v)",
+		s.inode, s.currentPartitionId, currentWriterMsg,len(s.exitCh),s.openWriteCnt)
 }
 
 //stream init,alloc a extent ,select dp and extent
@@ -255,6 +254,7 @@ func (s *StreamWriter) server() {
 			s.handleRequest(request)
 		case <-s.exitCh:
 			s.flushCurrExtentWriter()
+			log.LogDebugf(fmt.Sprintf("ino(%v) recive sigle exit serve",s.inode))
 			return
 		case <-t.C:
 			log.LogDebugf("ino(%v) update to metanode filesize To(%v) user has Write to (%v)",
