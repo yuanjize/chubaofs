@@ -55,9 +55,9 @@ func (sp sortPeers) Swap(i, j int) {
 
 /* MetRangeConfig used by create metaPartition and serialize
 PartitionId: Identity for raftStore group,RaftStore nodes in same raftStore group must have same groupID.
-Start: Minimal Inode ID of this range. (Required when initialize)
-End: Maximal Inode ID of this range. (Required when initialize)
-Cursor: Cursor ID value of Inode what have been already assigned.
+Start: Minimal inode ID of this range. (Required when initialize)
+End: Maximal inode ID of this range. (Required when initialize)
+Cursor: Cursor ID value of inode what have been already assigned.
 Peers: Peers information for raftStore.
 */
 type MetaPartitionConfig struct {
@@ -161,7 +161,7 @@ type MetaPartition interface {
 }
 
 // metaPartition manages necessary information of meta range, include ID, boundary of range and raftStore identity.
-// When a new Inode is requested, metaPartition allocates the Inode id for this Inode is possible.
+// When a new inode is requested, metaPartition allocates the inode id for this inode is possible.
 // States:
 //  +-----+             +-------+
 //  | New | → Restore → | Ready |
@@ -171,7 +171,7 @@ type metaPartition struct {
 	size          uint64 // For partition all file size
 	applyID       uint64 // store the applyID
 	dentryTree    *BTree
-	inodeTree     *BTree              // B-Tree for Inode.
+	inodeTree     *BTree              // B-Tree for inode.
 	raftPartition raftstore.Partition // RaftStore partition instance of this meta partition.
 	stopC         chan bool
 	storeChan     chan *storeMsg
@@ -402,8 +402,8 @@ func (mp *metaPartition) DeleteRaft() (err error) {
 	return
 }
 
-// NextInodeId returns a new ID value of Inode and update offset.
-// If Inode ID is out of this metaPartition limit then return ErrInodeOutOfRange error.
+// NextInodeId returns a new ID value of inode and update offset.
+// If inode ID is out of this metaPartition limit then return ErrInodeOutOfRange error.
 func (mp *metaPartition) nextInodeID() (inodeId uint64, err error) {
 	for {
 		cur := atomic.LoadUint64(&mp.config.Cursor)

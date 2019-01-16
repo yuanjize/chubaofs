@@ -22,6 +22,7 @@ import (
 	"github.com/tiglabs/containerfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 
+	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/data/stream"
 	"github.com/tiglabs/containerfs/util/log"
 	"sync"
@@ -96,7 +97,8 @@ func (f *File) Forget() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
 
-	if refcnt := f.super.ec.GetRefcnt(ino); refcnt != 0 {
+	if err := f.super.ec.EvictStream(ino); err != nil {
+		log.LogWarnf("Forget: stream not ready to evict, ino(%v) err(%v)", ino, err)
 		return
 	}
 
@@ -110,28 +112,19 @@ func (f *File) Forget() {
 }
 
 func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (handle fs.Handle, err error) {
+	var flag uint32
+
 	ino := f.inode.ino
 	log.LogDebugf("Open enter: ino(%v) req(%v)", ino, req)
 	start := time.Now()
-
-	f.super.ec.OpenForWrite(ino, 0)
-
-	err = f.super.mw.Open_ll(ino)
-	if err != nil {
-		f.super.ic.Delete(ino)
-		f.super.ec.CloseForWrite(ino)
-		log.LogErrorf("Open: ino(%v) req(%v) err(%v)", ino, req, ParseError(err))
-		return nil, ParseError(err)
+	if req.Flags.IsWriteOnly() || req.Flags.IsReadWrite() {
+		flag = proto.FlagWrite
 	}
-
-	//FIXME: let open return inode info
-	//	inode, err := f.super.InodeGet(ino)
-	//	if err != nil {
-	//		f.super.ic.Delete(ino)
-	//		f.super.ec.CloseForWrite(ino)
-	//		log.LogErrorf("Open: ino(%v) req(%v) err(%v)", ino, req, ParseError(err))
-	//		return nil, ParseError(err)
-	//	}
+	err = f.super.ec.OpenStream(ino, flag)
+	if err != nil {
+		log.LogErrorf("Open: failed to get write authorization, ino(%v) req(%v) err(%v)", ino, req, err)
+		return nil, fuse.EPERM
+	}
 
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Open: ino(%v) flags(%v) (%v)ns", ino, req.Flags, elapsed.Nanoseconds())
@@ -139,16 +132,15 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 }
 
 func (f *File) Release(ctx context.Context, req *fuse.ReleaseRequest) (err error) {
+	var flag uint32
+
 	ino := f.inode.ino
 	start := time.Now()
 
-	err = f.super.ec.Flush(f.inode.ino)
-	if err != nil {
-		log.LogErrorf("Release: flush failed, ino(%v) err(%v)", f.inode.ino, err)
-		return fuse.EIO
+	if req.Flags.IsWriteOnly() || req.Flags.IsReadWrite() {
+		flag = proto.FlagWrite
 	}
-
-	err = f.super.ec.CloseForWrite(ino)
+	err = f.super.ec.CloseStream(ino, flag)
 	if err != nil {
 		log.LogErrorf("Release: close writer failed, ino(%v) req(%v) err(%v)", ino, req, err)
 		return fuse.EIO

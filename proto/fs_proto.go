@@ -42,7 +42,7 @@ type InodeInfo struct {
 }
 
 func (info *InodeInfo) String() string {
-	return fmt.Sprintf("Inode(%v) Mode(%v) Size(%v) Gen(%v)", info.Inode, info.Mode, info.Size, info.Generation)
+	return fmt.Sprintf("inode(%v) Mode(%v) Size(%v) Gen(%v)", info.Inode, info.Mode, info.Size, info.Generation)
 }
 
 type Dentry struct {
@@ -52,7 +52,7 @@ type Dentry struct {
 }
 
 func (d Dentry) String() string {
-	return fmt.Sprintf("Dentry{Name(%v),Inode(%v),Type(%v)}", d.Name, d.Inode, d.Type)
+	return fmt.Sprintf("Dentry{Name(%v),inode(%v),Type(%v)}", d.Name, d.Inode, d.Type)
 }
 
 type CreateInodeRequest struct {
@@ -200,4 +200,13 @@ type TruncateRequest struct {
 
 type TruncateResponse struct {
 	Extents []ExtentKey `json:"ek"`
+}
+
+const (
+	FlagWrite uint32 = 1 << iota
+)
+
+// IsWriteFlag checks if the given flag is the write flag.
+func IsWriteFlag(flag uint32) bool {
+	return flag&FlagWrite != 0
 }

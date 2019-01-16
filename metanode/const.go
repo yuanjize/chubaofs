@@ -34,17 +34,17 @@ type (
 	CreateMetaRangeReq = proto.CreateMetaPartitionRequest
 	// MetaNode -> Master create metaPartition response struct
 	CreateMetaRangeResp = proto.CreateMetaPartitionResponse
-	// Client -> MetaNode create Inode request struct
+	// Client -> MetaNode create inode request struct
 	CreateInoReq = proto.CreateInodeRequest
-	// MetaNode -> Client create Inode response struct
+	// MetaNode -> Client create inode response struct
 	CreateInoResp = proto.CreateInodeResponse
 	// Client -> MetaNode create Link Request
 	LinkInodeReq = proto.LinkInodeRequest
 	// MetaNode -> Client create Link Response
 	LinkInodeResp = proto.LinkInodeResponse
-	// Client -> MetaNode delete Inode request struct
+	// Client -> MetaNode delete inode request struct
 	DeleteInoReq = proto.DeleteInodeRequest
-	// MetaNode -> Client delete Inode response
+	// MetaNode -> Client delete inode response
 	DeleteInoResp = proto.DeleteInodeResponse
 	// Client -> MetaNode create Dentry request struct
 	CreateDentryReq = proto.CreateDentryRequest

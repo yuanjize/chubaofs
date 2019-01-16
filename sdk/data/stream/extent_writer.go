@@ -43,7 +43,7 @@ var (
 )
 
 type ExtentWriter struct {
-	inode            uint64     //Current write Inode
+	inode            uint64     //Current write inode
 	requestQueue     *list.List //sendPacketList
 	dp               *wrapper.DataPartition
 	extentId         uint64 //current FileId

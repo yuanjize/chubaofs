@@ -66,7 +66,7 @@ func (mw *MetaWrapper) Create_ll(parentID uint64, name string, mode uint32, targ
 		return nil, syscall.ENOENT
 	}
 
-	// Create Inode
+	// Create inode
 
 	mp = mw.getLatestPartition()
 	if mp != nil {

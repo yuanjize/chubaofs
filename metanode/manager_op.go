@@ -149,7 +149,7 @@ func (m *metaManager) opCreateMetaPartition(conn net.Conn, p *Packet) (err error
 	return
 }
 
-// Handle OpCreate Inode
+// Handle OpCreate inode
 func (m *metaManager) opCreateInode(conn net.Conn, p *Packet) (err error) {
 	req := &CreateInoReq{}
 	if err = json.Unmarshal(p.Data, req); err != nil {

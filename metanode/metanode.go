@@ -37,7 +37,7 @@ import (
 
 var clusterInfo *proto.ClusterInfo
 
-// The MetaNode manage Dentry and Inode information in multiple metaPartition, and
+// The MetaNode manage Dentry and inode information in multiple metaPartition, and
 // through the RaftStore algorithm and other MetaNodes in the RageGroup for reliable
 // data synchronization to maintain data consistency within the MetaGroup.
 type MetaNode struct {

@@ -1853,7 +1853,7 @@ func (r *ForgetRequest) Respond() {
 
 // A Dirent represents a single directory entry.
 type Dirent struct {
-	// Inode this entry names.
+	// inode this entry names.
 	Inode uint64
 
 	// Type of the entry, for example DT_File.

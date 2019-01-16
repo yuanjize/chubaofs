@@ -33,16 +33,16 @@ type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error
 type GetExtentsFunc func(inode uint64) ([]proto.ExtentKey, error)
 
 var (
-	gDataWrapper     *wrapper.Wrapper
-	writeRequestPool *sync.Pool
-	flushRequestPool *sync.Pool
-	closeRequestPool *sync.Pool
+	gDataWrapper       *wrapper.Wrapper
+	openRequestPool    *sync.Pool
+	writeRequestPool   *sync.Pool
+	flushRequestPool   *sync.Pool
+	releaseRequestPool *sync.Pool
+	evictRequestPool   *sync.Pool
 )
 
 type ExtentClient struct {
 	writers         map[uint64]*StreamWriter
-	referCnt        map[uint64]uint64
-	referLock       sync.Mutex
 	writerLock      sync.RWMutex
 	appendExtentKey AppendExtentKeyFunc
 	getExtents      GetExtentsFunc
@@ -57,7 +57,6 @@ func NewExtentClient(volname, master string, appendExtentKey AppendExtentKeyFunc
 	}
 	client.writers = make(map[uint64]*StreamWriter)
 	client.appendExtentKey = appendExtentKey
-	client.referCnt = make(map[uint64]uint64)
 	client.getExtents = getExtents
 	writeRequestPool = &sync.Pool{New: func() interface{} {
 		return &WriteRequest{}
@@ -65,9 +64,13 @@ func NewExtentClient(volname, master string, appendExtentKey AppendExtentKeyFunc
 	flushRequestPool = &sync.Pool{New: func() interface{} {
 		return &FlushRequest{}
 	}}
-	closeRequestPool = &sync.Pool{New: func() interface{} {
-		return &CloseRequest{}
+	releaseRequestPool = &sync.Pool{New: func() interface{} {
+		return &ReleaseRequest{}
 	}}
+	evictRequestPool = &sync.Pool{New: func() interface{} {
+		return &EvictRequest{}
+	}}
+
 	return
 }
 
@@ -77,6 +80,47 @@ func (client *ExtentClient) getStreamWriter(inode uint64) (stream *StreamWriter)
 	client.writerLock.RUnlock()
 
 	return
+}
+
+func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
+	client.writerLock.Lock()
+	s, ok := client.writers[inode]
+	if !ok {
+		s = NewStreamWriter(inode, client, s.appendExtentKey)
+		client.writers[inode] = s
+	}
+	client.writerLock.Unlock()
+	return s.IssueOpenRequest(flag)
+}
+
+func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
+	client.writerLock.Lock()
+	s, ok := client.writers[inode]
+	if !ok {
+		client.writerLock.Unlock()
+		return
+	}
+	client.writerLock.Unlock()
+	return s.IssueReleaseRequest(flag)
+}
+
+func (client *ExtentClient) EvictStream(inode uint64) error {
+	client.writerLock.Lock()
+	s, ok := client.writers[inode]
+	if !ok {
+		client.writerLock.Unlock()
+		return nil
+	}
+	err := s.IssueEvictRequest()
+	if err != nil {
+		client.writerLock.Unlock()
+		return err
+	}
+	delete(client.writers, inode)
+	client.writerLock.Unlock()
+
+	s.exitCh <- struct{}{}
+	return nil
 }
 
 func (client *ExtentClient) getStreamWriterForRead(inode uint64) (stream *StreamWriter) {
@@ -97,16 +141,7 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 		return 0, 0, fmt.Errorf("Prefix(%v) cannot init write stream", prefix)
 	}
 
-	request := writeRequestPool.Get().(*WriteRequest)
-	request.data = data
-	request.kernelOffset = offset
-	request.size = len(data)
-	request.done = make(chan struct{}, 1)
-	stream.requestCh <- request
-	<-request.done
-	actualOffset = request.actualOffset
-	err = request.err
-	write = request.canWrite
+	write,actualOffset,err=stream.IssueWriteRequest(offset,data)
 	if err != nil {
 		prefix := fmt.Sprintf("inodewrite %v_%v_%v", inode, offset, len(data))
 		err = errors.Annotatef(err, prefix)
@@ -117,44 +152,11 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 			ump.Alarm(gDataWrapper.UmpWarningKey(), fmt.Sprintf("volname(%v) write error", wrapper.GVolname, err.Error()))
 		}
 	}
-	close(request.done)
-	writeRequestPool.Put(request)
 	return
 }
 
 func (client *ExtentClient) OpenForRead(inode uint64) (stream *StreamReader, err error) {
 	return NewStreamReader(inode, client.getExtents)
-}
-
-func (client *ExtentClient) OpenForWrite(inode, start uint64) {
-	client.referLock.Lock()
-	refercnt, ok := client.referCnt[inode]
-	if !ok {
-		client.referCnt[inode] = 1
-	} else {
-		refercnt++
-		client.referCnt[inode] = refercnt
-	}
-
-	client.referLock.Unlock()
-
-	client.writerLock.RLock()
-	_, ok = client.writers[inode]
-	client.writerLock.RUnlock()
-	if ok {
-		log.LogDebugf("OpenForWrite: already opened, ino(%v) start(%v)", inode, start)
-		return
-	}
-
-	client.writerLock.Lock()
-	_, ok = client.writers[inode]
-	if !ok {
-		writer := NewStreamWriter(inode, start, client.appendExtentKey)
-		client.writers[inode] = writer
-		log.LogDebugf("OpenForWrite: newly opened, ino(%v) start(%v)", inode, start)
-	}
-	client.writerLock.Unlock()
-
 }
 
 func (client *ExtentClient) GetWriteSize(inode uint64) uint64 {
@@ -176,10 +178,10 @@ func (client *ExtentClient) SetWriteSize(inode, size uint64) {
 	}
 }
 
-func (client *ExtentClient) deleteRefercnt(inode uint64) {
-	client.referLock.Lock()
-	defer client.referLock.Unlock()
-	delete(client.referCnt, inode)
+func (client *ExtentClient) release(inode uint64) {
+	client.writerLock.Lock()
+	defer client.writerLock.Unlock()
+	delete(client.writers, inode)
 }
 
 func (client *ExtentClient) Flush(inode uint64) (err error) {
@@ -187,62 +189,12 @@ func (client *ExtentClient) Flush(inode uint64) (err error) {
 	if stream == nil {
 		return nil
 	}
-	request := flushRequestPool.Get().(*FlushRequest)
-	request.done = make(chan struct{}, 1)
-	stream.requestCh <- request
-	<-request.done
-	err = request.err
+	err=stream.IssueFlushRequest()
 	if err != nil {
 		mesg := fmt.Sprintf("volname %v Flush %v", wrapper.GVolname, err.Error())
 		log.LogErrorf(mesg)
 	}
-	close(request.done)
-	flushRequestPool.Put(request)
 	return err
-}
-
-func (client *ExtentClient) CloseForWrite(inode uint64) (err error) {
-	client.referLock.Lock()
-	refercnt, ok := client.referCnt[inode]
-	if !ok {
-		client.referLock.Unlock()
-		client.Flush(inode)
-		return nil
-	}
-	refercnt = refercnt - 1
-	client.referCnt[inode] = refercnt
-	if refercnt > 0 {
-		client.referLock.Unlock()
-		client.Flush(inode)
-		return
-	}
-	client.referLock.Unlock()
-
-	streamWriter := client.getStreamWriter(inode)
-	if streamWriter == nil {
-		client.deleteRefercnt(inode)
-		return
-	}
-	atomic.StoreInt32(&streamWriter.hasClosed, HasClosed)
-	request := closeRequestPool.Get().(*CloseRequest)
-	request.done = make(chan struct{}, 1)
-	streamWriter.requestCh <- request
-	<-request.done
-	defer func() {
-		close(request.done)
-		closeRequestPool.Put(request)
-	}()
-	if err = request.err; err != nil {
-		return
-	}
-
-	client.deleteRefercnt(inode)
-	client.writerLock.Lock()
-	delete(client.writers, inode)
-	client.writerLock.Unlock()
-	atomic.StoreInt32(&streamWriter.hasClosed, HasClosed)
-	log.LogDebugf("CloseForWrite: writer deleted, ino(inode)")
-	return
 }
 
 func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte, offset int, size int) (read int, err error) {
@@ -260,13 +212,7 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 
 	wstream := client.getStreamWriterForRead(inode)
 	if wstream != nil {
-		request := flushRequestPool.Get().(*FlushRequest)
-		request.done = make(chan struct{}, 1)
-		wstream.requestCh <- request
-		<-request.done
-		close(request.done)
-		err = request.err
-		flushRequestPool.Put(request)
+		err=wstream.IssueFlushRequest()
 		if err != nil {
 			return 0, err
 		}
@@ -274,15 +220,4 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 	read, err = stream.read(data, offset, size)
 
 	return
-}
-
-func (client *ExtentClient) GetRefcnt(inode uint64) uint64 {
-	client.referLock.Lock()
-	defer client.referLock.Unlock()
-
-	refcnt, ok := client.referCnt[inode]
-	if !ok {
-		return 0
-	}
-	return refcnt
 }

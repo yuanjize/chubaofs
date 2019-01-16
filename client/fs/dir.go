@@ -22,6 +22,7 @@ import (
 	"github.com/tiglabs/containerfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 
+	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/util/log"
 )
 
@@ -70,6 +71,8 @@ func (d *Dir) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	var flag uint32
+
 	start := time.Now()
 	info, err := d.super.mw.Create_ll(d.inode.ino, req.Name, ModeRegular, nil)
 	if err != nil {
@@ -80,7 +83,14 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 	inode := NewInode(info)
 	d.super.ic.Put(inode)
 	child := NewFile(d.super, inode)
-	d.super.ec.OpenForWrite(inode.ino, 0)
+	if req.Flags.IsWriteOnly() || req.Flags.IsReadWrite() {
+		flag = proto.FlagWrite
+	}
+	d.super.ec.OpenStream(inode.ino, flag)
+	if err != nil {
+		log.LogErrorf("Create: failed to get write authorization, ino(%v) req(%v) err(%v)", inode.ino, req, err)
+		return nil, nil, fuse.EPERM
+	}
 
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Create: parent(%v) req(%v) resp(%v) ino(%v) (%v)ns", d.inode.ino, req, resp, inode.ino, elapsed.Nanoseconds())

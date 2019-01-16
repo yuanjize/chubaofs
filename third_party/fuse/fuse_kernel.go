@@ -395,8 +395,8 @@ const (
 )
 
 type entryOut struct {
-	Nodeid         uint64 // Inode ID
-	Generation     uint64 // Inode generation
+	Nodeid         uint64 // inode ID
+	Generation     uint64 // inode generation
 	EntryValid     uint64 // Cache timeout for the name
 	AttrValid      uint64 // Cache timeout for the attributes
 	EntryValidNsec uint32

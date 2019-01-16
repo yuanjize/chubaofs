@@ -29,8 +29,8 @@ type StreamKey struct {
 
 func (sk *StreamKey) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
-	buff.WriteString("Inode{")
-	buff.WriteString(fmt.Sprintf("Inode[%d]", sk.Inode))
+	buff.WriteString("inode{")
+	buff.WriteString(fmt.Sprintf("inode[%d]", sk.Inode))
 	buff.WriteString(fmt.Sprintf("Extents[%v]", sk.Extents))
 	buff.WriteString("}")
 	return buff.String()

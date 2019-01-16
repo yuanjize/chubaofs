@@ -97,7 +97,7 @@ type Node interface {
 	// Fields with reasonable defaults are prepopulated. For example,
 	// all times are set to a fixed moment when the program started.
 	//
-	// If Inode is left as 0, a dynamic inode number is chosen.
+	// If inode is left as 0, a dynamic inode number is chosen.
 	//
 	// The result may be cached for the duration set in Valid.
 	Attr(ctx context.Context, attr *fuse.Attr) error

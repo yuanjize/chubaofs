@@ -156,7 +156,7 @@ func (si *ItemIterator) Next() (data []byte, err error) {
 		si.cur++
 		return
 	}
-	// ascend Inode tree
+	// ascend inode tree
 	if si.cur <= si.inoLen {
 		si.inodeTree.AscendGreaterOrEqual(si.curItem, func(i btree.Item) bool {
 			ino := i.(*Inode)

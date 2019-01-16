@@ -10,9 +10,9 @@ import (
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/storage"
 	"github.com/tiglabs/containerfs/third_party/juju/errors"
+	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"hash/crc32"
-	"github.com/tiglabs/containerfs/util"
 )
 
 //every  datapartion  file metas used for auto repairt
@@ -366,7 +366,7 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	}
 	if localExtentInfo.Inode == 0 && remoteExtentInfo.Inode != 0 {
 		store.ModifyInode(remoteExtentInfo.Inode, remoteExtentInfo.FileId)
-		log.LogInfof("%v Modify Inode to %v", dp.applyRepairKey(int(remoteExtentInfo.FileId)), remoteExtentInfo.Inode)
+		log.LogInfof("%v Modify inode to %v", dp.applyRepairKey(int(remoteExtentInfo.FileId)), remoteExtentInfo.Inode)
 	}
 
 	//this code is used for ,when datanode is killed ,the extent body has write,but header not write
@@ -374,7 +374,7 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 	if localExtentInfo.Size >= remoteExtentInfo.Size {
 		return nil
 	}
-	if !storage.IsTinyExtent(remoteExtentInfo.FileId){
+	if !storage.IsTinyExtent(remoteExtentInfo.FileId) {
 		if localExtentInfo.Size <= util.BlockSize {
 			localExtentInfo.Size = 0
 		} else {

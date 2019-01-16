@@ -25,10 +25,10 @@ import (
 	"io"
 )
 
-// Inode wraps necessary properties of `Inode` information in file system.
+// inode wraps necessary properties of `inode` information in file system.
 // Marshal key:
 //  +-------+-------+
-//  | item  | Inode |
+//  | item  | inode |
 //  +-------+-------+
 //  | bytes |   8   |
 //  +-------+-------+
@@ -45,7 +45,7 @@ import (
 //  | bytes |     4     |   KeyLength  |     4     |   ValLength  |
 //  +-------+-----------+--------------+-----------+--------------+
 type Inode struct {
-	Inode      uint64 // Inode ID
+	Inode      uint64 // inode ID
 	Type       uint32
 	Size       uint64
 	Generation uint64
@@ -60,8 +60,8 @@ type Inode struct {
 
 func (i *Inode) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
-	buff.WriteString("Inode{")
-	buff.WriteString(fmt.Sprintf("Inode[%d]", i.Inode))
+	buff.WriteString("inode{")
+	buff.WriteString(fmt.Sprintf("inode[%d]", i.Inode))
 	buff.WriteString(fmt.Sprintf("Type[%d]", i.Type))
 	buff.WriteString(fmt.Sprintf("Size[%d]", i.Size))
 	buff.WriteString(fmt.Sprintf("Gen[%d]", i.Generation))
@@ -76,7 +76,7 @@ func (i *Inode) String() string {
 	return buff.String()
 }
 
-// NewInode returns a new Inode instance pointer with specified Inode ID, name and Inode type code.
+// NewInode returns a new inode instance pointer with specified inode ID, name and inode type code.
 // The AccessTime and ModifyTime of new instance will be set to current time.
 func NewInode(ino uint64, t uint32) *Inode {
 	ts := time.Now().Unix()
@@ -96,7 +96,7 @@ func NewInode(ino uint64, t uint32) *Inode {
 	return i
 }
 
-// Less tests whether the current Inode item is less than the given one.
+// Less tests whether the current inode item is less than the given one.
 // This method is necessary fot B-Tree item implementation.
 func (i *Inode) Less(than btree.Item) bool {
 	ino, ok := than.(*Inode)
