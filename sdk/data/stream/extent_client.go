@@ -85,7 +85,7 @@ func (client *ExtentClient) getStreamWriter(inode uint64) (stream *StreamWriter)
 }
 
 func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
-	if !proto.IsWriteFlag(flag){
+	if !proto.IsWriteFlag(flag) {
 		return
 	}
 	client.writerLock.Lock()
@@ -99,7 +99,7 @@ func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
 }
 
 func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
-	if !proto.IsWriteFlag(flag){
+	if !proto.IsWriteFlag(flag) {
 		return
 	}
 	client.writerLock.Lock()
@@ -125,6 +125,8 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 		return err
 	}
 	delete(client.writers, inode)
+	s.close()
+	s.exit()
 	client.writerLock.Unlock()
 
 	s.exit()
@@ -146,7 +148,7 @@ func (client *ExtentClient) Write(inode uint64, offset int, data []byte) (write 
 		return 0, 0, fmt.Errorf("Prefix(%v) cannot init write stream", prefix)
 	}
 
-	write,actualOffset,err=stream.IssueWriteRequest(offset,data)
+	write, actualOffset, err = stream.IssueWriteRequest(offset, data)
 	if err != nil {
 		prefix := fmt.Sprintf("inodewrite %v_%v_%v", inode, offset, len(data))
 		err = errors.Annotatef(err, prefix)
@@ -195,7 +197,7 @@ func (client *ExtentClient) Flush(inode uint64) (err error) {
 	if stream == nil {
 		return nil
 	}
-	err=stream.IssueFlushRequest()
+	err = stream.IssueFlushRequest()
 	if err != nil {
 		mesg := fmt.Sprintf("volname %v Flush %v", wrapper.GVolname, err.Error())
 		log.LogErrorf(mesg)
@@ -218,7 +220,7 @@ func (client *ExtentClient) Read(stream *StreamReader, inode uint64, data []byte
 
 	wstream := client.getStreamWriterForRead(inode)
 	if wstream != nil {
-		err=wstream.IssueFlushRequest()
+		err = wstream.IssueFlushRequest()
 		if err != nil {
 			return 0, err
 		}

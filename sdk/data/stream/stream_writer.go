@@ -81,9 +81,9 @@ func (s *StreamWriter) IssueOpenRequest(flag uint32) error {
 	return err
 }
 
-func (s *StreamWriter) IssueWriteRequest(offset int, data []byte) (write int, actualOffset int,err error) {
+func (s *StreamWriter) IssueWriteRequest(offset int, data []byte) (write int, actualOffset int, err error) {
 	if atomic.LoadInt32(&s.status) >= StreamerError {
-		return 0,0, errors.New(fmt.Sprintf("IssueWriteRequest: stream writer in error status, ino(%v)", s.inode))
+		return 0, 0, errors.New(fmt.Sprintf("IssueWriteRequest: stream writer in error status, ino(%v)", s.inode))
 	}
 
 	request := writeRequestPool.Get().(*WriteRequest)
@@ -94,7 +94,7 @@ func (s *StreamWriter) IssueWriteRequest(offset int, data []byte) (write int, ac
 	<-request.done
 	err = request.err
 	write = request.canWrite
-	actualOffset=request.actualOffset
+	actualOffset = request.actualOffset
 	writeRequestPool.Put(request)
 	return
 }
@@ -135,9 +135,6 @@ func (s *StreamWriter) evict() error {
 	if s.refcnt > 0 {
 		return errors.New(fmt.Sprintf("evict: streamer(%v) refcnt(%v) openWriteCnt(%v)", s, s.refcnt, s.openWriteCnt))
 	}
-	s.client.release(s.inode)
-	s.close()
-	s.exit()
 	return nil
 }
 
@@ -211,13 +208,13 @@ func (s *StreamWriter) toString() (m string) {
 		currentWriterMsg = s.currentWriter.toString()
 	}
 	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v) exitCh(%v) openCnt(%v)",
-		s.inode, s.currentPartitionId, currentWriterMsg,len(s.exitCh),s.openWriteCnt)
+		s.inode, s.currentPartitionId, currentWriterMsg, len(s.exitCh), s.openWriteCnt)
 }
 
 func (s *StreamWriter) toStringWithWriter(writer *ExtentWriter) (m string) {
 	currentWriterMsg := writer.toString()
 	return fmt.Sprintf("ino(%v) currentDataPartion(%v) currentExtentId(%v) exitCh(%v) openCnt(%v)",
-		s.inode, s.currentPartitionId, currentWriterMsg,len(s.exitCh),s.openWriteCnt)
+		s.inode, s.currentPartitionId, currentWriterMsg, len(s.exitCh), s.openWriteCnt)
 }
 
 //stream init,alloc a extent ,select dp and extent
@@ -255,7 +252,7 @@ func (s *StreamWriter) server() {
 			s.handleRequest(request)
 		case <-s.exitCh:
 			s.flushCurrExtentWriter()
-			log.LogDebugf(fmt.Sprintf("ino(%v) recive sigle exit serve",s.inode))
+			log.LogDebugf(fmt.Sprintf("ino(%v) recive sigle exit serve", s.inode))
 			return
 		case <-t.C:
 			log.LogDebugf("ino(%v) update to metanode filesize To(%v) user has Write to (%v)",
@@ -263,10 +260,10 @@ func (s *StreamWriter) server() {
 			if s.getCurrentWriter() == nil {
 				continue
 			}
-			err:=s.flushCurrExtentWriter()
-			if err==syscall.ENOENT{
+			err := s.flushCurrExtentWriter()
+			if err == syscall.ENOENT {
 				s.client.release(s.inode)
-				log.LogErrorf("ino(%v) has beeen delete meta",s.inode)
+				log.LogErrorf("ino(%v) has beeen delete meta", s.inode)
 				return
 			}
 		}
