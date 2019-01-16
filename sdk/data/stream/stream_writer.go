@@ -135,6 +135,9 @@ func (s *StreamWriter) evict() error {
 	if s.refcnt > 0 {
 		return errors.New(fmt.Sprintf("evict: streamer(%v) refcnt(%v) openWriteCnt(%v)", s, s.refcnt, s.openWriteCnt))
 	}
+	s.client.release(s.inode)
+	s.close()
+	s.exit()
 	return nil
 }
 
@@ -156,9 +159,7 @@ func (s *StreamWriter) release(flag uint32) error {
 	err := s.flushCurrExtentWriter()
 	s.openWriteCnt--
 	if s.openWriteCnt <= 0 {
-		s.client.release(s.inode)
 		s.close()
-		s.exit()
 	}
 	log.LogDebugf("release: streamer(%v) openWriteCnt(%v)", s.toString(), s.openWriteCnt)
 	return err
