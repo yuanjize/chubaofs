@@ -1,6 +1,6 @@
 # Gopkg.toml example
 #
-# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
 # for detailed Gopkg.toml documentation.
 #
 # required = ["github.com/user/thing/cmd/thing"]
@@ -26,12 +26,20 @@
 
 
 [[constraint]]
-  name = "github.com/golang/protobuf"
-  version = "1.0.0"
+  branch = "master"
+  name = "github.com/facebookgo/ensure"
 
 [[constraint]]
   branch = "master"
-  name = "github.com/tiglabs/containerfs/third_party/juju/errors"
+  name = "github.com/google/btree"
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "1.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/petar/GoLLRB"
 
 [[constraint]]
   branch = "master"
@@ -40,6 +48,14 @@
 [[constraint]]
   branch = "master"
   name = "golang.org/x/net"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/sys"
+
+[[constraint]]
+  branch = "v1"
+  name = "gopkg.in/check.v1"
 
 [prune]
   go-tests = true
