@@ -60,6 +60,9 @@ func NewExtentClient(volname, master string, appendExtentKey AppendExtentKeyFunc
 	writeRequestPool = &sync.Pool{New: func() interface{} {
 		return &WriteRequest{}
 	}}
+	openRequestPool = &sync.Pool{New: func() interface{} {
+		return &OpenRequest{}
+	}}
 	flushRequestPool = &sync.Pool{New: func() interface{} {
 		return &FlushRequest{}
 	}}
