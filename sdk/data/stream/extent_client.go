@@ -86,7 +86,7 @@ func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
-		s = NewStreamWriter(inode, client, s.appendExtentKey)
+		s = NewStreamWriter(inode, client, client.appendExtentKey)
 		client.writers[inode] = s
 	}
 	client.writerLock.Unlock()
@@ -127,9 +127,6 @@ func (client *ExtentClient) getStreamWriterForRead(inode uint64) (stream *Stream
 	client.writerLock.RLock()
 	defer client.writerLock.RUnlock()
 	stream = client.writers[inode]
-	if stream != nil && atomic.LoadInt32(&stream.hasClosed) == HasClosed {
-		return nil
-	}
 
 	return
 }
