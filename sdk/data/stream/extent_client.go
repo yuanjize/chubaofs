@@ -85,6 +85,9 @@ func (client *ExtentClient) getStreamWriter(inode uint64) (stream *StreamWriter)
 }
 
 func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
+	if !proto.IsWriteFlag(flag){
+		return
+	}
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
@@ -96,6 +99,9 @@ func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
 }
 
 func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
+	if !proto.IsWriteFlag(flag){
+		return
+	}
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
