@@ -173,6 +173,7 @@ type StreamWriter struct {
 	exitCh                  chan struct{}
 	hasUpdateKey            map[string]int
 	hasWriteSize            uint64
+	fileSize                uint64
 	hasClosed               int32
 	metaNodeStreamKey       *proto.StreamKey
 	hasUpdateToMetaNodeSize uint64

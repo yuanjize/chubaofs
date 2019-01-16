@@ -24,6 +24,7 @@ import (
 
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/data/stream"
+	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"sync"
 )
@@ -72,10 +73,6 @@ func NewFile(s *Super, i *Inode) *File {
 
 func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	ino := f.inode.ino
-	// Must do GetWriteSize before InodeGet just incase: Attr is invoked
-	// right after Write where AppendExtentKey is not finished; and stream
-	// writer is closed and reopened so that GetWriteSize is untrusted.
-	writeSize := f.super.ec.GetWriteSize(ino)
 	inode, err := f.super.InodeGet(ino)
 	if err != nil {
 		log.LogErrorf("Attr: ino(%v) err(%v)", ino, err)
@@ -83,11 +80,13 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	}
 
 	inode.fillAttr(a)
-	if writeSize > a.Size {
-		a.Size = writeSize
+	fileSize := f.super.ec.GetFileSize(ino)
+	writeSize := f.super.ec.GetWriteSize(ino)
+	if fileSize > a.Size || writeSize > a.Size {
+		a.Size = uint64(util.Max(int(fileSize), int(writeSize)))
 	}
 
-	log.LogDebugf("TRACE Attr: inode(%v) attr(%v) writeSize(%v)", inode, a, writeSize)
+	log.LogDebugf("TRACE Attr: inode(%v) attr(%v) fileSize(%v) writeSize(%v) resp(%v)", inode, a, fileSize, writeSize, a)
 	return nil
 }
 
@@ -181,15 +180,17 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 }
 
 func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) (err error) {
+	ino := f.inode.ino
 	reqlen := len(req.Data)
-	filesize := f.super.ec.GetWriteSize(f.inode.ino)
+	writeSize := f.super.ec.GetWriteSize(ino)
 
 	log.LogDebugf("TRACE Write enter: ino(%v) offset(%v) len(%v) req(%v)",
-		f.inode.ino, req.Offset, reqlen, req)
+		ino, req.Offset, reqlen, req)
 
-	if uint64(req.Offset) > filesize && reqlen == 1 && req.Data[0] == 0 {
-		// The fuse package is probably doing truncate size up, which is not supported yet. So Just return.
-		log.LogWarnf("Write: fallocate not supported, ino(%v) req(%v) filesize(%v)", f.inode.ino, req, filesize)
+	if uint64(req.Offset) > writeSize && reqlen == 1 && req.Data[0] == 0 {
+		// The user is doing posix_fallocate.
+		log.LogWarnf("Write: fallocate, ino(%v) req(%v) writeSize(%v)", ino, req, writeSize)
+		f.super.ec.SetFileSize(ino, uint64(req.Offset)+uint64(reqlen))
 		return nil
 	}
 
@@ -198,14 +199,14 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	}()
 
 	start := time.Now()
-	size, actualOffset, err := f.super.ec.Write(f.inode.ino, int(req.Offset), req.Data)
+	size, actualOffset, err := f.super.ec.Write(ino, int(req.Offset), req.Data)
 	if err != nil {
-		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) err(%v)", f.inode.ino, req.Offset, actualOffset, reqlen, err)
+		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) err(%v)", ino, req.Offset, actualOffset, reqlen, err)
 		return fuse.EIO
 	}
 	resp.Size = size
 	if size != reqlen {
-		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) size(%v)", f.inode.ino, req.Offset, actualOffset, reqlen, size)
+		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) size(%v)", ino, req.Offset, actualOffset, reqlen, size)
 	}
 
 	elapsed := time.Since(start)
@@ -242,6 +243,7 @@ func (f *File) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse
 		}
 		f.super.ic.Delete(ino)
 		f.super.ec.SetWriteSize(ino, 0)
+		f.super.ec.SetFileSize(ino, 0)
 	}
 
 	inode, err := f.super.InodeGet(ino)
