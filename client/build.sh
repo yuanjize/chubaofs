@@ -1,3 +1,1 @@
-#!/usr/bin/env bash
-export GOPATH=/home/guowl/cbfs
-go build
+go build -ldflags "-X main.Version=`git rev-parse HEAD`"
