@@ -26,7 +26,6 @@ import (
 	"io"
 	"runtime"
 	"strings"
-	"sync/atomic"
 )
 
 type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error
