@@ -260,7 +260,12 @@ func (s *StreamWriter) server() {
 			if s.getCurrentWriter() == nil {
 				continue
 			}
-			s.flushCurrExtentWriter()
+			err:=s.flushCurrExtentWriter()
+			if err==syscall.ENOENT{
+				s.client.release(s.inode)
+				log.LogErrorf("ino(%v) has beeen delete meta",s.inode)
+				return
+			}
 		}
 	}
 }
