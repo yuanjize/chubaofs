@@ -1,4 +1,3 @@
-// Copyright 2018 The Silenceper Authors
 // Modified work copyright (C) 2018 The CFS Authors.
 //
 // The MIT License (MIT)
