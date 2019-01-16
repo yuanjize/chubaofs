@@ -111,6 +111,15 @@ func (s *transportSender) loopSend(recvc chan *proto.Message) {
 				if conn == nil {
 					conn = getConn(s.nodeID, s.senderType, s.resolver, 0, 2*time.Second)
 					if conn == nil {
+						// reset chan
+						for {
+							select {
+							case <-recvc:
+								continue
+							default:
+							}
+							break
+						}
 						time.Sleep(50 * time.Millisecond)
 						continue
 					}
