@@ -104,7 +104,7 @@ Begin:
 			goto Begin
 		}
 		mp.storeDeletedInode(buffSlice...)
-		mp.deleteDataPartitionMark(buffSlice)
+		mp.deleteExtent(buffSlice)
 		if len(buffSlice) < BatchCounts {
 			goto Begin
 		}
@@ -151,7 +151,7 @@ func (mp *metaPartition) checkFreelistWorker() {
 	}
 }
 
-func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
+func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 	stepFunc := func(ext proto.ExtentKey) (err error) {
 		// get dataNode View
 		dp := mp.vol.GetPartition(ext.PartitionId)
@@ -162,8 +162,8 @@ func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
 		}
 		// delete dataNode
 		conn, err := mp.config.ConnPool.Get(dp.Hosts[0])
+		defer mp.config.ConnPool.Put(conn,ForceCloseConnect)
 		if err != nil {
-			mp.config.ConnPool.Put(conn, ForceCloseConnect)
 			err = errors.Errorf("get conn from pool %s, "+
 				"extents partitionId=%d, extentId=%d",
 				err.Error(), ext.PartitionId, ext.ExtentId)
@@ -171,19 +171,16 @@ func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
 		}
 		p := NewExtentDeletePacket(dp, &ext)
 		if err = p.WriteToConn(conn); err != nil {
-			mp.config.ConnPool.Put(conn, ForceCloseConnect)
 			err = errors.Errorf("write to dataNode %s, %s", p.GetUniqueLogId(),
 				err.Error())
 			return
 		}
 		if err = p.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
-			mp.config.ConnPool.Put(conn, ForceCloseConnect)
 			err = errors.Errorf("read response from dataNode %s, %s",
 				p.GetUniqueLogId(), err.Error())
 			return
 		}
-		log.LogDebugf("[deleteDataPartitionMark] %v", p.GetUniqueLogId())
-		mp.config.ConnPool.Put(conn, NoCloseConnect)
+		log.LogDebugf("[deleteExtent] %v", p.GetUniqueLogId())
 		return
 	}
 	shouldCommit := make([]*Inode, 0, BatchCounts)
@@ -193,7 +190,7 @@ func (mp *metaPartition) deleteDataPartitionMark(inoSlice []*Inode) {
 		ino.Extents.Range(func(i int, v proto.ExtentKey) bool {
 			if err = stepFunc(v); err != nil {
 				reExt = append(reExt, v)
-				log.LogWarnf("[deleteDataPartitionMark] extentKey: %s, "+
+				log.LogWarnf("[deleteExtent] extentKey: %s, "+
 					"err: %s", v.String(), err.Error())
 			}
 			return true
