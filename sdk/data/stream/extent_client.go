@@ -17,6 +17,7 @@ package stream
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/tiglabs/containerfs/proto"
 	"github.com/tiglabs/containerfs/sdk/data/wrapper"
@@ -181,6 +182,25 @@ func (client *ExtentClient) SetWriteSize(inode, size uint64) {
 	writer, ok := client.writers[inode]
 	if ok {
 		writer.setHasWriteSize(size)
+	}
+}
+
+func (client *ExtentClient) GetFileSize(inode uint64) uint64 {
+	client.writerLock.RLock()
+	defer client.writerLock.RUnlock()
+	writer, ok := client.writers[inode]
+	if !ok {
+		return 0
+	}
+	return atomic.LoadUint64(&writer.fileSize)
+}
+
+func (client *ExtentClient) SetFileSize(inode, size uint64) {
+	client.writerLock.Lock()
+	defer client.writerLock.Unlock()
+	writer, ok := client.writers[inode]
+	if ok {
+		atomic.StoreUint64(&writer.fileSize, size)
 	}
 }
 

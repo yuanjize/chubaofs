@@ -77,6 +77,7 @@ func (s *StreamWriter) IssueOpenRequest(flag uint32) error {
 	s.requestCh <- request
 	<-request.done
 	err := request.err
+	close(request.done)
 	openRequestPool.Put(request)
 	return err
 }
@@ -95,6 +96,7 @@ func (s *StreamWriter) IssueWriteRequest(offset int, data []byte) (write int, ac
 	err = request.err
 	write = request.canWrite
 	actualOffset = request.actualOffset
+	close(request.done)
 	writeRequestPool.Put(request)
 	return
 }
@@ -105,6 +107,7 @@ func (s *StreamWriter) IssueFlushRequest() error {
 	s.requestCh <- request
 	<-request.done
 	err := request.err
+	close(request.done)
 	flushRequestPool.Put(request)
 	return err
 }
@@ -116,6 +119,7 @@ func (s *StreamWriter) IssueReleaseRequest(flag uint32) error {
 	s.requestCh <- request
 	<-request.done
 	err := request.err
+	close(request.done)
 	releaseRequestPool.Put(request)
 	//s.done <- struct{}{}
 	return err
@@ -127,6 +131,7 @@ func (s *StreamWriter) IssueEvictRequest() error {
 	s.requestCh <- request
 	<-request.done
 	err := request.err
+	close(request.done)
 	evictRequestPool.Put(request)
 	return err
 }
@@ -173,6 +178,7 @@ type StreamWriter struct {
 	exitCh                  chan struct{}
 	hasUpdateKey            map[string]int
 	hasWriteSize            uint64
+	fileSize                uint64
 	hasClosed               int32
 	metaNodeStreamKey       *proto.StreamKey
 	hasUpdateToMetaNodeSize uint64
