@@ -55,8 +55,8 @@ type WriteRequest struct {
 }
 
 type ExitRequest struct {
-	err          error
-	done         chan struct{}
+	err  error
+	done chan struct{}
 }
 
 type FlushRequest struct {
@@ -129,8 +129,6 @@ func (s *StreamWriter) IssueReleaseRequest(flag uint32) error {
 	return err
 }
 
-
-
 func (s *StreamWriter) IssueEvictRequest() error {
 	request := evictRequestPool.Get().(*EvictRequest)
 	request.done = make(chan struct{}, 1)
@@ -192,11 +190,11 @@ type StreamWriter struct {
 	inodeHasDelete          bool
 	kernelOffset            uint64
 
-	refcnt       int
+	refcnt        int
 	autoForgetCnt int
-	openWriteCnt int
-	status       int32
-	client       *ExtentClient
+	openWriteCnt  int
+	status        int32
+	client        *ExtentClient
 }
 
 func NewStreamWriter(inode uint64, client *ExtentClient, appendExtentKey AppendExtentKeyFunc) (s *StreamWriter) {
@@ -257,7 +255,7 @@ func (s *StreamWriter) init(useNormalExtent bool, prepareWriteSize int) (err err
 }
 
 const (
-	MaxAutoForgetCnt=20
+	MaxAutoForgetCnt = 20
 )
 
 func (s *StreamWriter) server() {
@@ -272,36 +270,44 @@ func (s *StreamWriter) server() {
 			log.LogDebugf(fmt.Sprintf("ino(%v) recive sigle exit serve", s.inode))
 			return
 		case <-t.C:
-			autoExit:=s.autoTask()
-			if autoExit{
-				s.handleExit()
-				return
+			autoExit := s.autoTask()
+			if !autoExit {
+				continue
 			}
+			for {
+				if req, ok := <-s.requestCh; ok {
+					s.handleExit(req)
+				} else {
+					break
+				}
+			}
+
+			return
 		}
 	}
 }
 
-func (s *StreamWriter)autoTask()(autoExit bool){
+func (s *StreamWriter) autoTask() (autoExit bool) {
 	log.LogDebugf("ino(%v) update to metanode filesize To(%v) user has Write to (%v)",
 		s.inode, s.metaNodeStreamKey.Size(), s.getHasWriteSize())
 	if s.getCurrentWriter() == nil {
 		return
 	}
-	if s.refcnt<=0{
+	if s.refcnt <= 0 {
 		s.autoForgetCnt++
-	}else {
-		s.autoForgetCnt=0
+	} else {
+		s.autoForgetCnt = 0
 	}
-	if s.autoForgetCnt>=MaxAutoForgetCnt{
+	if s.autoForgetCnt >= MaxAutoForgetCnt {
 		s.client.release(s.inode)
-		autoExit=true
+		autoExit = true
 		log.LogErrorf("ino(%v) auto send forget command", s.inode)
 		return
 	}
 	err := s.flushCurrExtentWriter()
 	if err == syscall.ENOENT {
 		s.client.release(s.inode)
-		autoExit=true
+		autoExit = true
 		log.LogErrorf("ino(%v) has beeen delete meta", s.inode)
 	}
 	return
@@ -337,30 +343,32 @@ func (s *StreamWriter) handleRequest(request interface{}) {
 	}
 }
 
-
-func (s *StreamWriter)handleExit(){
-	s.close()
-	for request:=range s.requestCh{
-		switch request := request.(type) {
-		case *OpenRequest:
-			request.err = syscall.EAGAIN
+func (s *StreamWriter) handleExit(req interface{}) {
+	switch request := req.(type) {
+	case *OpenRequest:
+		request.err = syscall.EAGAIN
+		request.done <- struct{}{}
+		return
+	case *WriteRequest:
+		if s.inodeHasDelete {
+			request.err = syscall.ENOENT
 			request.done <- struct{}{}
-		case *WriteRequest:
-			if s.inodeHasDelete {
-				request.err = syscall.ENOENT
-				request.done <- struct{}{}
-				return
-			}
-			request.err = syscall.EINVAL
-			request.done <- struct{}{}
-		case *FlushRequest:
-			request.done <- struct{}{}
-		case *ReleaseRequest:
-			request.done <- struct{}{}
-		case *EvictRequest:
-			request.done <- struct{}{}
-		default:
+			return
 		}
+		request.err = syscall.EINVAL
+		request.done <- struct{}{}
+		return
+	case *FlushRequest:
+		request.done <- struct{}{}
+		return
+	case *ReleaseRequest:
+		request.done <- struct{}{}
+		return
+	case *EvictRequest:
+		request.done <- struct{}{}
+		return
+	default:
+		return
 	}
 }
 
