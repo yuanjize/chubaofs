@@ -65,6 +65,12 @@ func (mp *metaPartition) ExtentsList(req *proto.GetExtentsRequest,
 func (mp *metaPartition) ExtentsTruncate(req *ExtentsTruncateReq,
 	p *Packet) (err error) {
 	ino := NewInode(req.Inode, proto.ModeRegular)
+	if resp := mp.getInode(ino); resp.Status != proto.OpOk {
+		p.PackErrorWithBody(resp.Status, nil)
+		return
+	} else {
+		ino.Generation = resp.Msg.Generation
+	}
 	nextIno, err := mp.nextInodeID()
 	if err != nil {
 		p.PackErrorWithBody(proto.OpErr, nil)

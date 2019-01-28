@@ -191,6 +191,10 @@ func (mp *metaPartition) extentsTruncate(ino *Inode) (resp *ResponseInode) {
 	mp.inodeTree.Find(ino, func(item BtreeItem) {
 		isFind = true
 		i := item.(*Inode)
+		if ino.Generation != i.Generation {
+			resp.Status = proto.OpErr
+			return
+		}
 		if i.Type == proto.ModeDir {
 			resp.Status = proto.OpArgMismatchErr
 			return
