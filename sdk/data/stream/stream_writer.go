@@ -275,10 +275,11 @@ func (s *StreamWriter) server() {
 				continue
 			}
 			for {
-				if req, ok := <-s.requestCh; ok {
-					s.handleExit(req)
-				} else {
-					break
+				select {
+					case req:=<-s.requestCh:
+						s.handleExit(req)
+					default:
+						return
 				}
 			}
 
