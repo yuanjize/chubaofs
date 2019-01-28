@@ -291,25 +291,24 @@ func (s *StreamWriter) server() {
 func (s *StreamWriter) autoTask() (autoExit bool) {
 	log.LogDebugf("ino(%v) update to metanode filesize To(%v) user has Write to (%v)",
 		s.inode, s.metaNodeStreamKey.Size(), s.getHasWriteSize())
-	if s.getCurrentWriter() == nil {
-		return
-	}
+
 	if s.refcnt <= 0 {
 		s.autoForgetCnt++
 	} else {
 		s.autoForgetCnt = 0
 	}
+
 	if s.autoForgetCnt >= MaxAutoForgetCnt {
 		s.client.release(s.inode)
 		autoExit = true
-		log.LogErrorf("ino(%v) auto send forget command", s.inode)
+		log.LogWarnf("ino(%v) auto send forget command", s.inode)
 		return
 	}
 	err := s.flushCurrExtentWriter()
 	if err == syscall.ENOENT {
 		s.client.release(s.inode)
 		autoExit = true
-		log.LogErrorf("ino(%v) has beeen delete meta", s.inode)
+		log.LogWarnf("ino(%v) has beeen delete meta", s.inode)
 	}
 	return
 }
