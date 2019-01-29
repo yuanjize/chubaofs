@@ -96,17 +96,15 @@ func (f *File) Forget() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
 
-	if err := f.super.ec.EvictStream(ino); err != nil {
-		log.LogWarnf("Forget: stream not ready to evict, ino(%v) err(%v)", ino, err)
-		return
+	if f.super.orphan.Evict(ino) {
+		if err := f.super.mw.Evict(ino); err != nil {
+			log.LogErrorf("Forget: ino(%v) err(%v)", ino, err)
+			//TODO: push back to evicted list, and deal with it later
+		}
 	}
 
-	if !f.super.orphan.Evict(ino) {
-		return
-	}
-	if err := f.super.mw.Evict(ino); err != nil {
-		log.LogErrorf("Forget: ino(%v) err(%v)", ino, err)
-		//TODO: push back to evicted list, and deal with it later
+	if err := f.super.ec.EvictStream(ino); err != nil {
+		log.LogWarnf("Forget: stream not ready to evict, ino(%v) err(%v)", ino, err)
 	}
 }
 
