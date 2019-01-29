@@ -49,7 +49,9 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 			curIndex = msg.applyIndex
 		}
 		// Truncate raft log
-		mp.raftPartition.Truncate(curIndex)
+		if mp.raftPartition != nil {
+			mp.raftPartition.Truncate(curIndex)
+		}
 		if _, ok := mp.IsLeader(); ok {
 			timer.Reset(storeTimeTicker)
 		}
