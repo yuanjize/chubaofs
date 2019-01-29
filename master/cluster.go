@@ -992,3 +992,9 @@ func (c *Cluster) syncCompactStatus(status bool) (err error) {
 	}
 	return
 }
+
+func (c *Cluster) clearVols() {
+	c.volsLock.Lock()
+	defer c.volsLock.Unlock()
+	c.vols = make(map[string]*Vol, 0)
+}

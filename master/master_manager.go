@@ -84,7 +84,7 @@ func (m *Master) restoreIDAlloc() {
 
 // load stored meta data to memory
 func (m *Master) loadMetadata() {
-
+	m.clearMetadata()
 	m.restoreIDAlloc()
 	var err error
 	if err = m.cluster.loadCompactStatus(); err != nil {
@@ -110,4 +110,8 @@ func (m *Master) loadMetadata() {
 		panic(err)
 	}
 
+}
+
+func (m *Master) clearMetadata() {
+	m.cluster.clearVols()
 }
