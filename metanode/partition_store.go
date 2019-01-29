@@ -166,7 +166,7 @@ func (mp *metaPartition) loadDentry() (err error) {
 		} else {
 			bodyBuf = make([]byte, length)
 		}
-		_, err = io.ReadFull(fp, bodyBuf)
+		_, err = io.ReadFull(reader, bodyBuf)
 		if err != nil {
 			err = errors.Errorf("[loadDentry]: ReadBody: %s", err.Error())
 			return
