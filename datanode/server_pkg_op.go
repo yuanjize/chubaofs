@@ -37,6 +37,16 @@ var (
 
 func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	orgSize := pkg.Size
+	orgOffset := pkg.Offset
+	if pkg.Opcode == proto.OpMarkDelete && pkg.StoreMode == proto.TinyExtentMode {
+		ext := new(proto.ExtentKey)
+		err := json.Unmarshal(pkg.Data, ext)
+		if err == nil {
+			orgSize = ext.Size
+			orgOffset = int64(ext.ExtentOffset)
+		}
+	}
+
 	umpKey := fmt.Sprintf("%s_datanode_%s", s.clusterId, pkg.GetOpMsg())
 	tpObject := ump.BeforeTP(umpKey)
 	start := time.Now().UnixNano()
@@ -44,6 +54,8 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	defer func() {
 		resultSize := pkg.Size
 		pkg.Size = orgSize
+		resultOffset := pkg.Offset
+		pkg.Offset = orgOffset
 		if pkg.IsErrPack() {
 			err = fmt.Errorf("op[%v] error[%v]", pkg.GetOpMsg(), string(pkg.Data[:resultSize]))
 			logContent := fmt.Sprintf("action[operatePacket] %v.",
@@ -62,6 +74,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 			}
 		}
 		pkg.Size = resultSize
+		pkg.Offset = resultOffset
 		ump.AfterTP(tpObject, err)
 	}()
 	switch pkg.Opcode {
