@@ -295,6 +295,9 @@ func (s *DataNode) handleMarkDelete(pkg *Packet) {
 		err = json.Unmarshal(pkg.Data, ext)
 		if err == nil {
 			err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, int64(ext.ExtentOffset), int64(ext.Size))
+			log.LogInfof("action[MarkDeleteTiny] id[%v_%v_%v_%v_%v] err %v",
+				pkg.ReqID, pkg.PartitionID, pkg.FileID, ext.ExtentOffset, ext.Size, err)
+			pkg.Offset = int64(ext.ExtentOffset)
 		}
 	} else {
 		err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, 0, 0)
