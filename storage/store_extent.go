@@ -457,7 +457,9 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 	}
 
 	if IsTinyExtent(extentId) {
-		return extent.DeleteTiny(offset, size)
+		err = extent.DeleteTiny(offset, size)
+		log.LogInfof("action[MarkDeleteTiny] id[%v_%v_%v_%v] err %v", s.partitionId, extentId, offset, size)
+		return err
 	}
 
 	if err = extent.MarkDelete(); err != nil {
