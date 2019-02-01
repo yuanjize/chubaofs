@@ -67,7 +67,11 @@ func (t *Topology) getRack(name string) (rack *Rack, err error) {
 func (t *Topology) putRack(rack *Rack) {
 	t.rackLock.Lock()
 	defer t.rackLock.Unlock()
-	t.rackMap[rack.name] = rack
+	oldRack, ok := t.rackMap[rack.name]
+	if ok {
+		rack = oldRack
+		return
+	}
 	if ok := t.isExist(rack.name); !ok {
 		t.racks = append(t.racks, rack.name)
 	}
