@@ -120,6 +120,9 @@ func (mp *metaPartition) deleteInode(ino *Inode) (resp *ResponseInode) {
 		inode := i.(*Inode)
 		resp.Msg = inode
 		if inode.Type == proto.ModeRegular {
+			if inode.NLink <= 0 {
+				return
+			}
 			inode.NLink--
 			return
 		}
