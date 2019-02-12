@@ -232,11 +232,11 @@ func main() {
 	data, err := json.Marshal(map[string]interface{}{
 		"master": vstat,
 		"meta": map[string]interface{}{
-			"total":            metaSize,
-			"validUsed":        validSize,
-			"invalidTotal":     metaSize - validSize,
+			"Total":            metaSize,
+			"ValidUsed":        validSize,
+			"UnvalidTotal":     metaSize - validSize,
 			"UnavaliDentryCnt": UnavaliDentryCnt,
-			"invalidInoSize":   UnavaliInodeSize,
+			"UnavalidInoSize":  UnavaliInodeSize,
 			"LackPidSize":      LackPidSize,
 		},
 	})
