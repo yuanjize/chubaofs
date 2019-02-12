@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"github.com/tiglabs/containerfs/proto"
 )
 
 var (
@@ -113,6 +114,35 @@ func getMetaPartition(adminHosts, volName string) (metaHost string, metaId uint6
 	metaId = vols.MetaPartitions[0].PartitionID
 
 	return
+}
+
+type EvictInodeRequest struct {
+	VolName     string `json:"vol"`
+	PartitionID uint64 `json:"pid"`
+	Inode       uint64 `json:"ino"`
+}
+
+func EvictInode(inodes []*Inode, volname string, pID uint64) {
+	for _, ino := range inodes {
+		p := proto.NewPacket()
+		p.Opcode = proto.OpMetaEvictInode
+
+		req := &proto.EvictInodeRequest{
+			VolName:     volName,
+			PartitionID: pID,
+			Inode:       ino.Inode,
+		}
+
+		data, err := json.Marshal(req)
+		if err == nil {
+			p.Data = data
+			p.Size = uint32(len(p.Data))
+		} else {
+			fmt.Println(fmt.Sprintf("ievict ino(%v) json error: err(%v)", ino.Inode, err))
+			continue
+		}
+
+	}
 }
 
 func compare(inoMap map[uint64]*Inode, dMap map[uint64]*Dentry) (unavaliInode []*Inode,
