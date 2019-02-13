@@ -5,18 +5,20 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/tiglabs/containerfs/proto"
+	"github.com/tiglabs/containerfs/third_party/pool"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-	"github.com/tiglabs/containerfs/proto"
 )
 
 var (
 	adminHost string
 	volName   string
 	statsTime int64
+	gConnPool = pool.NewConnectPool()
 )
 
 type volStat struct {
@@ -122,7 +124,7 @@ type EvictInodeRequest struct {
 	Inode       uint64 `json:"ino"`
 }
 
-func EvictInode(inodes []*Inode, volname string, pID uint64) {
+func EvictInode(inodes []*Inode, volname string, pID uint64, metaHost string) {
 	for _, ino := range inodes {
 		p := proto.NewPacket()
 		p.Opcode = proto.OpMetaEvictInode
@@ -141,6 +143,26 @@ func EvictInode(inodes []*Inode, volname string, pID uint64) {
 			fmt.Println(fmt.Sprintf("ievict ino(%v) json error: err(%v)", ino.Inode, err))
 			continue
 		}
+		conn, err := gConnPool.Get(metaHost)
+		if err != nil {
+			fmt.Println(fmt.Sprintf("ievict ino(%v) get connnect to (%v) error: err(%v)", ino.Inode, metaHost, err))
+			continue
+		}
+		err = p.WriteToConn(conn)
+		if err != nil {
+			fmt.Println(fmt.Sprintf("ievict ino(%v) write to  host  (%v) error: err(%v)", ino.Inode, metaHost, err))
+			continue
+		}
+		err = p.ReadFromConn(conn, -1)
+		if err != nil {
+			fmt.Println(fmt.Sprintf("ievict ino(%v) read from   host  (%v) error: err(%v)", ino.Inode, metaHost, err))
+			continue
+		}
+		if p.IsOkReply() {
+			fmt.Println(fmt.Sprintf("ievict ino(%v) meta   host  (%v) deal error: err(%v)", ino.Inode, metaHost, string(p.Data[:p.Size])))
+			continue
+		}
+		break
 
 	}
 }
