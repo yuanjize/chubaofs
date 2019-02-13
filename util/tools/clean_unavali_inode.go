@@ -150,6 +150,13 @@ func EvictInode(pID uint64, metaHost string, ino *Inode) (n uint64, err error) {
 			ino.Inode, metaHost, err)
 		return
 	}
+	defer func() {
+		if err != nil {
+			gConnPool.Put(conn, true)
+		} else {
+			gConnPool.Put(conn, false)
+		}
+	}()
 	err = p.WriteToConn(conn)
 	if err != nil {
 		err = fmt.Errorf("ievict ino(%v) write to  host  (%v) error: err(%v)",
