@@ -60,6 +60,7 @@ func (mp *metaPartition) createLinkInode(ino *Inode) (resp *ResponseInode) {
 		return
 	}
 	i.NLink++
+	i.ModifyTime = ino.ModifyTime
 	resp.Msg = i
 	return
 }
@@ -119,11 +120,14 @@ func (mp *metaPartition) deleteInode(ino *Inode) (resp *ResponseInode) {
 		isFind = true
 		inode := i.(*Inode)
 		resp.Msg = inode
+		inode.ModifyTime = ino.ModifyTime
 		if inode.Type == proto.ModeRegular {
-			if inode.NLink <= 0 {
-				return
+			if inode.NLink > 0 {
+				inode.NLink--
 			}
-			inode.NLink--
+			if inode.NLink == 0 {
+				mp.freeList.Push(inode)
+			}
 			return
 		}
 		// should delete inode

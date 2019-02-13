@@ -31,6 +31,7 @@ const (
 	AsyncDeleteInterval = 10 * time.Second
 	UpdateVolTicket     = 5 * time.Minute
 	BatchCounts         = 100
+	TempFileValidTime   = 86400 //units: sec
 	MarkDeleteInodeFile = "DELETE_INODE"
 	MarkDeleteOptFlag   = os.O_RDWR | os.O_APPEND | os.O_CREATE
 )
@@ -81,10 +82,12 @@ func (mp *metaPartition) deleteWorker() {
 		isLeader bool
 	)
 	buffSlice := make([]*Inode, 0, BatchCounts)
+	var tempFileSlice []*Inode
 Begin:
 	time.Sleep(AsyncDeleteInterval)
 	for {
 		buffSlice = buffSlice[:0]
+		tempFileSlice = tempFileSlice[:0]
 		select {
 		case <-mp.stopC:
 			return
@@ -93,13 +96,23 @@ Begin:
 		if _, isLeader = mp.IsLeader(); !isLeader {
 			goto Begin
 		}
+		curTime := time.Now()
 		for idx = 0; idx < BatchCounts; idx++ {
 			// batch get free inode from freeList
 			ino := mp.freeList.Pop()
 			if ino == nil {
 				break
 			}
+			if ino.MarkDelete != 1 && ino.NLink == 0 {
+				if ino.ModifyTime >= (curTime.Unix() - TempFileValidTime) {
+					tempFileSlice = append(tempFileSlice, ino)
+					continue
+				}
+			}
 			buffSlice = append(buffSlice, ino)
+		}
+		for _, ino := range tempFileSlice {
+			mp.freeList.Push(ino)
 		}
 		if len(buffSlice) == 0 {
 			goto Begin
