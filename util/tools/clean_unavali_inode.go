@@ -11,18 +11,17 @@ import (
 	"net/http"
 	"os"
 	"time"
-	"io/ioutil"
 )
 
 var (
 	adminHost        string
 	volName          string
-	statsTime        int64
+	invalidTime      int64
+	do0link          bool
 	gConnPool        = pool.NewConnectPool()
 	inodeFile        = flag.String("ino", "/tmp/inode.txt", "default inode file")
 	dentryFile       = flag.String("dentry", "/tmp/dentry.txt", "default dentry file")
 	unavaliInodeFile = flag.String("unavali", "/tmp/unavali.txt", "unavali inode file")
-
 )
 
 type volStat struct {
@@ -71,7 +70,8 @@ func (d *Dentry) reset() {
 func init() {
 	flag.StringVar(&adminHost, "h", "", "master address")
 	flag.StringVar(&volName, "vol", "", "volume name")
-	flag.Int64Var(&statsTime, "t", time.Now().Unix(), "stats time: default now")
+	flag.Int64Var(&invalidTime, "t", time.Now().Unix(), "stats time: default now")
+	flag.BoolVar(&do0link, "d0", false, "delete nlink 0, default: false")
 	flag.Parse()
 }
 
@@ -117,70 +117,58 @@ func getMetaPartition(adminHosts, volName string) (metaHost string, metaId uint6
 	}
 
 	metaHost = vols.MetaPartitions[0].LeaderAddr
+	if metaHost == "" {
+		err = fmt.Errorf("meta leader addr is empty")
+		return
+	}
 	metaId = vols.MetaPartitions[0].PartitionID
 
 	return
 }
 
-type EvictInodeRequest struct {
-	VolName     string `json:"vol"`
-	PartitionID uint64 `json:"pid"`
-	Inode       uint64 `json:"ino"`
-}
+func EvictInode(pID uint64, metaHost string, ino *Inode) (n uint64, err error) {
+	p := proto.NewPacket()
+	p.Opcode = proto.OpMetaEvictInode
 
-func EvictInode(pID uint64, metaHost string) {
-	data, err := ioutil.ReadFile(*unavaliInodeFile)
-	if err != nil {
-		fmt.Println(err.Error())
+	req := &proto.EvictInodeRequest{
+		VolName:     volName,
+		PartitionID: pID,
+		Inode:       ino.Inode,
+	}
+
+	data, err := json.Marshal(req)
+	if err == nil {
+		p.Data = data
+		p.Size = uint32(len(p.Data))
+	} else {
+		err = fmt.Errorf("ievict ino(%v) json error: err(%v)", ino.Inode, err)
 		return
 	}
-	inodes := make([]*Inode, 0)
-	err = json.Unmarshal(data, inodes)
+	conn, err := gConnPool.Get(metaHost)
 	if err != nil {
-		fmt.Println(err.Error())
+		err = fmt.Errorf("ievict ino(%v) get connnect to (%v) error: err(%v)",
+			ino.Inode, metaHost, err)
 		return
 	}
-
-	for _, ino := range inodes {
-		p := proto.NewPacket()
-		p.Opcode = proto.OpMetaEvictInode
-
-		req := &proto.EvictInodeRequest{
-			VolName:     volName,
-			PartitionID: pID,
-			Inode:       ino.Inode,
-		}
-
-		data, err := json.Marshal(req)
-		if err == nil {
-			p.Data = data
-			p.Size = uint32(len(p.Data))
-		} else {
-			fmt.Println(fmt.Sprintf("ievict ino(%v) json error: err(%v)", ino.Inode, err))
-			continue
-		}
-		conn, err := gConnPool.Get(metaHost)
-		if err != nil {
-			fmt.Println(fmt.Sprintf("ievict ino(%v) get connnect to (%v) error: err(%v)", ino.Inode, metaHost, err))
-			continue
-		}
-		err = p.WriteToConn(conn)
-		if err != nil {
-			fmt.Println(fmt.Sprintf("ievict ino(%v) write to  host  (%v) error: err(%v)", ino.Inode, metaHost, err))
-			continue
-		}
-		err = p.ReadFromConn(conn, -1)
-		if err != nil {
-			fmt.Println(fmt.Sprintf("ievict ino(%v) read from   host  (%v) error: err(%v)", ino.Inode, metaHost, err))
-			continue
-		}
-		if p.IsOkReply() {
-			fmt.Println(fmt.Sprintf("ievict ino(%v) meta   host  (%v) deal error: err(%v)", ino.Inode, metaHost, string(p.Data[:p.Size])))
-			continue
-		}
-		break
-
+	err = p.WriteToConn(conn)
+	if err != nil {
+		err = fmt.Errorf("ievict ino(%v) write to  host  (%v) error: err(%v)",
+			ino.Inode, metaHost, err)
+		return
 	}
+	err = p.ReadFromConn(conn, -1)
+	if err != nil {
+		err = fmt.Errorf("ievict ino(%v) read from   host  (%v) error: err("+
+			"%v)", ino.Inode, metaHost, err)
+		return
+	}
+	if !p.IsOkReply() {
+		err = fmt.Errorf("ievict ino(%v) meta   host  (%v) deal error: err("+
+			"%v)", ino.Inode, metaHost, string(p.Data[:p.Size]))
+		return
+	}
+	n = ino.Size
+	return
 }
 
 func compare(inoMap map[uint64]*Inode, dMap map[uint64]*Dentry) (unavaliInode []*Inode,
@@ -245,11 +233,11 @@ func main() {
 		return
 	}
 
-	//_, _, err = getMetaPartition(adminHost, volName)
-	//if err != nil {
-	//	fmt.Println(fmt.Sprintf("get vol stat error %v", err))
-	//	return
-	//}
+	metaHost, metaId, err := getMetaPartition(adminHost, volName)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("get meta info error %v", err))
+		return
+	}
 
 	// get all inodes
 	inoMap, metaSize, err := getAllInodes(*inodeFile)
@@ -284,13 +272,26 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
+	releaseSize := uint64(0)
 	for _, inode := range NLink0Inodes {
 		data, _ := json.Marshal(inode)
+		if do0link {
+			if inode.AccessTime < invalidTime && inode.
+				CreateTime < invalidTime && inode.ModifyTime < invalidTime {
+				n, err := EvictInode(metaId, metaHost, inode)
+				if err != nil {
+					fmt.Println("delete nlink0: ", err.Error())
+				} else {
+					releaseSize += n
+					data = append(data, byte('Y'))
+				}
+
+			}
+		}
 		data = append(data, byte('\n'))
 		fp.Write(data)
 	}
 	fp.Close()
-
 
 	fp, err = os.OpenFile("./UnavaliDentry.txt",
 		os.O_CREATE|os.O_RDWR|os.O_TRUNC|os.O_APPEND, 0644)
@@ -321,14 +322,15 @@ func main() {
 	data, err := json.Marshal(map[string]interface{}{
 		"master": vstat,
 		"meta": map[string]interface{}{
-			"Total":            metaSize,
-			"ValidUsed":        validSize,
-			"UnvalidTotal":     metaSize - validSize,
-			"UnavaliDentryCnt": UnavaliDentryCnt,
-			"UnavalidInoSize":  UnavaliInodeSize,
-			"LackPidSize":      LackPidSize,
-			"NLink0InodeCnt":   len(NLink0Inodes),
-			"NLink0Size":       NLink0Size,
+			"Total":             metaSize,
+			"ValidUsed":         validSize,
+			"UnvalidTotal":      metaSize - validSize,
+			"UnavaliDentryCnt":  UnavaliDentryCnt,
+			"UnavalidInoSize":   UnavaliInodeSize,
+			"LackPidSize":       LackPidSize,
+			"NLink0InodeCnt":    len(NLink0Inodes),
+			"NLink0Size":        NLink0Size,
+			"NLink0ReleaseSize": releaseSize,
 		},
 	})
 	if err != nil {
