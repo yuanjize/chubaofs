@@ -287,7 +287,7 @@ func main() {
 				CreateTime < invalidTime && inode.ModifyTime < invalidTime {
 				n, err := EvictInode(metaId, metaHost, inode)
 				if err != nil {
-					fmt.Println("delete nlink0: ", err.Error())
+					fmt.Println(fmt.Sprintf("delete nlink0 err:(%v) ", err.Error()))
 				} else {
 					releaseSize += n
 					data = append(data, byte('Y'))
