@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -162,7 +163,7 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 		}
 		// delete dataNode
 		conn, err := mp.config.ConnPool.Get(dp.Hosts[0])
-		defer mp.config.ConnPool.Put(conn,ForceCloseConnect)
+		defer mp.config.ConnPool.Put(conn, ForceCloseConnect)
 		if err != nil {
 			err = errors.Errorf("get conn from pool %s, "+
 				"extents partitionId=%d, extentId=%d",
@@ -183,28 +184,38 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 		log.LogDebugf("[deleteExtent] %v", p.GetUniqueLogId())
 		return
 	}
+
 	shouldCommit := make([]*Inode, 0, BatchCounts)
 	var err error
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for _, ino := range inoSlice {
-		var reExt []proto.ExtentKey
-		ino.Extents.Range(func(i int, v proto.ExtentKey) bool {
-			if err = stepFunc(v); err != nil {
-				reExt = append(reExt, v)
-				log.LogWarnf("[deleteExtent] extentKey: %s, "+
-					"err: %s", v.String(), err.Error())
+		wg.Add(1)
+		go func(ino *Inode) {
+			defer wg.Done()
+			var reExt []proto.ExtentKey
+			ino.Extents.Range(func(i int, v proto.ExtentKey) bool {
+				if err = stepFunc(v); err != nil {
+					reExt = append(reExt, v)
+					log.LogWarnf("[deleteExtent] extentKey: %s, "+
+						"err: %s", v.String(), err.Error())
+				}
+				return true
+			})
+			if len(reExt) == 0 {
+				mu.Lock()
+				shouldCommit = append(shouldCommit, ino)
+				mu.Unlock()
+			} else {
+				newIno := NewInode(ino.Inode, ino.Type)
+				for _, ext := range reExt {
+					newIno.Extents.Put(ext)
+				}
+				mp.freeList.Push(newIno)
 			}
-			return true
-		})
-		if len(reExt) == 0 {
-			shouldCommit = append(shouldCommit, ino)
-		} else {
-			newIno := NewInode(ino.Inode, ino.Type)
-			for _, ext := range reExt {
-				newIno.Extents.Put(ext)
-			}
-			mp.freeList.Push(newIno)
-		}
+		}(ino)
 	}
+	wg.Wait()
 	if len(shouldCommit) > 0 {
 		bufSlice := make([]byte, 0, 8*len(shouldCommit))
 		for _, ino := range shouldCommit {
