@@ -57,7 +57,7 @@ const (
 )
 
 var (
-	LookupValidDuration = 0 * time.Second
+	LookupValidDuration = 5 * time.Second
 	AttrValidDuration   = 30 * time.Second
 )
 
