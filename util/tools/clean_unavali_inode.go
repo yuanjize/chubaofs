@@ -184,7 +184,7 @@ func EvictInode(pID uint64, metaHost string) {
 }
 
 func compare(inoMap map[uint64]*Inode, dMap map[uint64]*Dentry) (unavaliInode []*Inode,
-	unavaliDentry []*Dentry, lackPid []*Inode, unavaliInodeSize, unavaliDentryCnt, lackPidSize, validSize uint64) {
+	unavaliDentry []*Dentry, lackPid []*Inode, nLink0Inode []*Inode, unavaliInodeSize, unavaliDentryCnt, lackPidSize, validSize, nLink0Size uint64) {
 	unavaliInode = make([]*Inode, 0)
 	unavaliDentry = make([]*Dentry, 0)
 	lackPid = make([]*Inode, 0)
@@ -194,6 +194,13 @@ func compare(inoMap map[uint64]*Inode, dMap map[uint64]*Dentry) (unavaliInode []
 		if d == nil {
 			unavaliInode = append(unavaliInode, iinfo)
 			unavaliInodeSize += iinfo.Size
+		}
+	}
+
+	for _, iinfo := range inoMap {
+		if iinfo.NLink == 0 {
+			nLink0Size += iinfo.Size
+			nLink0Inode = append(nLink0Inode, iinfo)
 		}
 	}
 
@@ -238,11 +245,11 @@ func main() {
 		return
 	}
 
-	_, _, err = getMetaPartition(adminHost, volName)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("get vol stat error %v", err))
-		return
-	}
+	//_, _, err = getMetaPartition(adminHost, volName)
+	//if err != nil {
+	//	fmt.Println(fmt.Sprintf("get vol stat error %v", err))
+	//	return
+	//}
 
 	// get all inodes
 	inoMap, metaSize, err := getAllInodes(*inodeFile)
@@ -256,7 +263,7 @@ func main() {
 		fmt.Println("get all dentry: ", err.Error())
 	}
 
-	UnavaliInode, UnavaliDentry, LackPid, UnavaliInodeSize, UnavaliDentryCnt, LackPidSize, validSize := compare(inoMap, dMap)
+	UnavaliInode, UnavaliDentry, LackPid, NLink0Inodes, UnavaliInodeSize, UnavaliDentryCnt, LackPidSize, validSize, NLink0Size := compare(inoMap, dMap)
 
 	fp, err := os.OpenFile("./UnavaliInode.txt",
 		os.O_CREATE|os.O_RDWR|os.O_TRUNC|os.O_APPEND, 0644)
@@ -270,6 +277,20 @@ func main() {
 		fp.Write(data)
 	}
 	fp.Close()
+
+	fp, err = os.OpenFile("./NLink0Inode.txt",
+		os.O_CREATE|os.O_RDWR|os.O_TRUNC|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	for _, inode := range NLink0Inodes {
+		data, _ := json.Marshal(inode)
+		data = append(data, byte('\n'))
+		fp.Write(data)
+	}
+	fp.Close()
+
 
 	fp, err = os.OpenFile("./UnavaliDentry.txt",
 		os.O_CREATE|os.O_RDWR|os.O_TRUNC|os.O_APPEND, 0644)
@@ -306,6 +327,8 @@ func main() {
 			"UnavaliDentryCnt": UnavaliDentryCnt,
 			"UnavalidInoSize":  UnavaliInodeSize,
 			"LackPidSize":      LackPidSize,
+			"NLink0InodeCnt":   len(NLink0Inodes),
+			"NLink0Size":       NLink0Size,
 		},
 	})
 	if err != nil {
