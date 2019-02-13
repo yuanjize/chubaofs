@@ -10,15 +10,19 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
+	"io/ioutil"
 )
 
 var (
-	adminHost string
-	volName   string
-	statsTime int64
-	gConnPool = pool.NewConnectPool()
+	adminHost        string
+	volName          string
+	statsTime        int64
+	gConnPool        = pool.NewConnectPool()
+	inodeFile        = flag.String("ino", "/tmp/inode.txt", "default inode file")
+	dentryFile       = flag.String("dentry", "/tmp/dentry.txt", "default dentry file")
+	unavaliInodeFile = flag.String("unavali", "/tmp/unavali.txt", "unavali inode file")
+
 )
 
 type volStat struct {
@@ -124,7 +128,19 @@ type EvictInodeRequest struct {
 	Inode       uint64 `json:"ino"`
 }
 
-func EvictInode(inodes []*Inode, volname string, pID uint64, metaHost string) {
+func EvictInode(pID uint64, metaHost string) {
+	data, err := ioutil.ReadFile(*unavaliInodeFile)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	inodes := make([]*Inode, 0)
+	err = json.Unmarshal(data, inodes)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
 	for _, ino := range inodes {
 		p := proto.NewPacket()
 		p.Opcode = proto.OpMetaEvictInode
@@ -222,20 +238,20 @@ func main() {
 		return
 	}
 
-	metaHost, metaId, err := getMetaPartition(adminHost, volName)
+	_, _, err = getMetaPartition(adminHost, volName)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("get vol stat error %v", err))
 		return
 	}
 
 	// get all inodes
-	inoMap, metaSize, err := getAllInodes(metaHost, metaId)
+	inoMap, metaSize, err := getAllInodes(*inodeFile)
 	if err != nil {
 		fmt.Println("get all inodes: ", err.Error())
 		return
 	}
 
-	dMap, err := getAllDentry(metaHost, metaId)
+	dMap, err := getAllDentry(*dentryFile)
 	if err != nil {
 		fmt.Println("get all dentry: ", err.Error())
 	}
@@ -299,15 +315,15 @@ func main() {
 	fmt.Printf("%s\n", data)
 }
 
-func getAllInodes(host string, pid uint64) (imap map[uint64]*Inode,
+func getAllInodes(inodeFile string) (imap map[uint64]*Inode,
 	size uint64, err error) {
-	resp, err := http.Get(fmt.Sprintf("http://%s:9092/getInodeRange?id=%d",
-		strings.Split(host, ":")[0], pid))
+
+	fp, err := os.Open(inodeFile)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	reader := bufio.NewReader(resp.Body)
+	defer fp.Close()
+	reader := bufio.NewReader(fp)
 	imap = make(map[uint64]*Inode)
 	var buf []byte
 	for {
@@ -338,14 +354,20 @@ func getAllInodes(host string, pid uint64) (imap map[uint64]*Inode,
 	return
 }
 
-func getAllDentry(host string, pid uint64) (dmap map[uint64]*Dentry, err error) {
-	resp, err := http.Get(fmt.Sprintf("http://%s:9092/getDentry?pid=%d",
-		strings.Split(host, ":")[0], pid))
+func getAllDentry(dentryFile string) (dmap map[uint64]*Dentry, err error) {
+	//resp, err := http.Get(fmt.Sprintf("http://%s:9092/getDentry?pid=%d",
+	//	strings.Split(host, ":")[0], pid))
+	//if err != nil {
+	//	return
+	//}
+	//defer resp.Body.Close()
+
+	fp, err := os.Open(dentryFile)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	reader := bufio.NewReader(resp.Body)
+	defer fp.Close()
+	reader := bufio.NewReader(fp)
 	var buf []byte
 	den := &Dentry{}
 	dmap = make(map[uint64]*Dentry)
