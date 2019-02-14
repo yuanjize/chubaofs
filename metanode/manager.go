@@ -200,9 +200,9 @@ func (m *metaManager) loadPartitions() (err error) {
 			go func(fileName string) {
 				var err error
 				defer func() {
-					if r := recover(); r != nil {
+					if r := recover(); r != nil || err != nil {
 						log.LogErrorf("loadPartitions partition: %s, "+
-							"error: %s, failed: %v", fileName, err, r)
+							"error: %v, failed: %v", fileName, err, r)
 						log.LogFlush()
 						panic(r)
 					}
@@ -216,7 +216,9 @@ func (m *metaManager) loadPartitions() (err error) {
 				partitionId := fileName[len(partitionPrefix):]
 				id, err = strconv.ParseUint(partitionId, 10, 64)
 				if err != nil {
-					log.LogWarnf("ignore path: %s,not partition", partitionId)
+					log.LogWarnf("loadPartition ignore path: %s,not partition",
+						fileName)
+					err = nil
 					return
 				}
 				partitionConfig := &MetaPartitionConfig{
@@ -230,10 +232,6 @@ func (m *metaManager) loadPartitions() (err error) {
 				}
 				partition := NewMetaPartition(partitionConfig)
 				err = m.attachPartition(id, partition)
-				if err != nil {
-					log.LogErrorf("load partition id=%d failed: %s.",
-						id, err.Error())
-				}
 			}(fileInfo.Name())
 		}
 	}
