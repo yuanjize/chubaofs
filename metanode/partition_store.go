@@ -15,17 +15,17 @@
 package metanode
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/tiglabs/containerfs/proto"
+	"github.com/tiglabs/containerfs/third_party/btree"
+	"github.com/tiglabs/containerfs/third_party/juju/errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
-
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/third_party/btree"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
 )
 
 const (
@@ -86,10 +86,13 @@ func (mp *metaPartition) loadInode() (err error) {
 		return
 	}
 	defer fp.Close()
+	reader := bufio.NewReaderSize(fp, 4*1024*1024)
 	lenBuf := make([]byte, 4)
+	var bodyBuf []byte
 	for {
+		bodyBuf = bodyBuf[:0]
 		// First read length
-		_, err = io.ReadFull(fp, lenBuf)
+		_, err = io.ReadFull(reader, lenBuf)
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -100,14 +103,18 @@ func (mp *metaPartition) loadInode() (err error) {
 		}
 		length := binary.BigEndian.Uint32(lenBuf)
 		// Now Read Body
-		buf := make([]byte, length)
-		_, err = io.ReadFull(fp, buf)
+		if uint32(cap(bodyBuf)) >= length {
+			bodyBuf = bodyBuf[:length]
+		} else {
+			bodyBuf = make([]byte, length)
+		}
+		_, err = io.ReadFull(reader, bodyBuf)
 		if err != nil {
 			err = errors.Errorf("[loadInode] ReadBody: %s", err.Error())
 			return
 		}
 		ino := NewInode(0, 0)
-		if err = ino.Unmarshal(buf); err != nil {
+		if err = ino.Unmarshal(bodyBuf); err != nil {
 			err = errors.Errorf("[loadInode] Unmarshal: %s", err.Error())
 			return
 		}
@@ -136,10 +143,13 @@ func (mp *metaPartition) loadDentry() (err error) {
 		return
 	}
 	defer fp.Close()
+	reader := bufio.NewReaderSize(fp, 4*1024*1024)
 	lenBuf := make([]byte, 4)
+	var bodyBuf []byte
 	for {
+		bodyBuf = bodyBuf[:0]
 		// First Read 4byte header length
-		_, err = io.ReadFull(fp, lenBuf)
+		_, err = io.ReadFull(reader, lenBuf)
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -151,14 +161,18 @@ func (mp *metaPartition) loadDentry() (err error) {
 
 		length := binary.BigEndian.Uint32(lenBuf)
 		// Now Read Body Data
-		buf := make([]byte, length)
-		_, err = io.ReadFull(fp, buf)
+		if uint32(cap(bodyBuf)) >= length {
+			bodyBuf = bodyBuf[:length]
+		} else {
+			bodyBuf = make([]byte, length)
+		}
+		_, err = io.ReadFull(reader, bodyBuf)
 		if err != nil {
 			err = errors.Errorf("[loadDentry]: ReadBody: %s", err.Error())
 			return
 		}
 		dentry := &Dentry{}
-		if err = dentry.Unmarshal(buf); err != nil {
+		if err = dentry.Unmarshal(bodyBuf); err != nil {
 			err = errors.Errorf("[loadDentry] Unmarshal: %s", err.Error())
 			return
 		}
