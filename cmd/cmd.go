@@ -32,7 +32,7 @@ import (
 	"syscall"
 )
 
-const (
+var (
 	Version = "1.0"
 )
 
