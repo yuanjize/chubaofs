@@ -72,6 +72,7 @@ func (t *Topology) putRack(rack *Rack) {
 		rack = oldRack
 		return
 	}
+	t.rackMap[rack.name] = rack
 	if ok := t.isExist(rack.name); !ok {
 		t.racks = append(t.racks, rack.name)
 	}
