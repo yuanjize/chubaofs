@@ -199,7 +199,6 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 	}
 
 	shouldCommit := make([]*Inode, 0, BatchCounts)
-	var err error
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, ino := range inoSlice {
@@ -208,10 +207,10 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 			defer wg.Done()
 			var reExt []proto.ExtentKey
 			ino.Extents.Range(func(i int, v proto.ExtentKey) bool {
-				if err = stepFunc(v); err != nil {
+				if err := stepFunc(v); err != nil {
 					reExt = append(reExt, v)
 					log.LogWarnf("[deleteExtent] extentKey: %s, "+
-						"err: %s", v.String(), err.Error())
+						"err: %v", v.String(), err)
 				}
 				return true
 			})
