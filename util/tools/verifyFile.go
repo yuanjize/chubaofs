@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	fileCnt    = flag.Int("count", 10000000, "create file count")
-	para       = flag.Int("para", 300, "parallel processes")
-	rootPath   = flag.String("root", "/mnt/intest", "rootPath")
-	sumSize    = flag.Int("size", 1024*1200, "default max size")
-	prefix     = flag.String("prefix", "1", "default prefix")
-	isFixSize  = flag.Bool("isfix", false, "is fixSize write")
-	currentCnt uint64
+	fileCnt     = flag.Int("count", 10000000, "create file count")
+	para        = flag.Int("para", 300, "parallel processes")
+	rootPath    = flag.String("root", "/mnt/intest", "rootPath")
+	sumSize     = flag.Int("size", 1024*1200, "default max size")
+	prefix      = flag.String("prefix", "1", "default prefix")
+	isFixSize   = flag.Bool("isfix", false, "is fixSize write")
+	isOnlyWrite = flag.Bool("onlyWrite", true, "only write")
+	currentCnt  uint64
 )
 
 type VerifyInfo struct {
@@ -195,6 +196,9 @@ func create(wg *sync.WaitGroup) {
 			fmt.Println(err.Error())
 			continue
 			panic(err.Error())
+		}
+		if *isOnlyWrite {
+			continue
 		}
 		err = read(filename)
 		if err != nil {
