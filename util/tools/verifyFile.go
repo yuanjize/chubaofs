@@ -88,14 +88,10 @@ func write(name string, isFixSizeWrite bool) (verifyInfo []*VerifyInfo, err erro
 	fileSize := rand.Intn(*sumSize)
 	for {
 		rand.Seed(time.Now().UnixNano())
-		n := rand.Intn(1024)
+		n := rand.Intn(200 * 1024)
 		if isFixSizeWrite {
 			n = rand.Intn(3) * 1024 * 1024
 		}
-		if n <= 1 {
-			n = 2
-		}
-
 		v := new(VerifyInfo)
 		v.Name = name
 		v.Offset = offset
