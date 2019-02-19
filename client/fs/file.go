@@ -103,6 +103,7 @@ func (f *File) Forget() {
 		}
 	}
 
+	f.super.ic.Delete(ino)
 	if err := f.super.ec.EvictStream(ino); err != nil {
 		log.LogWarnf("Forget: stream not ready to evict, ino(%v) err(%v)", ino, err)
 	}
@@ -137,13 +138,14 @@ func (f *File) Release(ctx context.Context, req *fuse.ReleaseRequest) (err error
 	if req.Flags.IsWriteOnly() || req.Flags.IsReadWrite() {
 		flag = proto.FlagWrite
 	}
+
+	f.super.ic.Delete(ino)
 	err = f.super.ec.CloseStream(ino, flag)
 	if err != nil {
 		log.LogErrorf("Release: close writer failed, ino(%v) req(%v) err(%v)", ino, req, err)
 		return fuse.EIO
 	}
 
-	f.super.ic.Delete(ino)
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Release: ino(%v) req(%v) (%v)ns", ino, req, elapsed.Nanoseconds())
 	return nil
