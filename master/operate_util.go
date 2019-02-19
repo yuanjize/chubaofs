@@ -15,6 +15,8 @@
 package master
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/tiglabs/containerfs/proto"
@@ -114,4 +116,15 @@ func Warn(clusterID, msg string) {
 func WarnBySpecialUmpKey(umpKey, msg string) {
 	log.LogWarn(msg)
 	ump.Alarm(umpKey, msg)
+}
+
+func matchKey(serverKey, clientKey string) bool {
+	h := md5.New()
+	_, err := h.Write([]byte(serverKey))
+	if err != nil {
+		log.LogWarnf("action[matchKey] write server key[%v] failed,err[%v]", serverKey, err)
+		return false
+	}
+	cipherStr := h.Sum(nil)
+	return clientKey == hex.EncodeToString(cipherStr)
 }

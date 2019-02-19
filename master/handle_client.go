@@ -292,9 +292,17 @@ func parseGetVolPara(r *http.Request) (name string, err error) {
 	return checkVolPara(r)
 }
 
+func checkAuthKeyPara(r *http.Request) (authKey string, err error) {
+	if authKey = r.FormValue(ParaAuthKey); authKey == "" {
+		err = paraNotFound(ParaAuthKey)
+		return
+	}
+	return
+}
+
 func checkVolPara(r *http.Request) (name string, err error) {
 	if name = r.FormValue(ParaName); name == "" {
-		err = paraNotFound(name)
+		err = paraNotFound(ParaName)
 		return
 	}
 
