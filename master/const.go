@@ -26,6 +26,8 @@ const (
 	ParaEnable            = "enable"
 	ParaThreshold         = "threshold"
 	ParaVolCapacity       = "capacity"
+	ParaVolOwner          = "owner"
+	ParaAuthKey           = "authKey"
 )
 
 const (

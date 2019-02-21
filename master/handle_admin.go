@@ -68,6 +68,20 @@ type BadPartitionView struct {
 	PartitionIDs []uint64
 }
 
+// SimpleVolView defines the simple view of a volume
+type SimpleVolView struct {
+	ID           uint64
+	Name         string
+	Owner        string
+	DpReplicaNum uint8
+	MpReplicaNum uint8
+	Status       uint8
+	Capacity     uint64 // GB
+	RwDpCnt      int
+	MpCnt        int
+	DpCnt        int
+}
+
 func (m *Master) setMetaNodeThreshold(w http.ResponseWriter, r *http.Request) {
 	var (
 		threshold float64
@@ -363,15 +377,16 @@ errDeal:
 
 func (m *Master) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		name string
-		err  error
-		msg  string
+		name    string
+		authKey string
+		err     error
+		msg     string
 	)
 
-	if name, err = parseDeleteVolPara(r); err != nil {
+	if name, authKey, err = parseDeleteVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.markDeleteVol(name); err != nil {
+	if err = m.cluster.markDeleteVol(name, authKey); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("delete vol[%v] successed,from[%v]", name, r.RemoteAddr)
@@ -388,14 +403,15 @@ errDeal:
 func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name     string
+		authKey  string
 		err      error
 		msg      string
 		capacity int
 	)
-	if name, capacity, err = parseUpdateVolPara(r); err != nil {
+	if name, authKey, capacity, err = parseUpdateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.updateVol(name, capacity); err != nil {
+	if err = m.cluster.updateVol(name, authKey, capacity); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("update vol[%v] successed\n", name)
@@ -410,6 +426,7 @@ errDeal:
 func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name       string
+		owner      string
 		err        error
 		msg        string
 		volType    string
@@ -418,11 +435,11 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		vol        *Vol
 	)
 
-	if name, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
+	if name, owner, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
 
-	if err = m.cluster.createVol(name, volType, uint8(replicaNum), capacity); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -436,6 +453,46 @@ errDeal:
 	logMsg := getReturnMessage("createVol", r.RemoteAddr, err.Error(), http.StatusBadRequest)
 	HandleError(logMsg, err, http.StatusBadRequest, w)
 	return
+}
+
+func (m *Master) getVolSimpleInfo(w http.ResponseWriter, r *http.Request) {
+	var (
+		err     error
+		name    string
+		vol     *Vol
+		volView *SimpleVolView
+		body    []byte
+	)
+	if name, err = parseGetVolPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		goto errDeal
+	}
+	volView = newSimpleView(vol)
+	if body, err = json.Marshal(volView); err != nil {
+		goto errDeal
+	}
+	w.Write(body)
+	return
+errDeal:
+	logMsg := getReturnMessage("getVolSimpleInfo", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
+func newSimpleView(vol *Vol) *SimpleVolView {
+	return &SimpleVolView{
+		Name:         vol.Name,
+		Owner:        vol.Owner,
+		DpReplicaNum: vol.dpReplicaNum,
+		MpReplicaNum: vol.mpReplicaNum,
+		Status:       vol.Status,
+		Capacity:     vol.Capacity,
+		RwDpCnt:      vol.dataPartitions.readWriteDataPartitions,
+		MpCnt:        len(vol.MetaPartitions),
+		DpCnt:        len(vol.dataPartitions.dataPartitionMap),
+	}
 }
 
 func (m *Master) addDataNode(w http.ResponseWriter, r *http.Request) {
@@ -835,12 +892,18 @@ func parseTaskResponse(r *http.Request) (tr *proto.AdminTask, err error) {
 	return
 }
 
-func parseDeleteVolPara(r *http.Request) (name string, err error) {
+func parseDeleteVolPara(r *http.Request) (name, authKey string, err error) {
 	r.ParseForm()
-	return checkVolPara(r)
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if authKey, err = checkAuthKeyPara(r); err != nil {
+		return
+	}
+	return
 }
 
-func parseUpdateVolPara(r *http.Request) (name string, capacity int, err error) {
+func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -852,10 +915,13 @@ func parseUpdateVolPara(r *http.Request) (name string, capacity int, err error) 
 	} else {
 		err = paraNotFound(ParaVolCapacity)
 	}
+	if authKey, err = checkAuthKeyPara(r); err != nil {
+		return
+	}
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum, capacity int, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, replicaNum, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -875,6 +941,11 @@ func parseCreateVolPara(r *http.Request) (name, volType string, replicaNum, capa
 		}
 	} else {
 		capacity = DefaultVolCapacity
+	}
+
+	if owner = r.FormValue(ParaVolOwner); owner == "" {
+		err = paraNotFound(ParaVolOwner)
+		return
 	}
 	return
 }

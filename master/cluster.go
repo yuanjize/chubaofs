@@ -366,10 +366,21 @@ func (c *Cluster) deleteVol(name string) {
 	return
 }
 
-func (c *Cluster) markDeleteVol(name string) (err error) {
-	var vol *Vol
+func (c *Cluster) markDeleteVol(name, authKey string) (err error) {
+	var (
+		vol           *Vol
+		serverAuthKey string
+	)
 	if vol, err = c.getVol(name); err != nil {
 		return
+	}
+	if vol.Owner != "" {
+		serverAuthKey = vol.Owner
+	} else {
+		serverAuthKey = vol.Name
+	}
+	if !matchKey(serverAuthKey, authKey) {
+		return VolAuthKeyNotMatch
 	}
 	vol.Status = VolMarkDelete
 	if err = c.syncUpdateVol(vol); err != nil {
@@ -658,10 +669,21 @@ func (c *Cluster) delMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) updateVol(name string, capacity int) (err error) {
-	var vol *Vol
+func (c *Cluster) updateVol(name, authKey string, capacity int) (err error) {
+	var (
+		vol           *Vol
+		serverAuthKey string
+	)
 	if vol, err = c.getVol(name); err != nil {
 		goto errDeal
+	}
+	if vol.Owner != "" {
+		serverAuthKey = vol.Owner
+	} else {
+		serverAuthKey = vol.Name
+	}
+	if !matchKey(serverAuthKey, authKey) {
+		return VolAuthKeyNotMatch
 	}
 	if uint64(capacity) < vol.Capacity {
 		err = fmt.Errorf("capacity[%v] less than old capacity[%v]", capacity, vol.Capacity)
@@ -679,12 +701,12 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVol(name, volType string, replicaNum uint8, capacity int) (err error) {
+func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity int) (err error) {
 	var (
 		vol                     *Vol
 		readWriteDataPartitions int
 	)
-	if vol, err = c.createVolInternal(name, volType, replicaNum, capacity); err != nil {
+	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity); err != nil {
 		goto errDeal
 	}
 
@@ -712,12 +734,12 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVolInternal(name, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
+func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
 	}
-	vol = NewVol(name, volType, replicaNum, uint64(capacity))
+	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity))
 	if err = c.syncAddVol(vol); err != nil {
 		goto errDeal
 	}

@@ -34,6 +34,7 @@ const (
 	AdminDeleteVol            = "/vol/delete"
 	AdminUpdateVol            = "/vol/update"
 	AdminCreateVol            = "/admin/createVol"
+	AdminGetVol                    = "/admin/getVol"
 	AdminClusterFreeze        = "/cluster/freeze"
 	AdminGetIp                = "/admin/getIp"
 	AdminCreateMP             = "/metaPartition/create"
@@ -84,6 +85,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminDataPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminDataPartitionDelete, m.handlerWithInterceptor())
 	http.Handle(AdminCreateVol, m.handlerWithInterceptor())
+	http.Handle(AdminGetVol, m.handlerWithInterceptor())
 	http.Handle(AdminDeleteVol, m.handlerWithInterceptor())
 	http.Handle(AdminUpdateVol, m.handlerWithInterceptor())
 	http.Handle(AdminClusterFreeze, m.handlerWithInterceptor())
@@ -164,6 +166,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.deleteDataPartition(w, r)
 	case AdminCreateVol:
 		m.createVol(w, r)
+	case AdminGetVol:
+		m.getVolSimpleInfo(w, r)
 	case AdminDeleteVol:
 		m.markDeleteVol(w, r)
 	case AdminUpdateVol:

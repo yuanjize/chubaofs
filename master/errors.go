@@ -47,6 +47,7 @@ var (
 	ErrBadConfFile                      = errors.New("BadConfFile")
 	InvalidDataPartitionType            = errors.New("invalid data partition type. extent or tiny")
 	ParaEnableNotFound                  = errors.New("para enable not found")
+	VolAuthKeyNotMatch                  = errors.New("client and server auth key do not match")
 )
 
 func paraNotFound(name string) (err error) {
