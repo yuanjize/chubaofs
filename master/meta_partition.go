@@ -431,7 +431,7 @@ func (mp *MetaPartition) GenerateReplicaTask(clusterID, volName string) (tasks [
 			" on :%v PersistenceHosts:%v",
 			clusterID, mp.PartitionID, lackAddrs, mp.PersistenceHosts)
 		log.LogWarn(msg)
-		tasks = append(tasks, mp.generateAddLackMetaReplicaTask(lackAddrs, volName)...)
+		//tasks = append(tasks, mp.generateAddLackMetaReplicaTask(lackAddrs, volName)...)
 	}
 
 	return
