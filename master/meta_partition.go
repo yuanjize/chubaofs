@@ -430,8 +430,7 @@ func (mp *MetaPartition) GenerateReplicaTask(clusterID, volName string) (tasks [
 		msg = fmt.Sprintf("action[getLackReplication],clusterID[%v] metaPartition:%v  lack replication"+
 			" on :%v PersistenceHosts:%v",
 			clusterID, mp.PartitionID, lackAddrs, mp.PersistenceHosts)
-		log.LogWarn(msg)
-		//tasks = append(tasks, mp.generateAddLackMetaReplicaTask(lackAddrs, volName)...)
+		Warn(clusterID, msg)
 	}
 
 	return
