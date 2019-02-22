@@ -64,18 +64,18 @@ func (t *Topology) getRack(name string) (rack *Rack, err error) {
 	return
 }
 
-func (t *Topology) putRack(rack *Rack) {
+func (t *Topology) putRack(rack *Rack) *Rack {
 	t.rackLock.Lock()
 	defer t.rackLock.Unlock()
 	oldRack, ok := t.rackMap[rack.name]
 	if ok {
-		rack = oldRack
-		return
+		return oldRack
 	}
 	t.rackMap[rack.name] = rack
 	if ok := t.isExist(rack.name); !ok {
 		t.racks = append(t.racks, rack.name)
 	}
+	return rack
 }
 
 func (t *Topology) isExist(rackName string) (ok bool) {
@@ -98,7 +98,7 @@ func (t *Topology) putDataNode(dataNode *DataNode) {
 	rack, err := t.getRack(dataNode.RackName)
 	if err != nil {
 		rack = NewRack(dataNode.RackName)
-		t.putRack(rack)
+		rack = t.putRack(rack)
 	}
 	rack.PutDataNode(dataNode)
 }
