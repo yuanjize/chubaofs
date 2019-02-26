@@ -88,9 +88,13 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr string, partitionID uin
 		onlineAddrs []string
 		newPeers    []proto.Peer
 		removePeer  proto.Peer
+		metaNode    *MetaNode
 	)
 	log.LogWarnf("action[metaPartitionOffline],volName[%v],nodeAddr[%v],partitionID[%v]", volName, nodeAddr, partitionID)
 	if vol, err = c.getVol(volName); err != nil {
+		goto errDeal
+	}
+	if metaNode, err = c.getMetaNode(nodeAddr); err != nil {
 		goto errDeal
 	}
 	if mp, err = vol.getMetaPartition(partitionID); err != nil {
@@ -112,12 +116,16 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr string, partitionID uin
 
 	onlineAddrs = make([]string, len(newHosts))
 	copy(onlineAddrs, newHosts)
-	for _, mr := range mp.Replicas {
-		if mr.Addr == nodeAddr {
-			removePeer = proto.Peer{ID: mr.nodeId, Addr: mr.Addr}
+	for _, host := range mp.PersistenceHosts {
+		if host == nodeAddr {
+			removePeer = proto.Peer{ID: metaNode.ID, Addr: nodeAddr}
 		} else {
-			newPeers = append(newPeers, proto.Peer{ID: mr.nodeId, Addr: mr.Addr})
-			newHosts = append(newHosts, mr.Addr)
+			var mn *MetaNode
+			if mn, err = c.getMetaNode(host); err != nil {
+				goto errDeal
+			}
+			newPeers = append(newPeers, proto.Peer{ID: mn.ID, Addr: host})
+			newHosts = append(newHosts, host)
 		}
 	}
 
