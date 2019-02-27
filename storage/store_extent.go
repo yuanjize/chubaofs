@@ -34,6 +34,7 @@ import (
 	"github.com/tiglabs/containerfs/util"
 	"github.com/tiglabs/containerfs/util/log"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -780,7 +781,7 @@ func (s *ExtentStore) initTinyExtent() (err error) {
 	var extentId uint64
 	for extentId = TinyExtentStartId; extentId < TinyExtentStartId+TinyExtentCount; extentId++ {
 		err = s.Create(extentId, 0)
-		if err != nil && !strings.Contains(err.Error(), ErrorExtentHasExsit.Error()) {
+		if err != nil && !strings.Contains(err.Error(), syscall.EEXIST.Error()) {
 			return
 		}
 		err = nil
