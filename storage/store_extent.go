@@ -180,7 +180,13 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 }
 
 func (s *ExtentStore) NextExtentId() (extentId uint64) {
-	return atomic.AddUint64(&s.baseExtentId, 1)
+	extentId = atomic.AddUint64(&s.baseExtentId, 1)
+	if !IsTinyExtent(extentId) {
+		return extentId
+	}
+	extentId = atomic.AddUint64(&s.baseExtentId, TinyExtentCount)
+
+	return
 }
 
 func (s *ExtentStore) getExtentKey(extent uint64) string {
