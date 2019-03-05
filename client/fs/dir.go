@@ -18,12 +18,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/util/log"
 )
 
 type Dir struct {

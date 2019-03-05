@@ -20,9 +20,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
 
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/util/log"
 )
 
 const (

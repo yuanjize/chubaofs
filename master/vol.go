@@ -16,9 +16,9 @@ package master
 
 import (
 	"fmt"
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/util"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/log"
 	"sync"
 )
 
@@ -37,7 +37,7 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func NewVol(name,owner, volType string, replicaNum uint8, capacity uint64) (vol *Vol) {
+func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.Owner = owner
 	vol.dataPartitions = NewDataPartitionMap(name)

@@ -17,9 +17,9 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	bsProto "github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/log"
+	bsProto "github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util/log"
 	"github.com/tiglabs/raft/proto"
 	"strconv"
 	"strings"

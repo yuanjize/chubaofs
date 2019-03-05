@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 
 	"fmt"
-	"github.com/tiglabs/containerfs/proto"
+	"github.com/chubaofs/cfs/proto"
 )
 
 func (mp *metaPartition) CreateDentry(req *CreateDentryReq, p *Packet) (err error) {

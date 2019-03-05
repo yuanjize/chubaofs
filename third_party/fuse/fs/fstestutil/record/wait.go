@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 )
 

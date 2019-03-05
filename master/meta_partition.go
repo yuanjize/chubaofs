@@ -19,9 +19,9 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util/log"
 	"strings"
 	"time"
 )

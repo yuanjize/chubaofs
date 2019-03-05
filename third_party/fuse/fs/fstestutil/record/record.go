@@ -1,11 +1,11 @@
-package record // import "github.com/tiglabs/containerfs/third_party/fuse/fs/fstestutil/record"
+package record // import "github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil/record"
 
 import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 )
 

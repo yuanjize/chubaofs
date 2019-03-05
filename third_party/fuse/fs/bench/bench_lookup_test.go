@@ -6,9 +6,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs/fstestutil"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil"
 )
 
 type benchLookupDir struct {

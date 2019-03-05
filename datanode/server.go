@@ -29,15 +29,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tiglabs/containerfs/master"
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/storage"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/third_party/pool"
-	"github.com/tiglabs/containerfs/util"
-	"github.com/tiglabs/containerfs/util/config"
-	"github.com/tiglabs/containerfs/util/log"
-	"github.com/tiglabs/containerfs/util/ump"
+	"github.com/chubaofs/cfs/master"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/storage"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/third_party/pool"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/cfs/util/ump"
 )
 
 var (

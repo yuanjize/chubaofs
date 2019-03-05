@@ -19,10 +19,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/sdk/data/wrapper"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/sdk/data/wrapper"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util/log"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -276,10 +276,10 @@ func (s *StreamWriter) server() {
 			}
 			for {
 				select {
-					case req:=<-s.requestCh:
-						s.handleExit(req)
-					default:
-						return
+				case req := <-s.requestCh:
+					s.handleExit(req)
+				default:
+					return
 				}
 			}
 

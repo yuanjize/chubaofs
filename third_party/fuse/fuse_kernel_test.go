@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse"
 )
 
 func TestOpenFlagsAccmodeMaskReadWrite(t *testing.T) {

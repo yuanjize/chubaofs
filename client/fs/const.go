@@ -18,9 +18,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse"
 
-	"github.com/tiglabs/containerfs/proto"
+	"github.com/chubaofs/cfs/proto"
 )
 
 const (

@@ -15,15 +15,15 @@
 package main
 
 import (
-	"github.com/tiglabs/containerfs/datanode"
-	"github.com/tiglabs/containerfs/master"
-	"github.com/tiglabs/containerfs/metanode"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/datanode"
+	"github.com/chubaofs/cfs/master"
+	"github.com/chubaofs/cfs/metanode"
+	"github.com/chubaofs/cfs/util/log"
 	"strings"
 
 	"flag"
 	"fmt"
-	"github.com/tiglabs/containerfs/util/config"
+	"github.com/chubaofs/cfs/util/config"
 	"net/http"
 	_ "net/http/pprof"
 	"os"

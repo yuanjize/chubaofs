@@ -16,9 +16,9 @@ package stream
 
 import (
 	"encoding/binary"
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/sdk/data/wrapper"
-	"github.com/tiglabs/containerfs/util"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/sdk/data/wrapper"
+	"github.com/chubaofs/cfs/util"
 	"hash/crc32"
 	"io"
 	"net"

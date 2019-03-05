@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse"
 )
 
 type flagDebug bool

@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util/log"
 	"net/http/httputil"
 )
 
@@ -34,7 +34,7 @@ const (
 	AdminDeleteVol            = "/vol/delete"
 	AdminUpdateVol            = "/vol/update"
 	AdminCreateVol            = "/admin/createVol"
-	AdminGetVol                    = "/admin/getVol"
+	AdminGetVol               = "/admin/getVol"
 	AdminClusterFreeze        = "/cluster/freeze"
 	AdminGetIp                = "/admin/getIp"
 	AdminCreateMP             = "/metaPartition/create"

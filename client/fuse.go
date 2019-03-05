@@ -31,13 +31,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
 
-	bdfs "github.com/tiglabs/containerfs/client/fs"
-	"github.com/tiglabs/containerfs/util/config"
-	"github.com/tiglabs/containerfs/util/log"
-	"github.com/tiglabs/containerfs/util/ump"
+	bdfs "github.com/chubaofs/cfs/client/fs"
+	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/cfs/util/ump"
 	"strconv"
 )
 

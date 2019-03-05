@@ -17,8 +17,8 @@ package buf
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/tiglabs/containerfs/storage"
-	"github.com/tiglabs/containerfs/third_party/pool"
+	"github.com/chubaofs/cfs/storage"
+	"github.com/chubaofs/cfs/third_party/pool"
 	"hash/crc32"
 	"math/rand"
 	"testing"

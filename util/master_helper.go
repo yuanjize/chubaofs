@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/util/log"
 	"hash/crc32"
 	"io/ioutil"
 	"net/http"

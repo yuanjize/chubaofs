@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/storage"
-	"github.com/tiglabs/containerfs/util"
-	"github.com/tiglabs/containerfs/util/ump"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/storage"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/ump"
 )
 
 var (

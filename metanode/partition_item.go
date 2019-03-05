@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/tiglabs/containerfs/third_party/btree"
+	"github.com/chubaofs/cfs/third_party/btree"
 )
 
 type MetaItem struct {

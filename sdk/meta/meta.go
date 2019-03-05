@@ -21,11 +21,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/btree"
+	"github.com/chubaofs/cfs/third_party/btree"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/third_party/pool"
-	"github.com/tiglabs/containerfs/util"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/third_party/pool"
+	"github.com/chubaofs/cfs/util"
 )
 
 const (

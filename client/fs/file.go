@@ -18,14 +18,14 @@ import (
 	"io"
 	"time"
 
-	"github.com/tiglabs/containerfs/third_party/fuse"
-	"github.com/tiglabs/containerfs/third_party/fuse/fs"
+	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/cfs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/sdk/data/stream"
-	"github.com/tiglabs/containerfs/util"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/sdk/data/stream"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/log"
 	"sync"
 )
 

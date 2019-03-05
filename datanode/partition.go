@@ -26,13 +26,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tiglabs/containerfs/master"
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/storage"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/master"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/storage"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/log"
 	"syscall"
-	"github.com/tiglabs/containerfs/util"
 )
 
 const (

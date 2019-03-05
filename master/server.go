@@ -16,11 +16,11 @@ package master
 
 import (
 	"fmt"
-	"github.com/tiglabs/containerfs/raftstore"
-	"github.com/tiglabs/containerfs/third_party/juju/errors"
-	"github.com/tiglabs/containerfs/util/config"
-	"github.com/tiglabs/containerfs/util/log"
-	"github.com/tiglabs/containerfs/util/ump"
+	"github.com/chubaofs/cfs/raftstore"
+	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/cfs/util/ump"
 	"net/http/httputil"
 	"strconv"
 	"sync"

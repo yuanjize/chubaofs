@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tiglabs/containerfs/util/config"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/cfs/util/log"
 )
 
 func TestValidNodeID(t *testing.T) {

@@ -29,10 +29,10 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/tiglabs/containerfs/proto"
-	"github.com/tiglabs/containerfs/sdk/meta"
-	"github.com/tiglabs/containerfs/util"
-	"github.com/tiglabs/containerfs/util/log"
+	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/sdk/meta"
+	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/cfs/util/log"
 	"strings"
 	"syscall"
 )
