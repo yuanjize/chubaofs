@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"io/ioutil"
 )
 
 type Level uint8
@@ -45,6 +46,7 @@ const (
 	FileOpt              = os.O_RDWR | os.O_CREATE | os.O_APPEND
 	WriterBufferInitSize = 4 * 1024 * 1024
 	WriterBufferLenLimit = 4 * 1024 * 1024
+	RetentionTime        = 7 * 86400 //units: sec
 )
 
 var levelPrefixes = []string{
@@ -451,9 +453,24 @@ func LogFlush() {
 
 func (l *Log) checkLogRotation(logDir, module string) {
 	for {
-		yesterday := time.Now().AddDate(0, 0, -1)
-		_, err := os.Stat(logDir + "/" + module + ErrLogFileName + "." + yesterday.Format(FileNameDateFormat))
-		if err == nil || time.Now().Day() == l.startTime.Day() {
+		now := time.Now()
+		// check and delete >RetentionTime days old log files
+		fInfos, err := ioutil.ReadDir(logDir)
+		if err != nil {
+			LogErrorf("[checkLogRotation] read log dir: %s", err)
+			continue
+		}
+		for _, info := range fInfos {
+			if info.IsDir() {
+				continue
+			}
+			if (now.Unix() - info.ModTime().Unix()) > RetentionTime {
+				os.Remove(path.Join(logDir, info.Name()))
+			}
+		}
+		yesterday := now.AddDate(0, 0, -1)
+		_, err = os.Stat(logDir + "/" + module + ErrLogFileName + "." + yesterday.Format(FileNameDateFormat))
+		if err == nil || now.Day() == l.startTime.Day() {
 			time.Sleep(time.Second * 600)
 			continue
 		}
