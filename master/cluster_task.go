@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"strings"
 )
 
 func (c *Cluster) putDataNodeTasks(tasks []*proto.AdminTask) {
@@ -78,7 +79,63 @@ func (c *Cluster) loadDataPartitionAndCheckResponse(dp *DataPartition) {
 	}()
 }
 
-func (c *Cluster) metaPartitionOffline(volName, nodeAddr string, partitionID uint64) (err error) {
+func (c *Cluster) updateMetaPartitionHosts(volName, hosts string, partitionID uint64) (err error) {
+	var (
+		vol      *Vol
+		mp       *MetaPartition
+		oldHosts []string
+		oldPeers []proto.Peer
+		newHosts []string
+		newPeers []proto.Peer
+	)
+	log.LogWarnf("action[updateMetaPartitionHosts],volName[%v],partitionID[%v],newHosts[%v]", volName, partitionID, hosts)
+	if vol, err = c.getVol(volName); err != nil {
+		goto errDeal
+	}
+	if mp, err = vol.getMetaPartition(partitionID); err != nil {
+		goto errDeal
+	}
+	mp.Lock()
+	defer mp.Unlock()
+	newHosts = strings.Split(hosts, CommaSeparator)
+	if len(newHosts) != int(mp.ReplicaNum) {
+		err = fmt.Errorf("the number of host[%v] must be equal with replicaNum[%v]", hosts, mp.ReplicaNum)
+		goto errDeal
+	}
+	newPeers = make([]proto.Peer, 0)
+	for _, host := range newHosts {
+		metaNode, err := c.getMetaNode(host)
+		if err != nil {
+			goto errDeal
+		}
+		peer := proto.Peer{ID: metaNode.ID, Addr: host}
+		newPeers = append(newPeers, peer)
+	}
+	// reset hosts and peers
+	oldHosts = mp.PersistenceHosts
+	oldPeers = mp.Peers
+	mp.PersistenceHosts = newHosts
+	mp.Peers = newPeers
+	if err = c.syncUpdateMetaPartition(volName, mp); err != nil {
+		mp.PersistenceHosts = oldHosts
+		mp.Peers = oldPeers
+		goto errDeal
+	}
+	mp.Replicas = make([]*MetaReplica, 0)
+	mp.Status = proto.Unavaliable
+	mp.MissNodes = make(map[string]int64, 0)
+	log.LogWarnf("action[updateMetaPartitionHosts],vol[%v],mpID[%v] update hosts success,newHosts[%v],oldHosts[%v]",
+		volName, partitionID, hosts, strings.Join(oldHosts, UnderlineSeparator))
+	return
+errDeal:
+	log.LogError(fmt.Sprintf("action[updateMetaPartitionHosts],volName: %v,partitionID: %v,err: %v",
+		volName, partitionID, errors.ErrorStack(err)))
+	Warn(c.Name, fmt.Sprintf("clusterID[%v] vol[%v] mpID[%v] update failed,err:%v",
+		c.Name, volName, partitionID, err))
+	return
+}
+
+func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string, partitionID uint64) (err error) {
 	var (
 		vol         *Vol
 		mp          *MetaPartition
@@ -109,11 +166,18 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr string, partitionID uin
 	if err = mp.canOffline(nodeAddr, int(vol.mpReplicaNum)); err != nil {
 		goto errDeal
 	}
-
-	if newHosts, newPeers, err = c.getAvailMetaNodeHosts(mp.PersistenceHosts, 1); err != nil {
-		goto errDeal
+	if destinationAddr != "" {
+		destMetaNode, err := c.getMetaNode(destinationAddr)
+		if err != nil {
+			goto errDeal
+		}
+		newHosts = append(newHosts, destinationAddr)
+		newPeers = append(newPeers, proto.Peer{ID: destMetaNode.ID, Addr: destinationAddr})
+	} else {
+		if newHosts, newPeers, err = c.getAvailMetaNodeHosts(mp.PersistenceHosts, 1); err != nil {
+			goto errDeal
+		}
 	}
-
 	onlineAddrs = make([]string, len(newHosts))
 	copy(onlineAddrs, newHosts)
 	for _, host := range mp.PersistenceHosts {

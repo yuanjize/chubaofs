@@ -341,6 +341,32 @@ func (c *Cluster) getMetaPartitionByID(id uint64) (mp *MetaPartition, err error)
 	return
 }
 
+func (c *Cluster) updateMetaPartition(mp *MetaPartition, isManual bool) (err error) {
+	oldIsManual := mp.IsManual
+	mp.IsManual = isManual
+	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+		mp.IsManual = oldIsManual
+		return
+	}
+	if mp.IsManual {
+		mp.Status = proto.ReadOnly
+	}
+	return
+}
+
+func (c *Cluster) updateDataPartition(dp *DataPartition, isManual bool) (err error) {
+	oldIsManual := dp.IsManual
+	dp.IsManual = isManual
+	if err = c.syncUpdateDataPartition(dp.VolName, dp); err != nil {
+		dp.IsManual = oldIsManual
+		return
+	}
+	if dp.IsManual {
+		dp.Status = proto.ReadOnly
+	}
+	return
+}
+
 func (c *Cluster) putVol(vol *Vol) {
 	c.volsLock.Lock()
 	defer c.volsLock.Unlock()
@@ -650,7 +676,7 @@ func (c *Cluster) metaNodeOffLine(metaNode *MetaNode) {
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, mp := range vol.MetaPartitions {
-			c.metaPartitionOffline(vol.Name, metaNode.Addr, mp.PartitionID)
+			c.metaPartitionOffline(vol.Name, metaNode.Addr,"", mp.PartitionID)
 		}
 	}
 	if err := c.syncDeleteMetaNode(metaNode); err != nil {

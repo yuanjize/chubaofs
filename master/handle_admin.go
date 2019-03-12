@@ -230,6 +230,64 @@ errDeal:
 	return
 }
 
+// mp status control by master completely,reject receiving status reported by meta node
+func (m *Master) updateMetaPartition(w http.ResponseWriter, r *http.Request) {
+	var (
+		partitionID uint64
+		isManual    bool
+		mp          *MetaPartition
+		msg         string
+		err         error
+	)
+	r.ParseForm()
+	if partitionID, isManual, err = parseUpdateMetaPartition(r); err != nil {
+		return
+	}
+	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
+		goto errDeal
+		return
+	}
+	if err := m.cluster.updateMetaPartition(mp, isManual); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("updateMetaPartition partitionID :%v isManual[%v] success", partitionID, isManual)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("updateMetaPartition", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
+// dp status control by master completely,reject receiving status reported by data node
+func (m *Master) updateDataPartition(w http.ResponseWriter, r *http.Request) {
+	var (
+		partitionID uint64
+		isManual    bool
+		dp          *DataPartition
+		msg         string
+		err         error
+	)
+	r.ParseForm()
+	if partitionID, isManual, err = parseUpdateDataPartition(r); err != nil {
+		return
+	}
+	if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
+		goto errDeal
+		return
+	}
+	if err := m.cluster.updateDataPartition(dp, isManual); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("updateDataPartition partitionID :%v isManual[%v] success", partitionID, isManual)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("updateDataPartition", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) deleteDataPartition(w http.ResponseWriter, r *http.Request) {
 	var (
 		partitionID uint64
@@ -683,21 +741,46 @@ errDeal:
 	return
 }
 
+func (m *Master) updateMetaPartitionHosts(w http.ResponseWriter, r *http.Request) {
+	var (
+		partitionID uint64
+		volName     string
+		hosts       string
+		msg         string
+		err         error
+	)
+	if volName, hosts, partitionID, err = parseUpdateMetaPartitionHosts(r); err != nil {
+		goto errDeal
+	}
+
+	if err = m.cluster.updateMetaPartitionHosts(volName, hosts, partitionID); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("updateMetaPartitionHosts partitionID :%v,hosts[%v] success", partitionID, hosts)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("updateMetaPartitionHosts", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) metaPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	var (
 		partitionID       uint64
 		volName, nodeAddr string
+		destinationAddr   string
 		msg               string
 		err               error
 	)
-	if volName, nodeAddr, partitionID, err = parseMetaPartitionOffline(r); err != nil {
+	if volName, nodeAddr, destinationAddr, partitionID, err = parseMetaPartitionOffline(r); err != nil {
 		goto errDeal
 	}
 
-	if err = m.cluster.metaPartitionOffline(volName, nodeAddr, partitionID); err != nil {
+	if err = m.cluster.metaPartitionOffline(volName, nodeAddr, destinationAddr, partitionID); err != nil {
 		goto errDeal
 	}
-	msg = fmt.Sprintf(AdminLoadMetaPartition+" partitionID :%v  metaPartitionOffline success", partitionID)
+	msg = fmt.Sprintf(AdminMetaPartitionOffline+" partitionID :%v  metaPartitionOffline success", partitionID)
 	io.WriteString(w, msg)
 	return
 errDeal:
@@ -1048,7 +1131,22 @@ func parsePartitionIDAndVol(r *http.Request) (partitionID uint64, volName string
 	return
 }
 
-func parseMetaPartitionOffline(r *http.Request) (volName, nodeAddr string, partitionID uint64, err error) {
+func parseUpdateMetaPartitionHosts(r *http.Request) (volName, hosts string, partitionID uint64, err error) {
+	r.ParseForm()
+	if partitionID, err = checkMetaPartitionID(r); err != nil {
+		return
+	}
+	if volName, err = checkVolPara(r); err != nil {
+		return
+	}
+	if hosts = r.FormValue(ParaHosts); hosts == "" {
+		err = paraNotFound(ParaHosts)
+		return
+	}
+	return
+}
+
+func parseMetaPartitionOffline(r *http.Request) (volName, nodeAddr, destinationAddr string, partitionID uint64, err error) {
 	r.ParseForm()
 	if partitionID, err = checkMetaPartitionID(r); err != nil {
 		return
@@ -1057,6 +1155,29 @@ func parseMetaPartitionOffline(r *http.Request) (volName, nodeAddr string, parti
 		return
 	}
 	if nodeAddr, err = checkNodeAddr(r); err != nil {
+		return
+	}
+	destinationAddr = r.FormValue(ParaDestAddr)
+	return
+}
+
+func parseUpdateMetaPartition(r *http.Request) (partitionID uint64, isManual bool, err error) {
+	r.ParseForm()
+	if partitionID, err = checkMetaPartitionID(r); err != nil {
+		return
+	}
+	if isManual, err = strconv.ParseBool(r.FormValue(ParaIsManual)); err != nil {
+		return
+	}
+	return
+}
+
+func parseUpdateDataPartition(r *http.Request) (partitionID uint64, isManual bool, err error) {
+	r.ParseForm()
+	if partitionID, err = checkDataPartitionID(r); err != nil {
+		return
+	}
+	if isManual, err = strconv.ParseBool(r.FormValue(ParaIsManual)); err != nil {
 		return
 	}
 	return

@@ -31,6 +31,7 @@ type DataPartition struct {
 	ReplicaNum       uint8
 	Status           int8
 	isRecover        bool
+	IsManual         bool
 	Replicas         []*DataReplica
 	PartitionType    string
 	PersistenceHosts []string

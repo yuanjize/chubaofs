@@ -305,6 +305,7 @@ func (vol *Vol) deleteVolFromStore(c *Cluster) {
 	vol.deleteDataPartitionsFromStore(c)
 	vol.deleteMetaPartitionsFromStore(c)
 	c.deleteVol(vol.Name)
+	c.volSpaceStat.Delete(vol.Name)
 }
 
 func (vol *Vol) deleteMetaPartitionsFromStore(c *Cluster) {

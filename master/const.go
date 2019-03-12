@@ -15,6 +15,8 @@
 package master
 
 const (
+	ParaHosts             = "hosts"
+	ParaDestAddr          = "destAddr"
 	ParaNodeAddr          = "addr"
 	ParaDiskPath          = "disk"
 	ParaName              = "name"
@@ -28,6 +30,7 @@ const (
 	ParaVolCapacity       = "capacity"
 	ParaVolOwner          = "owner"
 	ParaAuthKey           = "authKey"
+	ParaIsManual          = "isManual"
 )
 
 const (
@@ -44,6 +47,7 @@ const (
 
 const (
 	UnderlineSeparator = "_"
+	CommaSeparator = ","
 )
 
 const (
@@ -64,7 +68,7 @@ const (
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 

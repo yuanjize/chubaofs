@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"github.com/chubaofs/cfs/util/log"
 )
 
 const (
@@ -85,12 +86,17 @@ func (partition *DataPartition) checkChunkFile(fc *FileInCore, liveReplicas []*D
 	if !needRepair {
 		return
 	}
-	if isSameSize(fms) {
+	if !isSameSize(fms) {
+		msg := fmt.Sprintf("CheckFileError size not match,cluster[%v],dpID[%v],", clusterID, partition.PartitionID)
+		for _, fm := range fms {
+			msg = msg + fmt.Sprintf("fm[%v]:size[%v]\n", fm.locIndex, fm.Size)
+		}
+		log.LogWarn(msg)
 		return
 	}
-	msg := fmt.Sprintf("CheckFileError size not match,cluster[%v],", clusterID)
+	msg := fmt.Sprintf("CheckFileError crc not match,cluster[%v],dpID[%v],", clusterID, partition.PartitionID)
 	for _, fm := range fms {
-		msg = fmt.Sprintf(msg+"fm[%v]:%v\n", fm.locIndex, fm.ToString())
+		msg = msg + fmt.Sprintf("fm[%v]:%v\n", fm.locIndex, fm.ToString())
 	}
 	Warn(clusterID, msg)
 	return

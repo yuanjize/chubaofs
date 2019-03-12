@@ -68,6 +68,7 @@ type MetaPartitionValue struct {
 	End         uint64
 	Hosts       string
 	Peers       []bsProto.Peer
+	IsManual    bool
 }
 
 func newMetaPartitionValue(mp *MetaPartition) (mpv *MetaPartitionValue) {
@@ -78,6 +79,7 @@ func newMetaPartitionValue(mp *MetaPartition) (mpv *MetaPartitionValue) {
 		End:         mp.End,
 		Hosts:       mp.hostsToString(),
 		Peers:       mp.Peers,
+		IsManual:    mp.IsManual,
 	}
 	return
 }
@@ -87,6 +89,7 @@ type DataPartitionValue struct {
 	ReplicaNum    uint8
 	Hosts         string
 	PartitionType string
+	IsManual      bool
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -95,6 +98,7 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		ReplicaNum:    dp.ReplicaNum,
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
+		IsManual:      dp.IsManual,
 	}
 	return
 }
@@ -576,6 +580,7 @@ func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
 		dp.PartitionType = dpv.PartitionType
 		dp.VolName = vol.Name
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsManual = dpv.IsManual
 		vol.dataPartitions.putDataPartition(dp)
 	}
 }
@@ -760,6 +765,7 @@ func (c *Cluster) loadMetaPartitions() (err error) {
 		mp.Lock()
 		mp.setPersistenceHosts(strings.Split(mpv.Hosts, UnderlineSeparator))
 		mp.setPeers(mpv.Peers)
+		mp.IsManual = mpv.IsManual
 		mp.Unlock()
 		vol.AddMetaPartition(mp)
 		encodedKey.Free()
@@ -797,6 +803,7 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, volName)
 		dp.Lock()
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
+		dp.IsManual = dpv.IsManual
 		dp.Unlock()
 		vol.dataPartitions.putDataPartition(dp)
 		encodedKey.Free()

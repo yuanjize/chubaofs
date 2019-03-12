@@ -104,7 +104,11 @@ func (metaNode *MetaNode) updateMetric(resp *proto.MetaNodeHeartbeatResponse, th
 	} else {
 		metaNode.Ratio = float64(resp.Used) / float64(resp.Total)
 	}
-	metaNode.MaxMemAvailWeight = resp.Total - resp.Used
+	if resp.Used > resp.Total {
+		metaNode.MaxMemAvailWeight = 0
+	} else {
+		metaNode.MaxMemAvailWeight = resp.Total - resp.Used
+	}
 	metaNode.RackName = resp.RackName
 	metaNode.Threshold = threshold
 }

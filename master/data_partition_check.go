@@ -25,6 +25,10 @@ func (partition *DataPartition) checkStatus(clusterName string, needLog bool, dp
 	partition.Lock()
 	defer partition.Unlock()
 	liveReplicas := partition.getLiveReplicasByPersistenceHosts(dpTimeOutSec)
+	if partition.IsManual {
+		partition.Status = proto.ReadOnly
+		goto record
+	}
 	if len(liveReplicas) > int(partition.ReplicaNum) {
 		partition.Status = proto.ReadOnly
 		msg := fmt.Sprintf("action[checkStatus],partitionID:%v has exceed repica, replicaNum:%v  liveReplicas:%v   Status:%v  RocksDBHost:%v ",
@@ -41,9 +45,10 @@ func (partition *DataPartition) checkStatus(clusterName string, needLog bool, dp
 	default:
 		partition.Status = proto.ReadOnly
 	}
+record:
 	if needLog == true {
-		msg := fmt.Sprintf("action[checkStatus],partitionID:%v  replicaNum:%v  liveReplicas:%v   Status:%v  RocksDBHost:%v ",
-			partition.PartitionID, partition.ReplicaNum, len(liveReplicas), partition.Status, partition.PersistenceHosts)
+		msg := fmt.Sprintf("action[checkStatus],partitionID:%v  replicaNum:%v  liveReplicas:%v   Status:%v  RocksDBHost:%v,isManual[%v] ",
+			partition.PartitionID, partition.ReplicaNum, len(liveReplicas), partition.Status, partition.PersistenceHosts, partition.IsManual)
 		log.LogInfo(msg)
 	}
 }

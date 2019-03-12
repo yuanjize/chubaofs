@@ -42,6 +42,7 @@ type MetaPartition struct {
 	Start            uint64
 	End              uint64
 	MaxNodeID        uint64
+	IsManual         bool
 	Replicas         []*MetaReplica
 	ReplicaNum       uint8
 	Status           int8
@@ -222,6 +223,10 @@ func (mp *MetaPartition) checkStatus(writeLog bool, replicaNum int) {
 	mp.Lock()
 	defer mp.Unlock()
 	liveReplicas := mp.getLiveReplica()
+	if mp.IsManual {
+		mp.Status = proto.ReadOnly
+		goto record
+	}
 	if len(liveReplicas) <= replicaNum/2 {
 		mp.Status = proto.Unavaliable
 	} else {
@@ -231,10 +236,10 @@ func (mp *MetaPartition) checkStatus(writeLog bool, replicaNum int) {
 		}
 		mp.Status = mr.Status
 	}
-
+record:
 	if writeLog {
-		log.LogInfof("action[checkMPStatus],id:%v,status:%v,replicaNum:%v,liveReplicas:%v persistenceHosts:%v",
-			mp.PartitionID, mp.Status, mp.ReplicaNum, len(liveReplicas), mp.PersistenceHosts)
+		log.LogInfof("action[checkMPStatus],id:%v,status:%v,replicaNum:%v,liveReplicas:%v persistenceHosts:%v,isManual[%v]",
+			mp.PartitionID, mp.Status, mp.ReplicaNum, len(liveReplicas), mp.PersistenceHosts, mp.IsManual)
 	}
 }
 
@@ -524,6 +529,7 @@ func (mp *MetaPartition) updateMetricByRaft(mpv *MetaPartitionValue) {
 	mp.End = mpv.End
 	mp.Peers = mpv.Peers
 	mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
+	mp.IsManual = mpv.IsManual
 }
 
 // the caller must add lock

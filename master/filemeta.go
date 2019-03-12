@@ -43,7 +43,7 @@ func NewFileMetaOnNode(volCrc uint32, volLoc string, volLocIndex int, size uint3
 }
 
 func (fm *FileMetaOnNode) ToString() (msg string) {
-	msg = fmt.Sprintf("ExtentOffset[%v] LocAddr[%d] locIndex[%v] Size[%v]",
+	msg = fmt.Sprintf("ExtentOffset[%v] LocAddr[%v] locIndex[%v] Size[%v]",
 		fm.Crc, fm.LocAddr, fm.locIndex, fm.Size)
 	return
 }
