@@ -197,6 +197,8 @@ var gLog *Log = nil
 
 func InitLog(dir, module string, level Level) (*Log, error) {
 	l := new(Log)
+	dir = path.Join(dir, module)
+	os.MkdirAll(dir, 0755)
 	l.dir = dir
 	l.module = module
 	fi, err := os.Stat(dir)
