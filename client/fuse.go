@@ -88,6 +88,7 @@ func Mount(cfg *config.Config) error {
 	logpath := cfg.GetString("logpath")
 	loglvl := cfg.GetString("loglvl")
 	profport := cfg.GetString("profport")
+	rdonly := cfg.GetBool("rdonly")
 	icacheTimeout := ParseConfigString(cfg, "icacheTimeout")
 	lookupValid := ParseConfigString(cfg, "lookupValid")
 	attrValid := ParseConfigString(cfg, "attrValid")
@@ -102,15 +103,20 @@ func Mount(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	c, err := fuse.Mount(
-		mnt,
+
+	options := []fuse.MountOption{
 		fuse.AllowOther(),
 		fuse.MaxReadahead(MaxReadAhead),
 		fuse.AsyncRead(),
-		fuse.FSName("cfs-"+volname),
+		fuse.FSName("cfs-" + volname),
 		fuse.LocalVolume(),
-		fuse.VolumeName("cfs-"+volname))
+		fuse.VolumeName("cfs-" + volname)}
 
+	if rdonly {
+		options = append(options, fuse.ReadOnly())
+	}
+
+	c, err := fuse.Mount(mnt, options...)
 	if err != nil {
 		return err
 	}
