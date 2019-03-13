@@ -95,7 +95,6 @@ func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
 		s = NewStreamWriter(inode, client, client.appendExtentKey)
 		client.writers[inode] = s
 	}
-	client.writerLock.Unlock()
 	return s.IssueOpenRequest(flag)
 }
 
@@ -109,7 +108,6 @@ func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
 		client.writerLock.Unlock()
 		return
 	}
-	client.writerLock.Unlock()
 	return s.IssueReleaseRequest(flag)
 }
 
@@ -122,14 +120,10 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 	}
 	err := s.IssueEvictRequest()
 	if err != nil {
-		client.writerLock.Unlock()
 		return err
 	}
-	delete(client.writers, inode)
 	s.close()
 	s.exit()
-	client.writerLock.Unlock()
-
 	return nil
 }
 

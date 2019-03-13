@@ -80,6 +80,7 @@ func (s *StreamWriter) IssueOpenRequest(flag uint32) error {
 	request.done = make(chan struct{}, 1)
 	request.flag = flag
 	s.requestCh <- request
+	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
 	close(request.done)
@@ -122,6 +123,7 @@ func (s *StreamWriter) IssueReleaseRequest(flag uint32) error {
 	request.done = make(chan struct{}, 1)
 	request.flag = flag
 	s.requestCh <- request
+	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
 	close(request.done)
@@ -133,6 +135,7 @@ func (s *StreamWriter) IssueEvictRequest() error {
 	request := evictRequestPool.Get().(*EvictRequest)
 	request.done = make(chan struct{}, 1)
 	s.requestCh <- request
+	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
 	close(request.done)
@@ -141,9 +144,13 @@ func (s *StreamWriter) IssueEvictRequest() error {
 }
 
 func (s *StreamWriter) evict() error {
-	if s.refcnt > 0 {
+	s.client.writerLock.Lock()
+	if s.refcnt > 0 || len(s.requestCh) != 0 {
+		s.client.writerLock.Unlock()
 		return errors.New(fmt.Sprintf("evict: streamer(%v) refcnt(%v) openWriteCnt(%v)", s, s.refcnt, s.openWriteCnt))
 	}
+	delete(s.client.writers, s.inode)
+	s.client.writerLock.Unlock()
 	return nil
 }
 
@@ -298,17 +305,18 @@ func (s *StreamWriter) autoTask() (autoExit bool) {
 		s.autoForgetCnt = 0
 	}
 
-	if s.autoForgetCnt >= MaxAutoForgetCnt {
-		s.client.release(s.inode)
-		autoExit = true
-		log.LogWarnf("ino(%v) auto send forget command", s.inode)
-		return
-	}
 	err := s.flushCurrExtentWriter()
 	if err == syscall.ENOENT {
-		s.client.release(s.inode)
 		autoExit = true
 		log.LogWarnf("ino(%v) has beeen delete meta", s.inode)
+	}
+
+	if s.autoForgetCnt >= MaxAutoForgetCnt {
+		autoExit = true
+	}
+	if autoExit {
+		s.client.release(s.inode)
+		log.LogWarnf("ino(%v) auto send forget command", s.inode)
 	}
 	return
 }
