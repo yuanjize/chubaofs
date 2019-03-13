@@ -19,14 +19,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"io/ioutil"
 )
 
 type Level uint8
@@ -451,6 +452,16 @@ func LogFlush() {
 	}
 }
 
+func (l *Log) getAllLogFileName(module string) (names []string) {
+	names = make([]string, 0)
+	logNames := [...]string{DebugLogFileName, InfoLogFileName, WarnLogFileName, ErrLogFileName, ReadLogFileName, UpdateLogFileName}
+	for _, logSufix := range logNames {
+		names = append(names, module+logSufix)
+	}
+
+	return
+}
+
 func (l *Log) checkLogRotation(logDir, module string) {
 	for {
 		now := time.Now()
@@ -462,6 +473,17 @@ func (l *Log) checkLogRotation(logDir, module string) {
 		}
 		for _, info := range fInfos {
 			if info.IsDir() {
+				continue
+			}
+			allLogName := l.getAllLogFileName(module)
+			doDelete := false
+			for _, logName := range allLogName {
+				if strings.Contains(info.Name(), logName) {
+					doDelete = true
+					break
+				}
+			}
+			if !doDelete {
 				continue
 			}
 			if (now.Unix() - info.ModTime().Unix()) > RetentionTime {
