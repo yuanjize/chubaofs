@@ -27,7 +27,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"path"
 	"runtime"
 	"strings"
 
@@ -93,7 +92,7 @@ func Mount(cfg *config.Config) error {
 	lookupValid := ParseConfigString(cfg, "lookupValid")
 	attrValid := ParseConfigString(cfg, "attrValid")
 	level := ParseLogLevel(loglvl)
-	_, err := log.InitLog(path.Join(logpath, LoggerDir), LoggerPrefix, level)
+	_, err := log.InitLog(logpath, LoggerPrefix, level)
 	if err != nil {
 		return err
 	}
