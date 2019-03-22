@@ -29,7 +29,6 @@ import (
 type Dir struct {
 	super  *Super
 	inode  *Inode
-	dcache *DentryCache
 }
 
 //functions that Dir needs to implement
@@ -123,7 +122,6 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	start := time.Now()
-	d.dcache.Delete(req.Name)
 	info, err := d.super.mw.Delete_ll(d.inode.ino, req.Name)
 	if err != nil {
 		log.LogErrorf("Remove: parent(%v) name(%v) err(%v)", d.inode.ino, req.Name, err)
@@ -153,15 +151,12 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.Lo
 
 	log.LogDebugf("TRACE Lookup: parent(%v) req(%v)", d.inode.ino, req)
 
-	ino, ok := d.dcache.Get(req.Name)
-	if !ok {
-		ino, mode, err = d.super.mw.Lookup_ll(d.inode.ino, req.Name)
-		if err != nil {
-			if err != syscall.ENOENT {
-				log.LogErrorf("Lookup: parent(%v) name(%v) err(%v)", d.inode.ino, req.Name, err)
-			}
-			return nil, ParseError(err)
+	ino, mode, err = d.super.mw.Lookup_ll(d.inode.ino, req.Name)
+	if err != nil {
+		if err != syscall.ENOENT {
+			log.LogErrorf("Lookup: parent(%v) name(%v) err(%v)", d.inode.ino, req.Name, err)
 		}
+		return nil, ParseError(err)
 	}
 
 	inode, err := d.super.InodeGet(ino)
@@ -192,7 +187,6 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 
 	inodes := make([]uint64, 0, len(children))
 	dirents := make([]fuse.Dirent, 0, len(children))
-	dcache := NewDentryCache()
 
 	for _, child := range children {
 		dentry := fuse.Dirent{
@@ -202,14 +196,12 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		}
 		inodes = append(inodes, child.Inode)
 		dirents = append(dirents, dentry)
-		dcache.Put(child.Name, child.Inode)
 	}
 
 	infos := d.super.mw.BatchInodeGet(inodes)
 	for _, info := range infos {
 		d.super.ic.Put(NewInode(info))
 	}
-	d.dcache = dcache
 
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE ReadDir: ino(%v) (%v)ns", d.inode.ino, elapsed.Nanoseconds())
@@ -223,7 +215,6 @@ func (d *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, newDir fs.Nod
 		return fuse.ENOTSUP
 	}
 	start := time.Now()
-	d.dcache.Delete(req.OldName)
 	err := d.super.mw.Rename_ll(d.inode.ino, req.OldName, dstDir.inode.ino, req.NewName)
 	if err != nil {
 		log.LogErrorf("Rename: parent(%v) req(%v) err(%v)", d.inode.ino, req, err)
