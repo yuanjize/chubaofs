@@ -241,11 +241,10 @@ func (m *Master) updateMetaPartition(w http.ResponseWriter, r *http.Request) {
 	)
 	r.ParseForm()
 	if partitionID, isManual, err = parseUpdateMetaPartition(r); err != nil {
-		return
+		goto errDeal
 	}
 	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
 		goto errDeal
-		return
 	}
 	if err := m.cluster.updateMetaPartition(mp, isManual); err != nil {
 		goto errDeal
@@ -270,11 +269,10 @@ func (m *Master) updateDataPartition(w http.ResponseWriter, r *http.Request) {
 	)
 	r.ParseForm()
 	if partitionID, isManual, err = parseUpdateDataPartition(r); err != nil {
-		return
+		goto errDeal
 	}
 	if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
-		return
 	}
 	if err := m.cluster.updateDataPartition(dp, isManual); err != nil {
 		goto errDeal
@@ -1166,7 +1164,7 @@ func parseUpdateMetaPartition(r *http.Request) (partitionID uint64, isManual boo
 	if partitionID, err = checkMetaPartitionID(r); err != nil {
 		return
 	}
-	if isManual, err = strconv.ParseBool(r.FormValue(ParaIsManual)); err != nil {
+	if isManual, err = checkIsManual(r); err != nil {
 		return
 	}
 	return
@@ -1177,10 +1175,18 @@ func parseUpdateDataPartition(r *http.Request) (partitionID uint64, isManual boo
 	if partitionID, err = checkDataPartitionID(r); err != nil {
 		return
 	}
-	if isManual, err = strconv.ParseBool(r.FormValue(ParaIsManual)); err != nil {
+	if isManual, err = checkIsManual(r); err != nil {
 		return
 	}
 	return
+}
+
+func checkIsManual(r *http.Request) (isManual bool, err error) {
+	value := r.FormValue(ParaIsManual)
+	if value == "" {
+		return false, paraNotFound(ParaIsManual)
+	}
+	return strconv.ParseBool(value)
 }
 
 func parseCompactPara(r *http.Request) (status bool, err error) {
