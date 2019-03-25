@@ -137,15 +137,16 @@ errDeal:
 
 func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string, partitionID uint64) (err error) {
 	var (
-		vol         *Vol
-		mp          *MetaPartition
-		t           *proto.AdminTask
-		tasks       []*proto.AdminTask
-		newHosts    []string
-		onlineAddrs []string
-		newPeers    []proto.Peer
-		removePeer  proto.Peer
-		metaNode    *MetaNode
+		vol          *Vol
+		mp           *MetaPartition
+		t            *proto.AdminTask
+		tasks        []*proto.AdminTask
+		newHosts     []string
+		onlineAddrs  []string
+		newPeers     []proto.Peer
+		removePeer   proto.Peer
+		metaNode     *MetaNode
+		destMetaNode *MetaNode
 	)
 	log.LogWarnf("action[metaPartitionOffline],volName[%v],nodeAddr[%v],partitionID[%v]", volName, nodeAddr, partitionID)
 	if vol, err = c.getVol(volName); err != nil {
@@ -167,7 +168,7 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		goto errDeal
 	}
 	if destinationAddr != "" {
-		destMetaNode, err := c.getMetaNode(destinationAddr)
+		destMetaNode, err = c.getMetaNode(destinationAddr)
 		if err != nil {
 			goto errDeal
 		}
