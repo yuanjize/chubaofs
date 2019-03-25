@@ -89,6 +89,7 @@ func GetProcessMemory(pid int) (used uint64, err error) {
 		if err != nil {
 			return
 		}
+		used = used * KB
 		break
 	}
 	return
