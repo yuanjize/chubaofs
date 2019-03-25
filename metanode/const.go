@@ -134,6 +134,7 @@ const (
 	cfgMasterAddrs       = "masterAddrs"
 	cfgRaftHeartbeatPort = "raftHeartbeatPort"
 	cfgRaftReplicatePort = "raftReplicatePort"
+	cfgTotalMem			 = "totalMem"
 )
 
 const (

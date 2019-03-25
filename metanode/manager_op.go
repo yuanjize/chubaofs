@@ -70,6 +70,9 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 		adminTask.Status = proto.TaskFail
 		goto end
 	}
+	if configTotalMem!=0{
+		resp.Total=uint64(configTotalMem)
+	}
 	// every partition used
 	m.Range(func(id uint64, partition MetaPartition) bool {
 		mConf := partition.GetBaseConfig()
