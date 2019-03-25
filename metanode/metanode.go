@@ -142,7 +142,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicatePort)
-	configTotalMem = cfg.GetInt(cfgTotalMem)
+	configTotalMem,_=strconv.ParseInt(cfg.GetString(cfgTotalMem),10,64)
 
 	log.LogDebugf("action[parseConfig] load listen[%v].", m.listen)
 	log.LogDebugf("action[parseConfig] load metaDir[%v].", m.metaDir)
