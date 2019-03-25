@@ -25,7 +25,6 @@ import (
 	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/log"
 	raftProto "github.com/tiglabs/raft/proto"
-	"runtime"
 )
 
 func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
@@ -61,17 +60,17 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 	// collect used info
 	// machine mem total and used
 	resp.Total, _, err = util.GetMemInfo()
-	{
-		m := &runtime.MemStats{}
-		runtime.ReadMemStats(m)
-		resp.Used = m.Sys
-	}
 	if err != nil {
 		adminTask.Status = proto.TaskFail
 		goto end
 	}
 	if configTotalMem != 0 {
 		resp.Total = uint64(configTotalMem)
+	}
+	resp.Used, err = util.GetProcessMemory(os.Getpid())
+	if err != nil {
+		adminTask.Status = proto.TaskFail
+		goto end
 	}
 	// every partition used
 	m.Range(func(id uint64, partition MetaPartition) bool {

@@ -16,12 +16,16 @@ package util
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 )
 
-const MEMINFO = "/proc/meminfo"
+const (
+	MEMINFO = "/proc/meminfo"
+	PRO_MEM = "/proc/%d/status"
+)
 
 func GetMemInfo() (total, used uint64, err error) {
 	fp, err := os.Open(MEMINFO)
@@ -61,5 +65,31 @@ func GetMemInfo() (total, used uint64, err error) {
 		}
 	}
 	used = total - free - buffer - cached
+	return
+}
+
+func GetProcessMemory(pid int) (used uint64, err error) {
+	proFileName := fmt.Sprintf(PRO_MEM, pid)
+	fp, err := os.Open(proFileName)
+	if err != nil {
+		return
+	}
+	defer fp.Close()
+	scan := bufio.NewScanner(fp)
+	for scan.Scan() {
+		line := scan.Text()
+		fields := strings.Split(line, ":")
+		key := fields[0]
+		if key != "VmRSS" {
+			continue
+		}
+		value := strings.TrimSpace(fields[1])
+		value = strings.Replace(value, " kB", "", -1)
+		used, err = strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return
+		}
+		break
+	}
 	return
 }
