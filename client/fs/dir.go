@@ -27,8 +27,8 @@ import (
 )
 
 type Dir struct {
-	super  *Super
-	inode  *Inode
+	super *Super
+	inode *Inode
 }
 
 //functions that Dir needs to implement

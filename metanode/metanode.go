@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	clusterInfo *proto.ClusterInfo
+	clusterInfo    *proto.ClusterInfo
 	configTotalMem int64
 )
 
@@ -132,7 +132,7 @@ func (m *MetaNode) Sync() {
 }
 
 func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
-	configTotalMem=0
+	configTotalMem = 0
 	if cfg == nil {
 		err = errors.New("invalid configuration")
 		return
@@ -142,7 +142,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicatePort)
-	configTotalMem=cfg.GetInt(cfgTotalMem)
+	configTotalMem = cfg.GetInt(cfgTotalMem)
 
 	log.LogDebugf("action[parseConfig] load listen[%v].", m.listen)
 	log.LogDebugf("action[parseConfig] load metaDir[%v].", m.metaDir)
@@ -150,7 +150,6 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	log.LogDebugf("action[parseConfig] load raftHeartbeatPort[%v].", m.raftHeartbeatPort)
 	log.LogDebugf("action[parseConfig] load raftReplicatePort[%v].", m.raftReplicatePort)
 	log.LogDebugf("action[parseConfig] load totalMemory[%v].", configTotalMem)
-
 
 	addrs := cfg.GetArray(cfgMasterAddrs)
 	for _, addr := range addrs {
