@@ -168,6 +168,10 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		goto errDeal
 	}
 	if destinationAddr != "" {
+		if contains(mp.PersistenceHosts, destinationAddr) {
+			err = errors.Errorf("destinationAddr[%v] must be a new meta node addr,oldHosts[%v]", destinationAddr, mp.PersistenceHosts)
+			goto errDeal
+		}
 		destMetaNode, err = c.getMetaNode(destinationAddr)
 		if err != nil {
 			goto errDeal
