@@ -10,7 +10,6 @@ import (
 	"github.com/chubaofs/cfs/proto"
 	"github.com/chubaofs/cfs/storage"
 	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/log"
 	"hash/crc32"
 )
