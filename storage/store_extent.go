@@ -359,7 +359,7 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	return nil
 }
 
-func (s *ExtentStore) WriteTinyRecover(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
+func (s *ExtentStore) WriteTinyRecover(extentId uint64, offset, size int64, data []byte, crc uint32, isEmptyPacket bool) (err error) {
 	var (
 		extentInfo *FileInfo
 		has        bool
@@ -379,13 +379,8 @@ func (s *ExtentStore) WriteTinyRecover(extentId uint64, offset, size int64, data
 	if err != nil {
 		return err
 	}
-	if err = s.checkOffsetAndSize(extentId, offset, size); err != nil {
-		return err
-	}
-	if extent.IsMarkDelete() {
-		return ErrorHasDelete
-	}
-	if err = extent.WriteTinyRecover(data, offset, size, crc); err != nil {
+
+	if err = extent.WriteTinyRecover(data, offset, size, crc, isEmptyPacket); err != nil {
 		return err
 	}
 	extentInfo.FromExtent(extent)
@@ -411,6 +406,26 @@ func (s *ExtentStore) checkOffsetAndSize(extentId uint64, offset, size int64) er
 
 func IsTinyExtent(extentId uint64) bool {
 	return extentId >= TinyExtentStartId && extentId < TinyExtentStartId+TinyExtentCount
+}
+
+func (s *ExtentStore) TinyExtentGetFinfoSize(extentId uint64) (size uint64, err error) {
+	var (
+		e *Extent
+	)
+	if !IsTinyExtent(extentId) {
+		return 0, fmt.Errorf("unavali extent id (%v)", extentId)
+	}
+	if e, err = s.getExtentWithHeader(extentId); err != nil {
+		return
+	}
+
+	finfo, err := e.file.Stat()
+	if err != nil {
+		return 0, err
+	}
+	size = uint64(finfo.Size())
+
+	return
 }
 
 func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (crc uint32, err error) {
@@ -847,4 +862,43 @@ func (s *ExtentStore) GetUnavaliTinyExtent() (extentId uint64, err error) {
 		return 0, ErrorNoUnAvaliFile
 
 	}
+}
+
+func (s *ExtentStore) TinyExtentAvaliOffset(extentID uint64, offset int64) (newOffset, newEnd int64, err error) {
+	var e *Extent
+	if !IsTinyExtent(extentID) {
+		return 0, 0, fmt.Errorf("unavali extent(%v)", extentID)
+	}
+	if e, err = s.getExtentWithHeader(extentID); err != nil {
+		return
+	}
+
+	defer func() {
+		if err != nil && strings.Contains(err.Error(), syscall.ENXIO.Error()) {
+			newOffset = e.dataSize
+			newEnd = e.dataSize
+			err = nil
+		}
+
+	}()
+
+	newOffset, err = e.file.Seek(int64(offset), SEEK_DATA)
+	if err != nil {
+		return
+	}
+	newEnd, err = e.file.Seek(int64(newOffset), SEEK_HOLE)
+	if err != nil {
+		return
+	}
+	if newOffset-offset > util.BlockSize {
+		newOffset = offset + util.BlockSize
+	}
+	if newEnd-newOffset > util.BlockSize {
+		newEnd = newOffset + util.BlockSize
+	}
+	if newEnd < newOffset {
+		err = fmt.Errorf("unavali TinyExtentAvaliOffset on SEEK_DATA or SEEK_HOLE   (%v) offset(%v) "+
+			"newEnd(%v) newOffset(%v)", s.getExtentKey(extentID), offset, newEnd, newOffset)
+	}
+	return
 }

@@ -676,7 +676,7 @@ func (c *Cluster) metaNodeOffLine(metaNode *MetaNode) {
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, mp := range vol.MetaPartitions {
-			c.metaPartitionOffline(vol.Name, metaNode.Addr,"", mp.PartitionID)
+			c.metaPartitionOffline(vol.Name, metaNode.Addr, "", mp.PartitionID)
 		}
 	}
 	if err := c.syncDeleteMetaNode(metaNode); err != nil {

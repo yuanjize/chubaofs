@@ -34,6 +34,8 @@ import (
 const (
 	ExtentOpenOpt          = os.O_CREATE | os.O_RDWR | os.O_EXCL
 	ExtentOpenOptOverwrite = os.O_CREATE | os.O_RDWR
+	SEEK_DATA              = 3
+	SEEK_HOLE              = 4
 )
 
 var (
@@ -166,16 +168,6 @@ func (e *Extent) InitToFS(ino uint64, overwrite bool) (err error) {
 	if _, err = e.file.WriteAt(e.header[:8], 0); err != nil {
 		return err
 	}
-	emptyCrc := crc32.ChecksumIEEE(make([]byte, util.BlockSize))
-	for blockNo := 0; blockNo < util.BlockCount; blockNo++ {
-		if err = e.updateBlockCrc(blockNo, emptyCrc); err != nil {
-			return err
-		}
-	}
-	if err = e.file.Sync(); err != nil {
-		return err
-	}
-
 	var (
 		fileInfo os.FileInfo
 	)
@@ -285,22 +277,40 @@ func (e *Extent) WriteTiny(data []byte, offset, size int64, crc uint32) (err err
 	return
 }
 
-func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
+func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32, isEmptyPacket bool) (err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if !IsTinyExtent(e.extentId) {
 		return ErrorUnavaliExtent
 	}
-	if offset != e.dataSize {
-		return ErrorUnavaliExtent
+	if offset%PageSize!=0 || offset != e.dataSize {
+		return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
+			" isEmptyPacket(%v)  e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, e.dataSize)
 	}
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
-	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
+	if isEmptyPacket {
+		finfo, err := e.file.Stat()
+		if err != nil {
+			return err
+		}
+		if offset < finfo.Size() {
+			return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
+				" isEmptyPacket(%v) filesize(%v) e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, finfo.Size(), e.dataSize)
+		}
+		err = syscall.Ftruncate(int(e.file.Fd()), offset+size)
+	} else {
+		_, err = e.file.WriteAt(data[:size], int64(offset))
+	}
+	if err != nil {
 		return
 	}
-	e.dataSize = offset + size
+	watermark := offset + size
+	if watermark%PageSize != 0 {
+		watermark = watermark + (PageSize - watermark%PageSize)
+	}
+	e.dataSize = watermark
 
 	return
 }
@@ -527,6 +537,9 @@ const (
 )
 
 func (e *Extent) DeleteTiny(offset, size int64) (err error) {
+	if offset+size > e.dataSize {
+		return fmt.Errorf("unavali MarkDeleteRequest offset(%v) size(%v) e.datasize(%v)", offset, size, e.dataSize)
+	}
 	if int(offset)%PageSize != 0 {
 		return ErrorParamMismatch
 	}

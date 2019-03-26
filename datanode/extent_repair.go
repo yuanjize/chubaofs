@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/binary"
 	"fmt"
 	"github.com/chubaofs/cfs/proto"
 	"github.com/chubaofs/cfs/storage"
@@ -104,9 +105,8 @@ func (dp *DataPartition) putAllTinyExtentsToStore(fixExtentType uint8, noNeedFix
 func (dp *DataPartition) getUnavaliTinyExtents() (unavaliTinyExtents []uint64) {
 	unavaliTinyExtents = make([]uint64, 0)
 	fixTinyExtents := MinFixTinyExtents
-	if dp.isFirstFixTinyExtents {
+	if dp.extentStore.GetAvaliExtentLen() == 0 {
 		fixTinyExtents = storage.TinyExtentCount
-		dp.isFirstFixTinyExtents = false
 	}
 	for i := 0; i < fixTinyExtents; i++ {
 		extentId, err := dp.extentStore.GetUnavaliTinyExtent()
@@ -379,6 +379,9 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 
 	// Create streamRead packet, it offset is local extentInfoSize, size is needFixSize
 	request := NewExtentRepairReadPacket(dp.ID(), remoteExtentInfo.FileId, int(localExtentInfo.Size), int(needFixSize))
+	if storage.IsTinyExtent(remoteExtentInfo.FileId) {
+		request = NewTinyExtentRepairReadPacket(dp.ID(), remoteExtentInfo.FileId, int(localExtentInfo.Size), int(needFixSize))
+	}
 	var conn *net.TCPConn
 
 	// Get a connection to leader host
@@ -414,16 +417,18 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		}
 
 		if reply.ReqID != request.ReqID || reply.PartitionID != request.PartitionID ||
-			reply.FileID != request.FileID || reply.Size == 0 || reply.Offset != int64(currFixOffset) {
+			reply.FileID != request.FileID {
 			err = errors.Annotatef(err, "streamRepairExtent receive unavalid "+
 				"request(%v) reply(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId())
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return
 		}
-
-		log.LogInfof("action[streamRepairExtent] partition(%v) extent(%v) start fix from (%v)"+
-			" remoteSize(%v) localSize(%v) reply(%v).", dp.ID(), remoteExtentInfo.FileId,
-			remoteExtentInfo.Source, remoteExtentInfo.Size, currFixOffset, reply.GetUniqueLogId())
+		if !storage.IsTinyExtent(reply.FileID) && (reply.Size == 0 || reply.Offset != int64(currFixOffset)) {
+			err = errors.Annotatef(err, "streamRepairExtent receive unavalid "+
+				"request(%v) reply(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId())
+			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
+			return
+		}
 
 		if reply.Crc != crc32.ChecksumIEEE(reply.Data[:reply.Size]) {
 			err = fmt.Errorf("streamRepairExtent crc mismatch partition(%v) extent(%v) start fix from (%v)"+
@@ -432,12 +437,23 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)
 			return errors.Annotatef(err, "streamRepairExtent receive data error")
 		}
+		isEmptyResponse := false
 		// Write it to local extent file
 		if storage.IsTinyExtent(uint64(localExtentInfo.FileId)) {
-			err = store.WriteTinyRecover(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(reply.Size), reply.Data, reply.Crc)
+			writeSize := uint64(reply.Size)
+			if reply.Arglen != 0 {
+				isEmptyResponse = reply.Arg[0] == EmptyResponse
+				writeSize = binary.BigEndian.Uint64(reply.Arg[1:EmptyPacketLength])
+				reply.Size = uint32(writeSize)
+			}
+			err = store.WriteTinyRecover(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(writeSize), reply.Data, reply.Crc, isEmptyResponse)
 		} else {
 			err = store.Write(uint64(localExtentInfo.FileId), int64(currFixOffset), int64(reply.Size), reply.Data, reply.Crc)
 		}
+		log.LogInfof("action[streamRepairExtent] partition(%v) extent(%v) start fix from (%v)"+
+			" remoteSize(%v) localSize(%v) reply(%v) isEmptyResponse(%v) err(%v).", dp.ID(), remoteExtentInfo.FileId,
+			remoteExtentInfo.Source, remoteExtentInfo.Size, currFixOffset, reply.GetUniqueLogId(), isEmptyResponse, err)
+
 		if err != nil {
 			err = errors.Annotatef(err, "streamRepairExtent repair data error")
 			log.LogErrorf("action[streamRepairExtent] err(%v).", err)

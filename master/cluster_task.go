@@ -20,9 +20,9 @@ import (
 	"github.com/chubaofs/cfs/third_party/juju/errors"
 	"github.com/chubaofs/cfs/util/log"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 func (c *Cluster) putDataNodeTasks(tasks []*proto.AdminTask) {

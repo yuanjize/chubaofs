@@ -190,21 +190,49 @@ func NewExtentRepairReadPacket(partitionId uint32, extentId uint64, offset, size
 	p.Magic = proto.ProtoMagic
 	p.Offset = int64(offset)
 	p.Size = uint32(size)
-	p.Opcode = proto.OpExtentRepairRead
+	p.Opcode = proto.OpNormalExtentRepairRead
 	p.StoreMode = proto.NormalExtentMode
 	p.ReqID = proto.GetReqID()
 
 	return
 }
 
-func NewStreamReadResponsePacket(requestId int64, partitionId uint32, extentId uint64) (p *Packet) {
+func NewTinyExtentRepairReadPacket(partitionId uint32, extentId uint64, offset, size int) (p *Packet) {
 	p = new(Packet)
 	p.FileID = extentId
 	p.PartitionID = partitionId
 	p.Magic = proto.ProtoMagic
-	p.Opcode = proto.OpOk
+	p.Offset = int64(offset)
+	p.Size = uint32(size)
+	p.Opcode = proto.OpTinyExtentRepairRead
+	p.StoreMode = proto.TinyExtentMode
+	p.ReqID = proto.GetReqID()
+
+	return
+}
+
+func NewNormalStreamReadResponsePacket(requestId int64, partitionId uint32, extentId uint64) (p *Packet) {
+	p = new(Packet)
+	p.FileID = extentId
+	p.PartitionID = partitionId
+	p.Magic = proto.ProtoMagic
+	p.Opcode = proto.OpStreamRead
 	p.ReqID = requestId
 	p.StoreMode = proto.NormalExtentMode
+	p.StartT = time.Now().UnixNano()
+
+	return
+}
+
+func NewTinyExtentStreamReadResponsePacket(requestId int64, partitionId uint32, extentId uint64) (p *Packet) {
+	p = new(Packet)
+	p.FileID = extentId
+	p.PartitionID = partitionId
+	p.Magic = proto.ProtoMagic
+	p.Opcode = proto.OpTinyExtentRepairRead
+	p.ReqID = requestId
+	p.StoreMode = proto.TinyExtentMode
+	p.StartT = time.Now().UnixNano()
 
 	return
 }
@@ -246,7 +274,7 @@ func (p *Packet) IsExtentWritePacket() bool {
 }
 
 func (p *Packet) IsReadOperation() bool {
-	return p.Opcode == proto.OpStreamRead || p.Opcode == proto.OpRead || p.Opcode == proto.OpExtentRepairRead
+	return p.Opcode == proto.OpStreamRead || p.Opcode == proto.OpRead || p.Opcode == proto.OpNormalExtentRepairRead || p.Opcode == proto.OpTinyExtentRepairRead
 }
 
 func (p *Packet) IsMarkDeleteReq() bool {
@@ -329,6 +357,8 @@ func (p *Packet) ReadFull(c net.Conn, readSize int) (err error) {
 func (p *Packet) ReadFromConnFromCli(c net.Conn, deadlineTime time.Duration) (err error) {
 	if deadlineTime != proto.NoReadDeadlineTime {
 		c.SetReadDeadline(time.Now().Add(deadlineTime * time.Second))
+	} else {
+		c.SetReadDeadline(time.Time{})
 	}
 	header, err := proto.Buffers.Get(util.PacketHeaderSize)
 	if err != nil {

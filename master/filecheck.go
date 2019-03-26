@@ -17,10 +17,10 @@ package master
 import (
 	"fmt"
 	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/util/log"
 	"sort"
 	"strconv"
 	"time"
-	"github.com/chubaofs/cfs/util/log"
 )
 
 const (

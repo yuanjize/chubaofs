@@ -68,6 +68,11 @@ const (
 )
 
 const (
+	EmptyResponse     = 'E'
+	EmptyPacketLength = 9
+)
+
+const (
 	DiskSectorSize = 512
 )
 
