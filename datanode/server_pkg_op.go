@@ -464,7 +464,7 @@ func (s *DataNode) handleTinyExtentRepairRead(request *Packet, connect net.Conn)
 	}
 
 	var (
-		newOffset,newEnd int64
+		newOffset, newEnd int64
 	)
 	for {
 		if needReplySize <= 0 {
@@ -486,8 +486,8 @@ func (s *DataNode) handleTinyExtentRepairRead(request *Packet, connect net.Conn)
 			offset += replySize
 			continue
 		}
-
-		currReadSize := uint32(util.Min(int(needReplySize), util.ReadBlockSize))
+		currNeedReplySize := newEnd - newOffset
+		currReadSize := uint32(util.Min(int(currNeedReplySize), util.ReadBlockSize))
 		if currReadSize == util.ReadBlockSize {
 			reply.Data, _ = proto.Buffers.Get(util.ReadBlockSize)
 		} else {

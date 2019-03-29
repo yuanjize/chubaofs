@@ -211,6 +211,7 @@ func (space *SpaceManager) flushDelete() {
 	})
 	for _, partition := range partitions {
 		partition.FlushDelete()
+		partition.extentStore.Cleanup()
 	}
 }
 

@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/sdk/meta"
 	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/log"
 	"strings"
@@ -91,7 +90,7 @@ var (
 	GetEmptyExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
-			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 60*60 && info.Deleted == false && info.Size == 0
+			return !IsTinyExtent(info.FileId) && now.Unix()-info.ModTime.Unix() > 20*60 && info.Deleted == false && info.Size == 0
 		}
 	}
 )
@@ -309,6 +308,12 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		if extent, loadErr = s.getExtent(extentId); loadErr != nil {
 			continue
 		}
+		if !IsTinyExtent(extentId) && extentId > baseFileId {
+			baseFileId = extentId
+		}
+		if extent.Size() == 0 {
+			continue
+		}
 		extentInfo = &FileInfo{}
 		extentInfo.FromExtent(extent)
 		extentInfo.Crc = 0
@@ -316,9 +321,6 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		s.extentInfoMap[extentId] = extentInfo
 		s.extentInfoMux.Unlock()
 		extent.Close()
-		if !IsTinyExtent(extentId) && extentId > baseFileId {
-			baseFileId = extentId
-		}
 	}
 	if baseFileId < MinExtentId {
 		baseFileId = MinExtentId
@@ -503,8 +505,6 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 	return
 }
 
-
-
 func (s *ExtentStore) Cleanup() {
 	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter())
 	if len(extentInfoSlice) == 0 {
@@ -515,18 +515,18 @@ func (s *ExtentStore) Cleanup() {
 			continue
 		}
 		if extentInfo.Size == 0 {
-			log.LogWarnf("start delete empty  %v", s.getExtentKey(extentInfo.FileId))
+			log.LogWarnf("start mark delete empty  %v", s.getExtentKey(extentInfo.FileId))
 			extent, err := s.getExtentWithHeader(extentInfo.FileId)
 			if err != nil {
-				log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+				log.LogWarnf("mark delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 				continue
 			}
 			if extent.Size() == 0 && !extent.IsMarkDelete() {
-				err = s.DeleteDirtyExtent(extent.ID())
+				err = s.MarkDeleteDirtyExtent(extent.ID())
 				if err != nil {
-					log.LogWarnf("delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
+					log.LogWarnf("mark delete empty  %v error %v", s.getExtentKey(extentInfo.FileId), err.Error())
 				} else {
-					log.LogWarnf("delete empty  %v success", s.getExtentKey(extentInfo.FileId))
+					log.LogWarnf("mark delete empty  %v success", s.getExtentKey(extentInfo.FileId))
 
 				}
 			}
@@ -741,7 +741,7 @@ func (s *ExtentStore) ParseExtentId(filename string) (extentId uint64, isExtent 
 	return
 }
 
-func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
+func (s *ExtentStore) MarkDeleteDirtyExtent(extentId uint64) (err error) {
 	var (
 		extent     *Extent
 		extentInfo *FileInfo
@@ -768,11 +768,6 @@ func (s *ExtentStore) DeleteDirtyExtent(extentId uint64) (err error) {
 	s.extentInfoMux.Lock()
 	delete(s.extentInfoMap, extentId)
 	s.extentInfoMux.Unlock()
-
-	extentFilePath := path.Join(s.dataDir, strconv.FormatUint(extentId, 10))
-	if err = os.Remove(extentFilePath); err != nil {
-		return
-	}
 
 	return
 }
@@ -867,7 +862,7 @@ func (s *ExtentStore) TinyExtentAvaliOffset(extentID uint64, offset int64) (newO
 
 	}()
 
-	newOffset,newEnd,err=e.tinyExtentAvaliOffset(offset)
+	newOffset, newEnd, err = e.tinyExtentAvaliOffset(offset)
 
 	return
 }

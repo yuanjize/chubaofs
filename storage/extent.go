@@ -29,6 +29,7 @@ import (
 	"github.com/chubaofs/cfs/third_party/juju/errors"
 	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/buf"
+	"github.com/chubaofs/cfs/util/log"
 )
 
 const (
@@ -277,19 +278,27 @@ func (e *Extent) WriteTiny(data []byte, offset, size int64, crc uint32) (err err
 	return
 }
 
+func (e *Extent) getRealBlockCnt() (blockNum int64) {
+	stat := new(syscall.Stat_t)
+	syscall.Stat(e.filePath, stat)
+	return stat.Blocks
+}
+
 func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32, isEmptyPacket bool) (err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if !IsTinyExtent(e.extentId) {
 		return ErrorUnavaliExtent
 	}
-	if offset%PageSize!=0 || offset != e.dataSize {
+	if offset%PageSize != 0 || offset != e.dataSize {
 		return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
 			" isEmptyPacket(%v)  e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, e.dataSize)
 	}
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
+	log.LogInfof("before file (%v) getRealBlockNo (%v) isEmptyPacket(%v)"+
+		"offset(%v) size(%v) e.datasize(%v)", e.filePath, e.getRealBlockCnt(), isEmptyPacket, offset, size, e.dataSize)
 	if isEmptyPacket {
 		finfo, err := e.file.Stat()
 		if err != nil {
@@ -299,7 +308,10 @@ func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32, i
 			return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
 				" isEmptyPacket(%v) filesize(%v) e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, finfo.Size(), e.dataSize)
 		}
-		err = syscall.Ftruncate(int(e.file.Fd()), offset+size)
+		if err = syscall.Ftruncate(int(e.file.Fd()), offset+size); err != nil {
+			return err
+		}
+		err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size)
 	} else {
 		_, err = e.file.WriteAt(data[:size], int64(offset))
 	}
@@ -311,6 +323,8 @@ func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32, i
 		watermark = watermark + (PageSize - watermark%PageSize)
 	}
 	e.dataSize = watermark
+	log.LogInfof("after file (%v) getRealBlockNo (%v) isEmptyPacket(%v)"+
+		"offset(%v) size(%v) e.datasize(%v)", e.filePath, e.getRealBlockCnt(), isEmptyPacket, offset, size, e.dataSize)
 
 	return
 }
@@ -557,9 +571,7 @@ func (e *Extent) DeleteTiny(offset, size int64) (err error) {
 	return
 }
 
-
-
-func (e *Extent)tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, err error) {
+func (e *Extent) tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	newOffset, err = e.file.Seek(int64(offset), SEEK_DATA)
@@ -580,4 +592,5 @@ func (e *Extent)tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, er
 		err = fmt.Errorf("unavali TinyExtentAvaliOffset on SEEK_DATA or SEEK_HOLE   (%v) offset(%v) "+
 			"newEnd(%v) newOffset(%v)", e.extentId, offset, newEnd, newOffset)
 	}
+	return
 }
