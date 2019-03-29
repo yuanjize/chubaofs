@@ -464,14 +464,14 @@ func (s *DataNode) handleTinyExtentRepairRead(request *Packet, connect net.Conn)
 	}
 
 	var (
-		newOffset int64
+		newOffset,newEnd int64
 	)
 	for {
 		if needReplySize <= 0 {
 			break
 		}
 		reply := NewTinyExtentStreamReadResponsePacket(request.ReqID, request.PartitionID, request.FileID)
-		newOffset, _, err = store.TinyExtentAvaliOffset(request.FileID, offset)
+		newOffset, newEnd, err = store.TinyExtentAvaliOffset(request.FileID, offset)
 		if err != nil {
 			return
 		}

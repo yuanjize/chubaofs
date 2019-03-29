@@ -194,6 +194,11 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 				p.GetUniqueLogId(), err.Error())
 			return
 		}
+		if p.ResultCode!=proto.OpOk{
+			err = errors.Errorf("read response from dataNode %s, %s",
+				p.GetUniqueLogId(), string(p.Data[:p.Size]))
+			return
+		}
 		log.LogDebugf("[deleteExtent] %v", p.GetUniqueLogId())
 		return
 	}

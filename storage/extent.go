@@ -537,6 +537,8 @@ const (
 )
 
 func (e *Extent) DeleteTiny(offset, size int64) (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if offset+size > e.dataSize {
 		return fmt.Errorf("unavali MarkDeleteRequest offset(%v) size(%v) e.datasize(%v)", offset, size, e.dataSize)
 	}
@@ -553,4 +555,29 @@ func (e *Extent) DeleteTiny(offset, size int64) (err error) {
 	err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size)
 
 	return
+}
+
+
+
+func (e *Extent)tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	newOffset, err = e.file.Seek(int64(offset), SEEK_DATA)
+	if err != nil {
+		return
+	}
+	newEnd, err = e.file.Seek(int64(newOffset), SEEK_HOLE)
+	if err != nil {
+		return
+	}
+	if newOffset-offset > util.BlockSize {
+		newOffset = offset + util.BlockSize
+	}
+	if newEnd-newOffset > util.BlockSize {
+		newEnd = newOffset + util.BlockSize
+	}
+	if newEnd < newOffset {
+		err = fmt.Errorf("unavali TinyExtentAvaliOffset on SEEK_DATA or SEEK_HOLE   (%v) offset(%v) "+
+			"newEnd(%v) newOffset(%v)", e.extentId, offset, newEnd, newOffset)
+	}
 }

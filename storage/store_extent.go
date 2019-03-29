@@ -503,22 +503,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64, offset, size int64) (err error
 	return
 }
 
-func (s *ExtentStore) extentIsAvaliOnMetaPartition(mw *meta.MetaWrapper, inode uint64, extentId uint32) (avali bool) {
-	extents, err := mw.GetExtents(inode)
-	if err != nil {
-		return true
-	}
-	if len(extents) == 0 {
-		return true
-	}
-	for _, e := range extents {
-		if e.PartitionId == s.partitionId && e.PartitionId == extentId {
-			return true
-		}
-	}
 
-	return false
-}
 
 func (s *ExtentStore) Cleanup() {
 	extentInfoSlice, _ := s.GetAllWatermark(GetEmptyExtentFilter())
@@ -882,23 +867,7 @@ func (s *ExtentStore) TinyExtentAvaliOffset(extentID uint64, offset int64) (newO
 
 	}()
 
-	newOffset, err = e.file.Seek(int64(offset), SEEK_DATA)
-	if err != nil {
-		return
-	}
-	newEnd, err = e.file.Seek(int64(newOffset), SEEK_HOLE)
-	if err != nil {
-		return
-	}
-	if newOffset-offset > util.BlockSize {
-		newOffset = offset + util.BlockSize
-	}
-	if newEnd-newOffset > util.BlockSize {
-		newEnd = newOffset + util.BlockSize
-	}
-	if newEnd < newOffset {
-		err = fmt.Errorf("unavali TinyExtentAvaliOffset on SEEK_DATA or SEEK_HOLE   (%v) offset(%v) "+
-			"newEnd(%v) newOffset(%v)", s.getExtentKey(extentID), offset, newEnd, newOffset)
-	}
+	newOffset,newEnd,err=e.tinyExtentAvaliOffset(offset)
+
 	return
 }
