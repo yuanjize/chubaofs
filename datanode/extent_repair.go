@@ -17,17 +17,19 @@ import (
 
 //every  datapartion  file metas used for auto repairt
 type MembersFileMetas struct {
-	TaskType               uint8                        //which type task
-	files                  map[uint64]*storage.FileInfo //storage file on datapartiondisk meta
-	NeedAddExtentsTasks    []*storage.FileInfo          //generator add extent file task
-	NeedFixExtentSizeTasks []*storage.FileInfo          //generator fixSize file task
+	TaskType                 uint8                        //which type task
+	files                    map[uint64]*storage.FileInfo //storage file on datapartiondisk meta
+	NeedAddExtentsTasks      []*storage.FileInfo          //generator add extent file task
+	NeedFixExtentSizeTasks   []*storage.FileInfo          //generator fixSize file task
+	LeaderTinyExtentRealSize map[uint64]uint64
 }
 
 func NewMemberFileMetas() (mf *MembersFileMetas) {
 	mf = &MembersFileMetas{
-		files:                  make(map[uint64]*storage.FileInfo),
-		NeedAddExtentsTasks:    make([]*storage.FileInfo, 0),
-		NeedFixExtentSizeTasks: make([]*storage.FileInfo, 0),
+		files:                    make(map[uint64]*storage.FileInfo),
+		NeedAddExtentsTasks:      make([]*storage.FileInfo, 0),
+		NeedFixExtentSizeTasks:   make([]*storage.FileInfo, 0),
+		LeaderTinyExtentRealSize: make(map[uint64]uint64, 0),
 	}
 	return
 }
@@ -76,6 +78,9 @@ func (dp *DataPartition) extentFileRepair(fixExtentsType uint8) {
 	}
 	log.LogInfof("action[extentFileRepair] partition(%v) AvaliTinyExtents(%v) UnavaliTinyExtents(%v) finish cost[%vms].",
 		dp.partitionId, dp.extentStore.GetAvaliExtentLen(), dp.extentStore.GetUnAvaliExtentLen(), (finishTime-startTime)/int64(time.Millisecond))
+	for extentId, extentSize := range allMembers[0].LeaderTinyExtentRealSize {
+		dp.extentStore.UpdateTinyExtentRealSize(extentId, extentSize)
+	}
 
 }
 
@@ -145,7 +150,11 @@ func (dp *DataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 	for _, fi := range files {
 		fi.Source = dp.replicaHosts[0]
 		leaderFileMetas.files[fi.FileId] = fi
+		if fixExtentMode == proto.TinyExtentMode {
+			leaderFileMetas.LeaderTinyExtentRealSize[fi.FileId] = fi.Size
+		}
 	}
+
 	allMemberFileMetas[0] = leaderFileMetas
 	// leader files meta has ready
 
@@ -192,6 +201,12 @@ func (dp *DataPartition) getAllMemberExtentMetas(fixExtentMode uint8, needFixExt
 		for _, fileInfo := range fileInfos {
 			fileInfo.Source = target
 			slaverFileMetas.files[fileInfo.FileId] = fileInfo
+			if fixExtentMode == proto.TinyExtentMode {
+				size, ok := leaderFileMetas.LeaderTinyExtentRealSize[fileInfo.FileId]
+				if ok {
+					slaverFileMetas.LeaderTinyExtentRealSize[fileInfo.FileId] = size
+				}
+			}
 		}
 		allMemberFileMetas[i] = slaverFileMetas
 	}
@@ -465,6 +480,7 @@ func (dp *DataPartition) streamRepairExtent(remoteExtentInfo *storage.FileInfo) 
 		}
 
 	}
+
 	return
 
 }

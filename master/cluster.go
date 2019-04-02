@@ -641,9 +641,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	if err = dp.updateForOffline(offlineAddr, newAddr, volName, c); err != nil {
 		goto errDeal
 	}
-	if replica, err = dp.getReplica(offlineAddr); err != nil {
-		goto errDeal
-	}
+	replica, _ = dp.getReplica(offlineAddr)
 	dp.offLineInMem(offlineAddr)
 	dp.checkAndRemoveMissReplica(offlineAddr)
 	task = dp.GenerateDeleteTask(offlineAddr)
@@ -657,7 +655,11 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 		goto errDeal
 	}
 	dp.isRecover = true
-	c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath), badPartitionIDs)
+	if replica != nil {
+		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath), badPartitionIDs)
+	} else {
+		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, ""), badPartitionIDs)
+	}
 errDeal:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",

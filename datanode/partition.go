@@ -194,7 +194,7 @@ func (dp *DataPartition) ReloadSnapshot() {
 	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
 		return
 	}
-	files, err := dp.extentStore.SnapShot()
+	files, err := dp.extentStore.SnapShotNormalExtent()
 	if err != nil {
 		return
 	}
@@ -206,8 +206,18 @@ func (dp *DataPartition) ReloadSnapshot() {
 func (dp *DataPartition) GetSnapShot() (files []*proto.File) {
 	dp.snapshotLock.RLock()
 	defer dp.snapshotLock.RUnlock()
+	tinySnapshot, _ := dp.extentStore.SnapShotTinyExtent()
+	allSnapshot := make([]*proto.File, 0, len(dp.snapshot)+len(tinySnapshot))
+	allSnapshot = append(allSnapshot, tinySnapshot...)
+	allSnapshot = append(allSnapshot, dp.snapshot...)
 
-	return dp.snapshot
+	return allSnapshot
+}
+
+func (dp *DataPartition) GetTinyExtentSnapShot() (files []*proto.File) {
+	files, _ = dp.extentStore.SnapShotTinyExtent()
+
+	return
 }
 
 func (dp *DataPartition) Stop() {
@@ -455,7 +465,7 @@ func (dp *DataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response.Used = uint64(dp.Used())
 	var err error
 	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
-		response.PartitionSnapshot = make([]*proto.File, 0)
+		response.PartitionSnapshot = dp.GetTinyExtentSnapShot()
 	} else {
 		response.PartitionSnapshot = dp.GetSnapShot()
 	}
@@ -503,6 +513,9 @@ func (dp *DataPartition) MergeExtentStoreRepair(metas *MembersFileMetas) {
 		}
 	}
 	wg.Wait()
+	for extentId, extentSize := range metas.LeaderTinyExtentRealSize {
+		dp.extentStore.UpdateTinyExtentRealSize(extentId, extentSize)
+	}
 }
 
 func (dp *DataPartition) AddWriteMetrics(latency uint64) {

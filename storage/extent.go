@@ -30,6 +30,7 @@ import (
 	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/buf"
 	"github.com/chubaofs/cfs/util/log"
+	"sync/atomic"
 )
 
 const (
@@ -87,6 +88,7 @@ type Extent struct {
 	dataSize   int64
 	closeC     chan bool
 	closed     bool
+	realSize   int64
 }
 
 // NewExtentInCore create and returns a new extent instance.
@@ -593,4 +595,29 @@ func (e *Extent) tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, e
 			"newEnd(%v) newOffset(%v)", e.extentId, offset, newEnd, newOffset)
 	}
 	return
+}
+
+func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
+	if !IsTinyExtent(e.extentId) {
+		return
+	}
+	if e.dataSize < leaderFileSize {
+		atomic.StoreInt64(&e.realSize, 0)
+		return
+	}
+	atomic.StoreInt64(&e.realSize, 0)
+	var offset int64
+	offset = 0
+	for {
+		newOffset, err := e.file.Seek(int64(offset), SEEK_DATA)
+		if err != nil {
+			return
+		}
+		newEnd, err := e.file.Seek(int64(newOffset), SEEK_HOLE)
+		if err != nil {
+			return
+		}
+		offset = offset + (newEnd - newOffset)
+	}
+	atomic.StoreInt64(&e.realSize, offset)
 }

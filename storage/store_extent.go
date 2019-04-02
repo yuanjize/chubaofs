@@ -158,11 +158,11 @@ func (s *ExtentStore) DeleteStore() (err error) {
 	return
 }
 
-func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
+func (s *ExtentStore) SnapShotNormalExtent() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetAllExtentFilter()); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
@@ -175,6 +175,26 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 		}
 		files = append(files, file)
 	}
+	return
+}
+
+func (s *ExtentStore) SnapShotTinyExtent() (files []*proto.File, err error) {
+	var extentID uint64
+	files = make([]*proto.File, 0)
+	for extentID = TinyExtentStartId; extentID < TinyExtentStartId+TinyExtentCount; extentID++ {
+		e, ok := s.cache.Get(extentID)
+		if !ok {
+			continue
+		}
+		file := &proto.File{
+			Name:     strconv.FormatUint(e.extentId, 10),
+			Crc:      0,
+			Size:     uint32(atomic.LoadInt64(&e.realSize)),
+			Modified: e.modifyTime.Unix(),
+		}
+		files = append(files, file)
+	}
+
 	return
 }
 
@@ -865,4 +885,18 @@ func (s *ExtentStore) TinyExtentAvaliOffset(extentID uint64, offset int64) (newO
 	newOffset, newEnd, err = e.tinyExtentAvaliOffset(offset)
 
 	return
+}
+
+func (s *ExtentStore) UpdateTinyExtentRealSize(extentID uint64, leaderSize uint64) {
+	var (
+		e   *Extent
+		err error
+	)
+	if !IsTinyExtent(extentID) {
+		return
+	}
+	if e, err = s.getExtentWithHeader(extentID); err != nil {
+		return
+	}
+	e.tinyExtentUpdateRealSize(int64(leaderSize))
 }
