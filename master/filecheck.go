@@ -17,15 +17,11 @@ package master
 import (
 	"fmt"
 	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/cfs/storage"
 	"github.com/chubaofs/cfs/util/log"
 	"sort"
 	"strconv"
 	"time"
-)
-
-const (
-	TinyExtentCount   = 128
-	TinyExtentStartId = 5000000
 )
 
 /*check File: recover File,if File lack or timeOut report or crc bad*/
@@ -65,16 +61,12 @@ func (partition *DataPartition) checkFileInternal(liveReplicas []*DataReplica, c
 		if extentId == 1 {
 			continue
 		}
-		if IsTinyExtent(extentId) {
+		if storage.IsTinyExtent(extentId) {
 			partition.checkChunkFile(fc, liveReplicas, clusterID)
 		} else {
 			partition.checkExtentFile(fc, liveReplicas, clusterID)
 		}
 	}
-}
-
-func IsTinyExtent(extentId uint64) bool {
-	return extentId >= TinyExtentStartId && extentId < TinyExtentStartId+TinyExtentCount
 }
 
 func (partition *DataPartition) checkChunkFile(fc *FileInCore, liveReplicas []*DataReplica, clusterID string) {

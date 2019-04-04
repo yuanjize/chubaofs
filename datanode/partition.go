@@ -81,7 +81,6 @@ type DataPartition struct {
 	runtimeMetrics          *DataPartitionMetrics
 	updateReplicationTime   int64
 	updatePartitionSizeTime int64
-	isFirstFixTinyExtents   bool
 
 	snapshot               []*proto.File
 	snapshotLock           sync.RWMutex

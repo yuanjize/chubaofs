@@ -607,7 +607,7 @@ func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
 	}
 	atomic.StoreInt64(&e.realSize, 0)
 	var (
-		offset,realSize int64
+		offset, realSize int64
 	)
 	for {
 		newOffset, err := e.file.Seek(int64(offset), SEEK_DATA)
@@ -619,7 +619,7 @@ func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
 			return
 		}
 		realSize = realSize + (newEnd - newOffset)
-		offset=newEnd
+		offset = newEnd
 	}
 	atomic.StoreInt64(&e.realSize, offset)
 }
