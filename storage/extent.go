@@ -612,11 +612,11 @@ func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
 	for {
 		newOffset, err := e.file.Seek(int64(offset), SEEK_DATA)
 		if err != nil {
-			return
+			break
 		}
 		newEnd, err := e.file.Seek(int64(newOffset), SEEK_HOLE)
 		if err != nil {
-			return
+			break
 		}
 		realSize = realSize + (newEnd - newOffset)
 		offset = newEnd
