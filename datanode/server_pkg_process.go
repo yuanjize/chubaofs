@@ -101,7 +101,7 @@ func (s *DataNode) doRequestCh(req *Packet, msgH *MessageHandler) {
 	)
 	if !req.IsTransitPkg() {
 		s.operatePacket(req, msgH.inConn)
-		if !(req.Opcode == proto.OpStreamRead || req.Opcode == proto.OpExtentRepairRead) {
+		if !(req.IsReadOperation()) {
 			msgH.replyCh <- req
 		}
 
@@ -218,8 +218,11 @@ func (s *DataNode) receiveFromNext(request *Packet, index int) (reply *Packet, e
 	}
 
 	reply = NewPacket()
-
-	if err = reply.ReadFromConn(request.NextConns[index], proto.ReadDeadlineTime); err != nil {
+	readDeadTime := proto.ReadDeadlineTime
+	if request.IsCreateFileOperation() {
+		readDeadTime = proto.ReadDeadlineTime * 2
+	}
+	if err = reply.ReadFromConn(request.NextConns[index], readDeadTime); err != nil {
 		err = fmt.Errorf(ActionReceiveFromNext+"recive From remote (%v) network error (%v) ",
 			request.NextAddrs[index], err)
 		err = errors.Annotatef(err, "Request(%v) receiveFromNext %v Error", request.GetUniqueLogId(), request.NextConns[index])

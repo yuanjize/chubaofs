@@ -134,12 +134,7 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 		if dp.Status == proto.ReadWrite {
 			readWriteDataPartitions++
 		}
-		diskErrorAddrs := dp.checkDiskError(c.Name)
-		if diskErrorAddrs != nil {
-			for _, addr := range diskErrorAddrs {
-				c.dataPartitionOffline(addr, vol.Name, dp, CheckDataPartitionDiskErrorErr)
-			}
-		}
+		dp.checkDiskError(c.Name)
 		tasks := dp.checkReplicationTask(c.Name)
 		if len(tasks) != 0 {
 			c.putDataNodeTasks(tasks)

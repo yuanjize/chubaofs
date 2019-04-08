@@ -47,7 +47,7 @@ const (
 
 const (
 	UnderlineSeparator = "_"
-	CommaSeparator = ","
+	CommaSeparator     = ","
 )
 
 const (
@@ -68,7 +68,7 @@ const (
 )
 
 const (
-	OK     = iota
+	OK = iota
 	Failed
 )
 

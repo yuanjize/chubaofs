@@ -29,11 +29,15 @@ import (
 	"github.com/chubaofs/cfs/third_party/juju/errors"
 	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/buf"
+	"github.com/chubaofs/cfs/util/log"
+	"sync/atomic"
 )
 
 const (
 	ExtentOpenOpt          = os.O_CREATE | os.O_RDWR | os.O_EXCL
 	ExtentOpenOptOverwrite = os.O_CREATE | os.O_RDWR
+	SEEK_DATA              = 3
+	SEEK_HOLE              = 4
 )
 
 var (
@@ -84,6 +88,7 @@ type Extent struct {
 	dataSize   int64
 	closeC     chan bool
 	closed     bool
+	realSize   int64
 }
 
 // NewExtentInCore create and returns a new extent instance.
@@ -166,16 +171,6 @@ func (e *Extent) InitToFS(ino uint64, overwrite bool) (err error) {
 	if _, err = e.file.WriteAt(e.header[:8], 0); err != nil {
 		return err
 	}
-	emptyCrc := crc32.ChecksumIEEE(make([]byte, util.BlockSize))
-	for blockNo := 0; blockNo < util.BlockCount; blockNo++ {
-		if err = e.updateBlockCrc(blockNo, emptyCrc); err != nil {
-			return err
-		}
-	}
-	if err = e.file.Sync(); err != nil {
-		return err
-	}
-
 	var (
 		fileInfo os.FileInfo
 	)
@@ -285,22 +280,53 @@ func (e *Extent) WriteTiny(data []byte, offset, size int64, crc uint32) (err err
 	return
 }
 
-func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32) (err error) {
+func (e *Extent) getRealBlockCnt() (blockNum int64) {
+	stat := new(syscall.Stat_t)
+	syscall.Stat(e.filePath, stat)
+	return stat.Blocks
+}
+
+func (e *Extent) WriteTinyRecover(data []byte, offset, size int64, crc uint32, isEmptyPacket bool) (err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if !IsTinyExtent(e.extentId) {
 		return ErrorUnavaliExtent
 	}
-	if offset != e.dataSize {
-		return ErrorUnavaliExtent
+	if offset%PageSize != 0 || offset != e.dataSize {
+		return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
+			" isEmptyPacket(%v)  e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, e.dataSize)
 	}
 	if offset+size >= math.MaxUint32 {
 		return ErrorExtentHasFull
 	}
-	if _, err = e.file.WriteAt(data[:size], int64(offset)); err != nil {
+	log.LogInfof("before file (%v) getRealBlockNo (%v) isEmptyPacket(%v)"+
+		"offset(%v) size(%v) e.datasize(%v)", e.filePath, e.getRealBlockCnt(), isEmptyPacket, offset, size, e.dataSize)
+	if isEmptyPacket {
+		finfo, err := e.file.Stat()
+		if err != nil {
+			return err
+		}
+		if offset < finfo.Size() {
+			return fmt.Errorf("error empty packet on (%v) offset(%v) size(%v)"+
+				" isEmptyPacket(%v) filesize(%v) e.dataSize(%v)", e.file.Name(), offset, size, isEmptyPacket, finfo.Size(), e.dataSize)
+		}
+		if err = syscall.Ftruncate(int(e.file.Fd()), offset+size); err != nil {
+			return err
+		}
+		err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size)
+	} else {
+		_, err = e.file.WriteAt(data[:size], int64(offset))
+	}
+	if err != nil {
 		return
 	}
-	e.dataSize = offset + size
+	watermark := offset + size
+	if watermark%PageSize != 0 {
+		watermark = watermark + (PageSize - watermark%PageSize)
+	}
+	e.dataSize = watermark
+	log.LogInfof("after file (%v) getRealBlockNo (%v) isEmptyPacket(%v)"+
+		"offset(%v) size(%v) e.datasize(%v)", e.filePath, e.getRealBlockCnt(), isEmptyPacket, offset, size, e.dataSize)
 
 	return
 }
@@ -527,6 +553,11 @@ const (
 )
 
 func (e *Extent) DeleteTiny(offset, size int64) (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if offset+size > e.dataSize {
+		return fmt.Errorf("unavali MarkDeleteRequest offset(%v) size(%v) e.datasize(%v)", offset, size, e.dataSize)
+	}
 	if int(offset)%PageSize != 0 {
 		return ErrorParamMismatch
 	}
@@ -540,4 +571,55 @@ func (e *Extent) DeleteTiny(offset, size int64) (err error) {
 	err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size)
 
 	return
+}
+
+func (e *Extent) tinyExtentAvaliOffset(offset int64) (newOffset, newEnd int64, err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	newOffset, err = e.file.Seek(int64(offset), SEEK_DATA)
+	if err != nil {
+		return
+	}
+	newEnd, err = e.file.Seek(int64(newOffset), SEEK_HOLE)
+	if err != nil {
+		return
+	}
+	if newOffset-offset > util.BlockSize {
+		newOffset = offset + util.BlockSize
+	}
+	if newEnd-newOffset > util.BlockSize {
+		newEnd = newOffset + util.BlockSize
+	}
+	if newEnd < newOffset {
+		err = fmt.Errorf("unavali TinyExtentAvaliOffset on SEEK_DATA or SEEK_HOLE   (%v) offset(%v) "+
+			"newEnd(%v) newOffset(%v)", e.extentId, offset, newEnd, newOffset)
+	}
+	return
+}
+
+func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
+	if !IsTinyExtent(e.extentId) {
+		return
+	}
+	if e.dataSize < leaderFileSize {
+		atomic.StoreInt64(&e.realSize, 0)
+		return
+	}
+	atomic.StoreInt64(&e.realSize, 0)
+	var (
+		offset, realSize int64
+	)
+	for {
+		newOffset, err := e.file.Seek(int64(offset), SEEK_DATA)
+		if err != nil {
+			break
+		}
+		newEnd, err := e.file.Seek(int64(newOffset), SEEK_HOLE)
+		if err != nil {
+			break
+		}
+		realSize = realSize + (newEnd - newOffset)
+		offset = newEnd
+	}
+	atomic.StoreInt64(&e.realSize, realSize)
 }

@@ -55,8 +55,8 @@ const (
 	OpGetWatermark               uint8 = 0x06
 	OpExtentStoreGetAllWaterMark uint8 = 0x07
 	OpNotifyExtentRepair         uint8 = 0x08
-	OpExtentRepairRead           uint8 = 0x09
-	OpChunkRepairRead            uint8 = 0x0A
+	OpNormalExtentRepairRead     uint8 = 0x09
+	OpTinyExtentRepairRead       uint8 = 0x0A
 	OpFlowInfo                   uint8 = 0x0B
 	OpSyncDelNeedle              uint8 = 0x0C
 	OpNotifyCompact              uint8 = 0x0D
@@ -182,11 +182,11 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "ExtentStoreGetAllWaterMark"
 	case OpNotifyExtentRepair:
 		m = "NotifyExtentRepair"
-	case OpChunkRepairRead:
-		m = "ChunkRepairRead"
+	case OpTinyExtentRepairRead:
+		m = "TinyExtentRepairRead"
 	case OpNotifyCompact:
 		m = "NotifyCompact"
-	case OpExtentRepairRead:
+	case OpNormalExtentRepairRead:
 		m = "ExtentRepairRead"
 	case OpFlowInfo:
 		m = "FlowInfo"
@@ -409,6 +409,8 @@ func ReadFull(c net.Conn, buf *[]byte, readSize int) (err error) {
 func (p *Packet) ReadFromConn(c net.Conn, timeoutSec int) (err error) {
 	if timeoutSec != NoReadDeadlineTime {
 		c.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeoutSec)))
+	} else {
+		c.SetReadDeadline(time.Time{})
 	}
 	header, err := Buffers.Get(util.PacketHeaderSize)
 	if err != nil {
@@ -432,7 +434,7 @@ func (p *Packet) ReadFromConn(c net.Conn, timeoutSec int) (err error) {
 		return
 	}
 	size := p.Size
-	if (p.Opcode == OpRead || p.Opcode == OpStreamRead || p.Opcode == OpExtentRepairRead) && p.ResultCode == OpInitResultCode {
+	if (p.Opcode == OpRead || p.Opcode == OpStreamRead || p.Opcode == OpNormalExtentRepairRead || p.Opcode == OpTinyExtentRepairRead) && p.ResultCode == OpInitResultCode {
 		size = 0
 	}
 	return ReadFull(c, &p.Data, int(size))

@@ -38,6 +38,7 @@ import (
 	"github.com/chubaofs/cfs/util/config"
 	"github.com/chubaofs/cfs/util/log"
 	"github.com/chubaofs/cfs/util/ump"
+	"runtime/debug"
 )
 
 var (
@@ -123,7 +124,7 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	if err = s.parseConfig(cfg); err != nil {
 		return
 	}
-
+	debug.SetMaxThreads(20000)
 	go s.registerProfHandler()
 
 	if err = s.startSpaceManager(cfg); err != nil {

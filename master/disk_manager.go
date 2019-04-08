@@ -70,7 +70,7 @@ func (c *Cluster) diskOffLine(dataNode *DataNode, badDiskPath string, badPartiti
 		for _, dp := range vol.dataPartitions.dataPartitions {
 			for _, bad := range badPartitionIds {
 				if bad == dp.PartitionID {
-					c.dataPartitionOffline(dataNode.Addr, vol.Name, dp, DiskOfflineInfo)
+					c.dataPartitionOffline(dataNode.Addr,"", vol.Name, dp, DiskOfflineInfo)
 				}
 			}
 		}
