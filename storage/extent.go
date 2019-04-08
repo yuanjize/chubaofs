@@ -621,5 +621,5 @@ func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
 		realSize = realSize + (newEnd - newOffset)
 		offset = newEnd
 	}
-	atomic.StoreInt64(&e.realSize, offset)
+	atomic.StoreInt64(&e.realSize, realSize)
 }
