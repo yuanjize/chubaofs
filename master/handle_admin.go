@@ -403,16 +403,16 @@ errDeal:
 
 func (m *Master) dataPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	var (
-		volName     string
-		vol         *Vol
-		rstMsg      string
-		dp          *DataPartition
-		addr        string
-		partitionID uint64
-		err         error
+		volName               string
+		vol                   *Vol
+		rstMsg                string
+		dp                    *DataPartition
+		offlineAddr, destAddr string
+		partitionID           uint64
+		err                   error
 	)
 
-	if addr, partitionID, volName, err = parseDataPartitionOfflinePara(r); err != nil {
+	if offlineAddr, destAddr, partitionID, volName, err = parseDataPartitionOfflinePara(r); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(volName); err != nil {
@@ -421,8 +421,8 @@ func (m *Master) dataPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	if dp, err = vol.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataPartitionOffline(addr, volName, dp, HandleDataPartitionOfflineErr)
-	rstMsg = fmt.Sprintf(AdminDataPartitionOffline+" dataPartitionID :%v  on node:%v  has offline success", partitionID, addr)
+	m.cluster.dataPartitionOffline(offlineAddr,destAddr, volName, dp, HandleDataPartitionOfflineErr)
+	rstMsg = fmt.Sprintf(AdminDataPartitionOffline+" dataPartitionID :%v  on node:%v  has offline success", partitionID, offlineAddr)
 	io.WriteString(w, rstMsg)
 	return
 errDeal:
@@ -1087,7 +1087,7 @@ func checkDataPartitionID(r *http.Request) (ID uint64, err error) {
 	return strconv.ParseUint(value, 10, 64)
 }
 
-func parseDataPartitionOfflinePara(r *http.Request) (nodeAddr string, ID uint64, name string, err error) {
+func parseDataPartitionOfflinePara(r *http.Request) (nodeAddr, destinationAddr string, ID uint64, name string, err error) {
 	r.ParseForm()
 	if ID, err = checkDataPartitionID(r); err != nil {
 		return
@@ -1095,7 +1095,7 @@ func parseDataPartitionOfflinePara(r *http.Request) (nodeAddr string, ID uint64,
 	if nodeAddr, err = checkNodeAddr(r); err != nil {
 		return
 	}
-
+	destinationAddr = r.FormValue(ParaDestAddr)
 	if name, err = checkVolPara(r); err != nil {
 		return
 	}

@@ -571,7 +571,7 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode) {
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, dp := range vol.dataPartitions.dataPartitions {
-			c.dataPartitionOffline(dataNode.Addr, vol.Name, dp, DataNodeOfflineInfo)
+			c.dataPartitionOffline(dataNode.Addr, "", vol.Name, dp, DataNodeOfflineInfo)
 		}
 	}
 	if err := c.syncDeleteDataNode(dataNode); err != nil {
@@ -591,7 +591,7 @@ func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 	go dataNode.clean()
 }
 
-func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPartition, errMsg string) {
+func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) {
 	var (
 		newHosts []string
 		newAddr  string
@@ -634,7 +634,17 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 	if rack, err = c.t.getRack(dataNode.RackName); err != nil {
 		goto errDeal
 	}
-	if newHosts, err = rack.getAvailDataNodeHosts(dp.PersistenceHosts, 1); err != nil {
+	if destAddr != "" {
+		if contains(dp.PersistenceHosts, destAddr) {
+			err = errors.Errorf("destinationAddr[%v] must be a new data node addr,oldHosts[%v]", destAddr, dp.PersistenceHosts)
+			goto errDeal
+		}
+		_, err = c.getDataNode(destAddr)
+		if err != nil {
+			goto errDeal
+		}
+		newHosts = append(newHosts, destAddr)
+	} else if newHosts, err = rack.getAvailDataNodeHosts(dp.PersistenceHosts, 1); err != nil {
 		goto errDeal
 	}
 	newAddr = newHosts[0]
@@ -661,7 +671,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, volName string, dp *DataPart
 		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, ""), badPartitionIDs)
 	}
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
