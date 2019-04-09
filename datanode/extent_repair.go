@@ -255,9 +255,6 @@ func (dp *DataPartition) generatorAddExtentsTasks(allMembers []*MembersFileMetas
 		for index := 0; index < len(allMembers); index++ {
 			follower := allMembers[index]
 			if _, ok := follower.files[fileId]; !ok && maxFileInfo.Deleted == false {
-				if maxFileInfo.Inode == 0 {
-					continue
-				}
 				addFile := &storage.FileInfo{Source: maxFileInfo.Source, FileId: fileId, Size: maxFileInfo.Size, Inode: maxFileInfo.Inode}
 				follower.NeedAddExtentsTasks = append(follower.NeedAddExtentsTasks, addFile)
 				follower.NeedFixExtentSizeTasks = append(follower.NeedFixExtentSizeTasks, addFile)
