@@ -331,9 +331,6 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 		if !IsTinyExtent(extentId) && extentId > baseFileId {
 			baseFileId = extentId
 		}
-		if extent.Size() == 0 {
-			continue
-		}
 		extentInfo = &FileInfo{}
 		extentInfo.FromExtent(extent)
 		extentInfo.Crc = 0

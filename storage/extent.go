@@ -59,9 +59,9 @@ func (ei *FileInfo) FromExtent(extent *Extent) {
 		ei.FileId = extent.ID()
 		ei.Inode = extent.Ino()
 		ei.Size = uint64(extent.Size())
+		ei.ModTime = extent.ModTime()
 		if !IsTinyExtent(ei.FileId) {
 			ei.Deleted = extent.IsMarkDelete()
-			ei.ModTime = extent.ModTime()
 			ei.Crc = extent.HeaderChecksum()
 		}
 	}
@@ -568,7 +568,10 @@ func (e *Extent) DeleteTiny(offset, size int64) (err error) {
 	if int(size)%PageSize != 0 {
 		return ErrorParamMismatch
 	}
-	err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size)
+	if err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size);err!=nil {
+		return
+	}
+	e.modifyTime=time.Now()
 
 	return
 }
