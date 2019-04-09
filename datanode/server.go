@@ -125,15 +125,13 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 		return
 	}
 	debug.SetMaxThreads(20000)
-	go s.registerProfHandler()
-
 	if err = s.startSpaceManager(cfg); err != nil {
 		return
 	}
 	if err = s.startTcpService(); err != nil {
 		return
 	}
-
+	go s.registerProfHandler()
 	go s.registerToMaster()
 	ump.InitUmp(UmpModuleName)
 	return
