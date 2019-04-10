@@ -421,7 +421,7 @@ func (m *Master) dataPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	if dp, err = vol.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataPartitionOffline(offlineAddr,destAddr, volName, dp, HandleDataPartitionOfflineErr)
+	m.cluster.dataPartitionOffline(offlineAddr, destAddr, volName, dp, HandleDataPartitionOfflineErr)
 	rstMsg = fmt.Sprintf(AdminDataPartitionOffline+" dataPartitionID :%v  on node:%v  has offline success", partitionID, offlineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -599,20 +599,20 @@ errDeal:
 
 func (m *Master) dataNodeOffline(w http.ResponseWriter, r *http.Request) {
 	var (
-		node        *DataNode
-		rstMsg      string
-		offLineAddr string
-		err         error
+		node                  *DataNode
+		rstMsg                string
+		offLineAddr, destAddr string
+		err                   error
 	)
 
-	if offLineAddr, err = parseDataNodeOfflinePara(r); err != nil {
+	if offLineAddr, destAddr, err = parseDataNodeOfflinePara(r); err != nil {
 		goto errDeal
 	}
 
 	if node, err = m.cluster.getDataNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataNodeOffLine(node)
+	m.cluster.dataNodeOffLine(node, destAddr)
 	rstMsg = fmt.Sprintf("dataNodeOffline node [%v] has offline SUCCESS", offLineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -627,11 +627,12 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 		node                  *DataNode
 		rstMsg                string
 		offLineAddr, diskPath string
+		destAddr              string
 		err                   error
 		badPartitionIds       []uint64
 	)
 
-	if offLineAddr, diskPath, err = parseDiskOfflinePara(r); err != nil {
+	if offLineAddr, destAddr, diskPath, err = parseDiskOfflinePara(r); err != nil {
 		goto errDeal
 	}
 
@@ -646,7 +647,7 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 	rstMsg = fmt.Sprintf("recive diskOffline node[%v] disk[%v],badPartitionIds[%v]  has offline  success",
 		node.Addr, diskPath, badPartitionIds)
 	m.cluster.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offLineAddr, diskPath), badPartitionIds)
-	m.cluster.diskOffLine(node, diskPath, badPartitionIds)
+	m.cluster.diskOffLine(node, destAddr, diskPath, badPartitionIds)
 	io.WriteString(w, rstMsg)
 	log.LogWarnf(rstMsg)
 	Warn(m.clusterName, rstMsg)
@@ -821,20 +822,20 @@ errDeal:
 
 func (m *Master) metaNodeOffline(w http.ResponseWriter, r *http.Request) {
 	var (
-		metaNode    *MetaNode
-		rstMsg      string
-		offLineAddr string
-		err         error
+		metaNode              *MetaNode
+		rstMsg                string
+		offLineAddr, destAddr string
+		err                   error
 	)
 
-	if offLineAddr, err = parseDataNodeOfflinePara(r); err != nil {
+	if offLineAddr, destAddr, err = parseDataNodeOfflinePara(r); err != nil {
 		goto errDeal
 	}
 
 	if metaNode, err = m.cluster.getMetaNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	m.cluster.metaNodeOffLine(metaNode)
+	m.cluster.metaNodeOffLine(metaNode, destAddr)
 	rstMsg = fmt.Sprintf("metaNodeOffline metaNode [%v] has offline SUCCESS", offLineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -944,17 +945,20 @@ func parseGetDataNodePara(r *http.Request) (nodeAddr string, err error) {
 	return checkNodeAddr(r)
 }
 
-func parseDataNodeOfflinePara(r *http.Request) (nodeAddr string, err error) {
+func parseDataNodeOfflinePara(r *http.Request) (nodeAddr, destAddr string, err error) {
 	r.ParseForm()
-	return checkNodeAddr(r)
+	destAddr = r.FormValue(ParaDestAddr)
+	nodeAddr, err = checkNodeAddr(r)
+	return
 }
 
-func parseDiskOfflinePara(r *http.Request) (nodeAddr, diskPath string, err error) {
+func parseDiskOfflinePara(r *http.Request) (nodeAddr, destAddr, diskPath string, err error) {
 	r.ParseForm()
 	nodeAddr, err = checkNodeAddr(r)
 	if err != nil {
 		return
 	}
+	destAddr = r.FormValue(ParaDestAddr)
 	diskPath, err = checkDiskPath(r)
 	return
 }

@@ -564,14 +564,14 @@ func (c *Cluster) getMetaNode(addr string) (metaNode *MetaNode, err error) {
 	return
 }
 
-func (c *Cluster) dataNodeOffLine(dataNode *DataNode) {
+func (c *Cluster) dataNodeOffLine(dataNode *DataNode, destAddr string) {
 	msg := fmt.Sprintf("action[dataNodeOffLine], Node[%v] OffLine", dataNode.Addr)
 	log.LogWarn(msg)
 
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, dp := range vol.dataPartitions.dataPartitions {
-			c.dataPartitionOffline(dataNode.Addr, "", vol.Name, dp, DataNodeOfflineInfo)
+			c.dataPartitionOffline(dataNode.Addr, destAddr, vol.Name, dp, DataNodeOfflineInfo)
 		}
 	}
 	if err := c.syncDeleteDataNode(dataNode); err != nil {
@@ -671,7 +671,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, ""), badPartitionIDs)
 	}
 errDeal:
-	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
@@ -681,14 +681,14 @@ errDeal:
 	return
 }
 
-func (c *Cluster) metaNodeOffLine(metaNode *MetaNode) {
+func (c *Cluster) metaNodeOffLine(metaNode *MetaNode, destAddr string) {
 	msg := fmt.Sprintf("action[metaNodeOffLine],clusterID[%v] Node[%v] OffLine", c.Name, metaNode.Addr)
 	log.LogWarn(msg)
 
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, mp := range vol.MetaPartitions {
-			c.metaPartitionOffline(vol.Name, metaNode.Addr, "", mp.PartitionID)
+			c.metaPartitionOffline(vol.Name, metaNode.Addr, destAddr, mp.PartitionID)
 		}
 	}
 	if err := c.syncDeleteMetaNode(metaNode); err != nil {
