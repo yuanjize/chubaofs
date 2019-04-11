@@ -568,10 +568,10 @@ func (e *Extent) DeleteTiny(offset, size int64) (err error) {
 	if int(size)%PageSize != 0 {
 		return ErrorParamMismatch
 	}
-	if err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size);err!=nil {
+	if err = syscall.Fallocate(int(e.file.Fd()), FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, size); err != nil {
 		return
 	}
-	e.modifyTime=time.Now()
+	e.modifyTime = time.Now()
 
 	return
 }

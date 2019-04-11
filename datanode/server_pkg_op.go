@@ -263,11 +263,7 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 	log.LogInfof(fmt.Sprintf("action[handleDeleteDataPartition] %v error(%v)", request.PartitionId, string(data)))
 }
 
-// Handle OpLoadDataPartition packet.
-func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
-	task := &proto.AdminTask{}
-	json.Unmarshal(pkg.Data, task)
-	pkg.PackOkReply()
+func (s *DataNode) asyncLoadDataPartition(task *proto.AdminTask) {
 	request := &proto.LoadDataPartitionRequest{}
 	response := &proto.LoadDataPartitionResponse{}
 	if task.OpCode == proto.OpLoadDataPartition {
@@ -303,6 +299,14 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 		err = errors.Annotatef(err, "load DataPartition failed,partitionId[%v]", request.PartitionId)
 		log.LogError(errors.ErrorStack(err))
 	}
+}
+
+// Handle OpLoadDataPartition packet.
+func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
+	task := &proto.AdminTask{}
+	json.Unmarshal(pkg.Data, task)
+	pkg.PackOkReply()
+	go s.asyncLoadDataPartition(task)
 }
 
 // Handle OpMarkDelete packet.

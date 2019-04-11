@@ -11,9 +11,10 @@ import (
 	"github.com/chubaofs/cfs/proto"
 	"github.com/chubaofs/cfs/storage"
 	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/log"
 	"hash/crc32"
-	"github.com/chubaofs/cfs/util"
+	"sync/atomic"
 )
 
 //every  datapartion  file metas used for auto repairt
@@ -81,6 +82,16 @@ func (dp *DataPartition) extentFileRepair(fixExtentsType uint8) {
 		dp.partitionId, dp.extentStore.GetAvaliExtentLen(), dp.extentStore.GetUnAvaliExtentLen(), (finishTime-startTime)/int64(time.Millisecond))
 	for extentId, extentSize := range allMembers[0].LeaderTinyExtentRealSize {
 		dp.extentStore.UpdateTinyExtentRealSize(extentId, extentSize)
+	}
+	if dp.extentStore.GetUnAvaliExtentLen()+dp.extentStore.GetUnAvaliExtentLen()+
+		int(atomic.LoadInt32(&dp.useTinyExtentCnt)) != storage.TinyExtentCount {
+		lackExtents := dp.extentStore.LackExtents()
+		if len(lackExtents) > 3 {
+			log.LogWarnf("action[extentFileRepair] partition(%v) has "+
+				"lack Extents(%v) avaliExtentLen(%v) unavaliExtentLen(%v) usedTinyExtentCnt(%v)",
+				dp.partitionId, dp.extentStore.LackExtents(), dp.extentStore.GetAvaliExtentLen(),
+				dp.extentStore.GetAvaliExtentLen(), int(atomic.LoadInt32(&dp.useTinyExtentCnt)))
+		}
 	}
 
 }

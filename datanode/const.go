@@ -86,3 +86,9 @@ const (
 	LogRead       = "RD:"
 	LogRepair     = "Repair:"
 )
+
+const (
+	ReplRuning    = 2
+	ReplExiting   = 1
+	ReplHasExited = -2
+)

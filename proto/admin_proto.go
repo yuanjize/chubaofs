@@ -95,13 +95,15 @@ type HeartBeatRequest struct {
 }
 
 type PartitionReport struct {
-	PartitionID     uint64
-	PartitionStatus int
-	Total           uint64
-	Used            uint64
-	DiskPath        string
-	ExtentCount     int
-	NeedCompare     bool
+	PartitionID          uint64
+	PartitionStatus      int
+	Total                uint64
+	Used                 uint64
+	DiskPath             string
+	ExtentCount          int
+	NeedCompare          bool
+	AvaliTinyExtentCnt   int
+	UnavaliTinyExtentCnt int
 }
 
 type DataNodeHeartBeatResponse struct {

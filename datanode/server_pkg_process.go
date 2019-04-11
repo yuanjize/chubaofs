@@ -27,11 +27,6 @@ import (
 )
 
 func (s *DataNode) readFromCliAndDeal(msgH *MessageHandler) (err error) {
-	defer func() {
-		if err != nil {
-			msgH.Stop()
-		}
-	}()
 	pkg := NewPacket()
 	s.statsFlow(pkg, InFlow)
 	if err = pkg.ReadFromConnFromCli(msgH.inConn, proto.NoReadDeadlineTime); err != nil {
@@ -72,11 +67,12 @@ func (s *DataNode) checkAndAddInfo(pkg *Packet) error {
 		if err != nil {
 			return err
 		}
-		pkg.FileID = extentId
 		pkg.Offset, err = store.GetWatermarkForWrite(extentId)
 		if err != nil {
 			return err
 		}
+		pkg.FileID = extentId
+		atomic.AddInt32(&pkg.DataPartition.useTinyExtentCnt, 1)
 	} else if pkg.isHeadNode() && pkg.Opcode == proto.OpCreateFile {
 		pkg.FileID = pkg.DataPartition.GetExtentStore().NextExtentId()
 	}
@@ -90,6 +86,12 @@ func (s *DataNode) handleRequest(msgH *MessageHandler) {
 		case <-msgH.handleCh:
 			s.reciveFromAllReplicates(msgH)
 		case <-msgH.exitC:
+			msgH.exitedMu.Lock()
+			if atomic.AddInt32(&msgH.exited, -1) == ReplHasExited {
+				msgH.inConn.Close()
+				msgH.cleanResource(s)
+			}
+			msgH.exitedMu.Unlock()
 			return
 		}
 	}
@@ -173,7 +175,12 @@ func (s *DataNode) writeToCli(msgH *MessageHandler) {
 		case reply := <-msgH.replyCh:
 			s.doReplyCh(reply, msgH)
 		case <-msgH.exitC:
-			msgH.ClearReqs(s)
+			msgH.exitedMu.Lock()
+			if atomic.AddInt32(&msgH.exited, -1) == ReplHasExited {
+				msgH.inConn.Close()
+				msgH.cleanResource(s)
+			}
+			msgH.exitedMu.Unlock()
 			return
 		}
 	}
@@ -354,5 +361,6 @@ func (s *DataNode) leaderPutTinyExtentToStore(pkg *Packet) {
 	} else {
 		store.PutTinyExtentToAvaliCh(pkg.FileID)
 	}
+	atomic.AddInt32(&pkg.DataPartition.useTinyExtentCnt, -1)
 	atomic.StoreInt32(&pkg.IsReturn, HasReturnToStore)
 }

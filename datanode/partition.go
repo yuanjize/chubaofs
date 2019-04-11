@@ -85,6 +85,7 @@ type DataPartition struct {
 	snapshot               []*proto.File
 	snapshotLock           sync.RWMutex
 	loadExtentHeaderStatus int
+	useTinyExtentCnt       int32
 }
 
 func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int, partitionType string) (dp *DataPartition, err error) {

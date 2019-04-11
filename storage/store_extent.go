@@ -819,6 +819,41 @@ func (s *ExtentStore) GetAvaliTinyExtent() (extentId uint64, err error) {
 	}
 }
 
+func (s *ExtentStore) LackExtents() (lackExtents []int) {
+	allExtents := make([]int, 0)
+	lackExtents = make([]int, 0)
+	for i := 0; i < len(s.unavaliTinyExtentCh); i++ {
+		extentId, err := s.GetUnavaliTinyExtent()
+		if err != nil {
+			break
+		}
+		allExtents = append(allExtents, int(extentId))
+		s.unavaliTinyExtentCh <- extentId
+	}
+	for i := 0; i < len(s.avaliTinyExtentCh); i++ {
+		extentId, err := s.GetAvaliTinyExtent()
+		if err != nil {
+			break
+		}
+		allExtents = append(allExtents, int(extentId))
+		s.avaliTinyExtentCh <- extentId
+	}
+	for extentId := TinyExtentStartId; extentId < TinyExtentStartId+TinyExtentCount; extentId++ {
+		isFind := false
+		for _, id := range allExtents {
+			if id == extentId {
+				isFind = true
+				break
+			}
+		}
+		if !isFind {
+			lackExtents = append(lackExtents, extentId)
+		}
+	}
+
+	return
+}
+
 func (s *ExtentStore) PutTinyExtentToAvaliCh(extentId uint64) {
 	s.avaliTinyExtentCh <- extentId
 }

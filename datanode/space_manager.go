@@ -290,13 +290,15 @@ func (s *DataNode) fillHeartBeatResponse(response *proto.DataNodeHeartBeatRespon
 	space := s.space
 	space.RangePartitions(func(partition *DataPartition) bool {
 		vr := &proto.PartitionReport{
-			PartitionID:     uint64(partition.ID()),
-			PartitionStatus: partition.Status(),
-			Total:           uint64(partition.Size()),
-			Used:            uint64(partition.Used()),
-			DiskPath:        partition.Disk().Path,
-			ExtentCount:     partition.GetExtentStore().GetExtentCount(),
-			NeedCompare:     partition.loadExtentHeaderStatus==FinishLoadDataPartitionExtentHeader,
+			PartitionID:          uint64(partition.ID()),
+			PartitionStatus:      partition.Status(),
+			Total:                uint64(partition.Size()),
+			Used:                 uint64(partition.Used()),
+			DiskPath:             partition.Disk().Path,
+			ExtentCount:          partition.GetExtentStore().GetExtentCount(),
+			NeedCompare:          partition.loadExtentHeaderStatus == FinishLoadDataPartitionExtentHeader,
+			AvaliTinyExtentCnt:   partition.GetExtentStore().GetAvaliExtentLen(),
+			UnavaliTinyExtentCnt: partition.GetExtentStore().GetUnAvaliExtentLen(),
 		}
 		response.PartitionInfo = append(response.PartitionInfo, vr)
 		return true

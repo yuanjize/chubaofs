@@ -305,33 +305,29 @@ func (s *DataNode) serveConn(conn net.Conn) {
 	msgH := NewMsgHandler(c)
 	go s.handleRequest(msgH)
 	go s.writeToCli(msgH)
+	s.dealClientPkg(msgH)
 
+}
+
+func (s *DataNode) dealClientPkg(msgH *MessageHandler) {
 	var (
 		err error
 	)
-
 	defer func() {
-		if err != nil && err != io.EOF &&
-			!strings.Contains(err.Error(), "closed connection") &&
-			!strings.Contains(err.Error(), "reset by peer") {
-			log.LogErrorf("action[serveConn] err[%v] inconn[%v].", err, conn.RemoteAddr().String())
+		msgH.Stop()
+		msgH.exitedMu.Lock()
+		if atomic.AddInt32(&msgH.exited, -1) == ReplHasExited {
+			msgH.inConn.Close()
+			msgH.cleanResource(s)
 		}
-		space.Stats().RemoveConnection()
-		conn.Close()
+		msgH.exitedMu.Unlock()
 	}()
-
 	for {
-		select {
-		case <-msgH.exitC:
-			log.LogDebugf("action[DataNode.serveConn] event loop for %v exit.", conn.RemoteAddr())
+		if err = s.readFromCliAndDeal(msgH); err != nil {
 			return
-		default:
-			if err = s.readFromCliAndDeal(msgH); err != nil {
-				msgH.Stop()
-				return
-			}
 		}
 	}
+
 }
 
 func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {

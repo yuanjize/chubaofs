@@ -168,9 +168,9 @@ func main() {
 
 	if profPort != "" {
 		go func() {
-			err=http.ListenAndServe(fmt.Sprintf(":%v", profPort), nil)
-			if err!=nil {
-				panic(fmt.Sprintf("cannot listen pprof %v err %v",profPort,err.Error()))
+			err = http.ListenAndServe(fmt.Sprintf(":%v", profPort), nil)
+			if err != nil {
+				panic(fmt.Sprintf("cannot listen pprof %v err %v", profPort, err.Error()))
 			}
 		}()
 	}

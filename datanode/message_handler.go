@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 var single = struct{}{}
@@ -32,7 +33,7 @@ type MessageHandler struct {
 	inConn      *net.TCPConn
 	isClean     bool
 	exitC       chan bool
-	exited      bool
+	exited      int32
 	exitedMu    sync.RWMutex
 	connectMap  map[string]*net.TCPConn
 	connectLock sync.RWMutex
@@ -46,6 +47,7 @@ func NewMsgHandler(inConn *net.TCPConn) *MessageHandler {
 	m.replyCh = make(chan *Packet, RequestChanSize)
 	m.exitC = make(chan bool, 100)
 	m.inConn = inConn
+	m.exited = ReplRuning
 	m.connectMap = make(map[string]*net.TCPConn)
 
 	return m
@@ -60,24 +62,13 @@ func (msgH *MessageHandler) RenewList(isHeadNode bool) {
 func (msgH *MessageHandler) Stop() {
 	msgH.exitedMu.Lock()
 	defer msgH.exitedMu.Unlock()
-	if !msgH.exited {
+	if atomic.LoadInt32(&msgH.exited) == ReplRuning {
 		if msgH.exitC != nil {
 			close(msgH.exitC)
 		}
-		msgH.exited = true
+		atomic.StoreInt32(&msgH.exited, ReplExiting)
 	}
 
-}
-
-func (msgH *MessageHandler) ExitSign() {
-	msgH.exitedMu.Lock()
-	defer msgH.exitedMu.Unlock()
-	if !msgH.exited {
-		if msgH.exitC != nil {
-			close(msgH.exitC)
-		}
-		msgH.exited = true
-	}
 }
 
 func (msgH *MessageHandler) AllocateNextConn(pkg *Packet, index int) (err error) {
@@ -100,23 +91,6 @@ func (msgH *MessageHandler) AllocateNextConn(pkg *Packet, index int) (err error)
 	return nil
 }
 
-func (msgH *MessageHandler) checkReplyAvail(reply *Packet, index int) (err error) {
-	msgH.listMux.Lock()
-	defer msgH.listMux.Unlock()
-
-	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
-		request := e.Value.(*Packet)
-		if reply.ReqID == request.ReqID {
-			return
-		}
-		return fmt.Errorf(ActionCheckReplyAvail+" request (%v) reply(%v) from %v localaddr %v"+
-			" remoteaddr %v requestCrc(%v) replyCrc(%v)", request.GetUniqueLogId(), reply.GetUniqueLogId(), request.NextAddrs[index],
-			request.NextConns[index].LocalAddr().String(), request.NextConns[index].RemoteAddr().String(), request.Crc, reply.Crc)
-	}
-
-	return
-}
-
 func (msgH *MessageHandler) GetListElement() (e *list.Element) {
 	msgH.listMux.RLock()
 	e = msgH.sentList.Front()
@@ -131,25 +105,53 @@ func (msgH *MessageHandler) PushListElement(e *Packet) {
 	msgH.listMux.Unlock()
 }
 
-func (msgH *MessageHandler) ClearReqs(s *DataNode) {
+func (msgH *MessageHandler) cleanRequest(s *DataNode) {
+	defer func() {
+		close(msgH.requestCh)
+	}()
+	for {
+		select {
+		case pkg := <-msgH.requestCh:
+			pkg.forceDestoryAllConnect()
+			s.leaderPutTinyExtentToStore(pkg)
+		default:
+			return
+
+		}
+	}
+}
+
+func (msgH *MessageHandler) cleanReply(s *DataNode) {
+	defer func() {
+		close(msgH.replyCh)
+	}()
+	for {
+		select {
+		case pkg := <-msgH.replyCh:
+			pkg.forceDestoryAllConnect()
+			s.leaderPutTinyExtentToStore(pkg)
+		default:
+			return
+
+		}
+	}
+}
+
+func (msgH *MessageHandler) cleanResource(s *DataNode) {
 	msgH.listMux.Lock()
 	for e := msgH.sentList.Front(); e != nil; e = e.Next() {
 		request := e.Value.(*Packet)
 		request.forceDestoryAllConnect()
 		s.leaderPutTinyExtentToStore(request)
-
 	}
-	replys := len(msgH.replyCh)
-	for i := 0; i < replys; i++ {
-		<-msgH.replyCh
-	}
+	close(msgH.handleCh)
+	msgH.cleanReply(s)
+	msgH.cleanRequest(s)
 	msgH.sentList = list.New()
-	msgH.connectLock.RLock()
+	msgH.connectLock.Lock()
 	for _, conn := range msgH.connectMap {
 		conn.Close()
 	}
-	msgH.connectLock.RUnlock()
-	msgH.connectLock.Lock()
 	msgH.connectMap = make(map[string]*net.TCPConn, 0)
 	msgH.connectLock.Unlock()
 	msgH.listMux.Unlock()
