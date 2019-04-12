@@ -29,13 +29,16 @@ func (c *Cluster) checkBadDiskRecovery() {
 		for _, partitionID := range badDataPartitionIds {
 			partition, err := c.getDataPartitionByID(partitionID)
 			if err != nil {
+				newBadDpIds = append(newBadDpIds, partitionID)
 				continue
 			}
 			vol, err := c.getVol(partition.VolName)
 			if err != nil {
+				newBadDpIds = append(newBadDpIds, partitionID)
 				continue
 			}
 			if len(partition.Replicas) == 0 || len(partition.Replicas) < int(vol.dpReplicaNum) {
+				newBadDpIds = append(newBadDpIds, partitionID)
 				continue
 			}
 			used := partition.Replicas[0].Used
