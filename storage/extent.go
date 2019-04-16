@@ -621,7 +621,7 @@ func (e *Extent) tinyExtentUpdateRealSize(leaderFileSize int64) {
 		if err != nil {
 			break
 		}
-		if newOffset>=leaderFileSize || newEnd>=leaderFileSize{
+		if newOffset >= leaderFileSize || newEnd >= leaderFileSize {
 			break
 		}
 		realSize = realSize + (newEnd - newOffset)

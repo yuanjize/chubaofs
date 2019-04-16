@@ -55,12 +55,14 @@ const (
 	OpGetWatermark               uint8 = 0x06
 	OpExtentStoreGetAllWaterMark uint8 = 0x07
 	OpNotifyExtentRepair         uint8 = 0x08
-	OpNormalExtentRepairRead     uint8 = 0x09
-	OpTinyExtentRepairRead       uint8 = 0x0A
-	OpFlowInfo                   uint8 = 0x0B
-	OpSyncDelNeedle              uint8 = 0x0C
-	OpNotifyCompact              uint8 = 0x0D
-	OpGetDataPartitionMetrics    uint8 = 0x0E
+
+	OpFlowInfo                uint8 = 0x0B
+	OpSyncDelNeedle           uint8 = 0x0C
+	OpNotifyCompact           uint8 = 0x0D
+	OpGetDataPartitionMetrics uint8 = 0x0E
+
+	OpNormalExtentRepairRead uint8 = 0x10
+	OpTinyExtentRepairRead   uint8 = 0x11
 
 	// Operations: Client -> MetaNode.
 	OpMetaCreateInode   uint8 = 0x20

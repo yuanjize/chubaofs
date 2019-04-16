@@ -162,7 +162,7 @@ func (s *ExtentStore) SnapShotNormalExtent() (files []*proto.File, err error) {
 	var (
 		extentInfoSlice []*FileInfo
 	)
-	if extentInfoSlice, err = s.GetAllWatermark(GetStableExtentFilter()); err != nil {
+	if extentInfoSlice, err = s.GetAllWatermark(GetAllExtentFilter()); err != nil {
 		return
 	}
 	files = make([]*proto.File, 0, len(extentInfoSlice))
@@ -175,26 +175,6 @@ func (s *ExtentStore) SnapShotNormalExtent() (files []*proto.File, err error) {
 		}
 		files = append(files, file)
 	}
-	return
-}
-
-func (s *ExtentStore) SnapShotTinyExtent() (files []*proto.File, err error) {
-	var extentID uint64
-	files = make([]*proto.File, 0)
-	for extentID = TinyExtentStartId; extentID < TinyExtentStartId+TinyExtentCount; extentID++ {
-		e, ok := s.cache.Get(extentID)
-		if !ok {
-			continue
-		}
-		file := &proto.File{
-			Name:     strconv.FormatUint(e.extentId, 10),
-			Crc:      0,
-			Size:     uint32(atomic.LoadInt64(&e.realSize)),
-			Modified: e.modifyTime.Unix(),
-		}
-		files = append(files, file)
-	}
-
 	return
 }
 

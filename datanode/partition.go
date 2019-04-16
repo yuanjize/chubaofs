@@ -206,18 +206,8 @@ func (dp *DataPartition) ReloadSnapshot() {
 func (dp *DataPartition) GetSnapShot() (files []*proto.File) {
 	dp.snapshotLock.RLock()
 	defer dp.snapshotLock.RUnlock()
-	tinySnapshot, _ := dp.extentStore.SnapShotTinyExtent()
-	allSnapshot := make([]*proto.File, 0, len(dp.snapshot)+len(tinySnapshot))
-	allSnapshot = append(allSnapshot, tinySnapshot...)
-	allSnapshot = append(allSnapshot, dp.snapshot...)
 
-	return allSnapshot
-}
-
-func (dp *DataPartition) GetTinyExtentSnapShot() (files []*proto.File) {
-	files, _ = dp.extentStore.SnapShotTinyExtent()
-
-	return
+	return dp.snapshot
 }
 
 func (dp *DataPartition) Stop() {
@@ -465,7 +455,7 @@ func (dp *DataPartition) Load() (response *proto.LoadDataPartitionResponse) {
 	response.Used = uint64(dp.Used())
 	var err error
 	if dp.loadExtentHeaderStatus != FinishLoadDataPartitionExtentHeader {
-		response.PartitionSnapshot = dp.GetTinyExtentSnapShot()
+		response.PartitionSnapshot = make([]*proto.File, 0)
 	} else {
 		response.PartitionSnapshot = dp.GetSnapShot()
 	}
