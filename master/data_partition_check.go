@@ -212,7 +212,6 @@ func (partition *DataPartition) addLackReplication() (lackAddr string, err error
 				partition.PartitionID, addr))
 			err = DataReplicaLackError
 			lackAddr = addr
-			partition.isRecover = true
 			break
 		}
 	}

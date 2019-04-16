@@ -604,8 +604,6 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		vol      *Vol
 		replica  *DataReplica
 	)
-	badPartitionIDs := make([]uint64, 0)
-	badPartitionIDs = append(badPartitionIDs, dp.PartitionID)
 	dp.Lock()
 	defer dp.Unlock()
 	if ok := dp.isInPersistenceHosts(offlineAddr); !ok {
@@ -665,11 +663,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		goto errDeal
 	}
 	dp.isRecover = true
-	if replica != nil {
-		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath), badPartitionIDs)
-	} else {
-		c.BadDataPartitionIds.Store(fmt.Sprintf("%s:%s", offlineAddr, ""), badPartitionIDs)
-	}
+	c.putBadDataPartitionIDs(replica,offlineAddr,dp.PartitionID)
 errDeal:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
@@ -679,6 +673,22 @@ errDeal:
 	}
 	log.LogWarn(msg)
 	return
+}
+
+func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica,offlineAddr string,partitionID uint64) {
+	var key string
+	newBadPartitionIDs := make([]uint64,0)
+	if replica != nil {
+		key = fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath)
+	} else {
+		key = fmt.Sprintf("%s:%s", offlineAddr, "")
+	}
+	badPartitionIDs,ok := c.BadDataPartitionIds.Load(key)
+	if ok {
+		newBadPartitionIDs = badPartitionIDs.([]uint64)
+	}
+	newBadPartitionIDs = append(newBadPartitionIDs,partitionID)
+	c.BadDataPartitionIds.Store(key, newBadPartitionIDs)
 }
 
 func (c *Cluster) metaNodeOffLine(metaNode *MetaNode, destAddr string) {
