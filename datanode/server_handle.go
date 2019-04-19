@@ -8,6 +8,7 @@ import (
 
 	"github.com/chubaofs/cfs/proto"
 	"github.com/chubaofs/cfs/storage"
+	"time"
 )
 
 func (s *DataNode) apiGetDisk(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +142,7 @@ func (s *DataNode) apiGetExtent(w http.ResponseWriter, r *http.Request) {
 		reload      int
 		err         error
 		extentInfo  *storage.FileInfo
+		realSize    int64
 	)
 	if err = r.ParseForm(); err != nil {
 		s.buildApiFailureResp(w, http.StatusBadRequest, err.Error())
@@ -161,12 +163,23 @@ func (s *DataNode) apiGetExtent(w http.ResponseWriter, r *http.Request) {
 		s.buildApiFailureResp(w, http.StatusNotFound, "partition not exist")
 		return
 	}
-	if extentInfo, err = partition.GetExtentStore().GetWatermark(uint64(extentId), reload == 1); err != nil {
+	if extentInfo, realSize, err = partition.GetExtentStore().GetWatermarkWithRealSize(uint64(extentId), reload == 1); err != nil {
 		s.buildApiFailureResp(w, 500, err.Error())
 		return
 	}
-
-	s.buildApiSuccessResp(w, extentInfo)
+	result := &struct {
+		FileId      uint64
+		Size        uint64
+		ModTime     time.Time
+		PartitionID uint32
+		RealSize    int64
+	}{
+		FileId:      extentInfo.FileId,
+		Size:        extentInfo.Size,
+		PartitionID: uint32(partitionId),
+		RealSize:    realSize,
+	}
+	s.buildApiSuccessResp(w, result)
 	return
 }
 

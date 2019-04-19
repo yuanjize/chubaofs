@@ -667,6 +667,31 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 	return
 }
 
+func (s *ExtentStore) GetWatermarkWithRealSize(extentId uint64, reload bool) (extentInfo *FileInfo, realSize int64, err error) {
+	var (
+		has    bool
+		extent *Extent
+	)
+	s.extentInfoMux.RLock()
+	extentInfo, has = s.extentInfoMap[extentId]
+	s.extentInfoMux.RUnlock()
+	if !has {
+		err = fmt.Errorf("extent %v not exist", s.getExtentKey(extentId))
+		return
+	}
+	if reload {
+		if extent, err = s.getExtentWithHeader(extentId); err != nil {
+			return
+		}
+		extentInfo.FromExtent(extent)
+		s.extentInfoMux.Lock()
+		s.extentInfoMap[extentId] = extentInfo
+		s.extentInfoMux.Unlock()
+		realSize = atomic.LoadInt64(&extent.realSize)
+	}
+	return
+}
+
 func (s *ExtentStore) GetWatermarkForWrite(extentId uint64) (watermark int64, err error) {
 	einfo, err := s.GetWatermark(extentId, false)
 	if err != nil {

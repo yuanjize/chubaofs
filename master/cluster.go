@@ -663,7 +663,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		goto errDeal
 	}
 	dp.isRecover = true
-	c.putBadDataPartitionIDs(replica,offlineAddr,dp.PartitionID)
+	c.putBadDataPartitionIDs(replica, offlineAddr, dp.PartitionID)
 errDeal:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
@@ -675,19 +675,19 @@ errDeal:
 	return
 }
 
-func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica,offlineAddr string,partitionID uint64) {
+func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica, offlineAddr string, partitionID uint64) {
 	var key string
-	newBadPartitionIDs := make([]uint64,0)
+	newBadPartitionIDs := make([]uint64, 0)
 	if replica != nil {
 		key = fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath)
 	} else {
 		key = fmt.Sprintf("%s:%s", offlineAddr, "")
 	}
-	badPartitionIDs,ok := c.BadDataPartitionIds.Load(key)
+	badPartitionIDs, ok := c.BadDataPartitionIds.Load(key)
 	if ok {
 		newBadPartitionIDs = badPartitionIDs.([]uint64)
 	}
-	newBadPartitionIDs = append(newBadPartitionIDs,partitionID)
+	newBadPartitionIDs = append(newBadPartitionIDs, partitionID)
 	c.BadDataPartitionIds.Store(key, newBadPartitionIDs)
 }
 
