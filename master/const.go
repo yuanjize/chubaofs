@@ -65,10 +65,11 @@ const (
 	LoadDataPartitionPeriod                 = 12 * 60 * 60
 	VolExpandDataPartitionStepRatio         = 0.1
 	VolMaxExpandDataPartitionCount          = 100
+	VolWarningRatio                         = 0.7
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 

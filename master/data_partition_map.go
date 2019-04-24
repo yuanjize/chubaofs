@@ -227,6 +227,15 @@ func (dpMap *DataPartitionMap) getTotalUsedSpace() (totalUsed uint64) {
 	return
 }
 
+func (dpMap *DataPartitionMap) getTotalSpace() (total uint64) {
+	dpMap.RLock()
+	defer dpMap.RUnlock()
+	for _, dp := range dpMap.dataPartitions {
+		total = total + dp.total
+	}
+	return
+}
+
 func (dpMap *DataPartitionMap) setAllDataPartitionsToReadOnly() {
 	dpMap.Lock()
 	defer dpMap.Unlock()
