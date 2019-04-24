@@ -222,7 +222,11 @@ func (dpMap *DataPartitionMap) getTotalUsedSpace() (totalUsed uint64) {
 	dpMap.RLock()
 	defer dpMap.RUnlock()
 	for _, dp := range dpMap.dataPartitions {
-		totalUsed = totalUsed + dp.getMaxUsedSize()
+		size := dp.getMaxUsedSize()
+		if size > dp.total {
+			size = dp.total
+		}
+		totalUsed = totalUsed + size
 	}
 	return
 }
