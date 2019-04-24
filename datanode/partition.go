@@ -30,7 +30,6 @@ import (
 	"github.com/chubaofs/cfs/proto"
 	"github.com/chubaofs/cfs/storage"
 	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util"
 	"github.com/chubaofs/cfs/util/log"
 	"syscall"
 )
@@ -313,9 +312,15 @@ func ParseExtentId(filename string) (extentId uint64, isExtent bool) {
 
 func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64) {
 	name := finfo.Name()
+	defer func() {
+		if size<0 {
+			size=0
+		}
+	}()
 	extentid, isExtent := ParseExtentId(name)
 	if !isExtent {
-		return 0
+		size=0
+		return
 	}
 	if storage.IsTinyExtent(extentid) {
 		stat := new(syscall.Stat_t)
@@ -323,12 +328,11 @@ func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 		if err != nil {
 			return finfo.Size()
 		}
-		return stat.Blocks * DiskSectorSize
-
+		size=stat.Blocks * DiskSectorSize
 	} else {
-		return finfo.Size() - util.BlockHeaderSize
+		size=finfo.Size()
 	}
-
+	return size
 }
 
 func (dp *DataPartition) computeUsage() {
