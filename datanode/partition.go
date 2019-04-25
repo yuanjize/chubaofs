@@ -31,6 +31,7 @@ import (
 	"github.com/chubaofs/cfs/storage"
 	"github.com/chubaofs/cfs/third_party/juju/errors"
 	"github.com/chubaofs/cfs/util/log"
+	"math/rand"
 	"syscall"
 )
 
@@ -256,7 +257,8 @@ func (dp *DataPartition) ForceLoadHeader() {
 }
 
 func (dp *DataPartition) statusUpdateScheduler() {
-	ticker := time.NewTicker(10 * time.Second)
+	rand.Seed(time.Now().UnixNano())
+	ticker := time.NewTicker(10*time.Second + time.Duration(rand.Intn(10))*time.Second)
 	metricTicker := time.NewTicker(5 * time.Second)
 	var index int
 	for {
@@ -313,13 +315,13 @@ func ParseExtentId(filename string) (extentId uint64, isExtent bool) {
 func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64) {
 	name := finfo.Name()
 	defer func() {
-		if size<0 {
-			size=0
+		if size < 0 {
+			size = 0
 		}
 	}()
 	extentid, isExtent := ParseExtentId(name)
 	if !isExtent {
-		size=0
+		size = 0
 		return
 	}
 	if storage.IsTinyExtent(extentid) {
@@ -328,9 +330,9 @@ func (dp *DataPartition) getRealSize(path string, finfo os.FileInfo) (size int64
 		if err != nil {
 			return finfo.Size()
 		}
-		size=stat.Blocks * DiskSectorSize
+		size = stat.Blocks * DiskSectorSize
 	} else {
-		size=finfo.Size()
+		size = finfo.Size()
 	}
 	return size
 }

@@ -251,7 +251,7 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	ratio := float64(vol.getTotalUsedSpace()) / float64(vol.Capacity*util.GB)
 	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || ratio > VolWarningRatio {
 		count := vol.calculateExpandNum()
-		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],ratio[%v]", vol.Name, count,ratio)
+		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],ratio[%v]", vol.Name, count, ratio)
 		for i := 0; i < count; i++ {
 			c.createDataPartition(vol.Name, vol.VolType)
 		}
