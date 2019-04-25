@@ -104,6 +104,7 @@ type PartitionReport struct {
 	NeedCompare          bool
 	AvaliTinyExtentCnt   int
 	UnavaliTinyExtentCnt int
+	VolName              string
 }
 
 type DataNodeHeartBeatResponse struct {

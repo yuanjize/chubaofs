@@ -66,6 +66,7 @@ func (helper *masterHelper) Request(method, path string, param map[string]string
 }
 
 func (helper *masterHelper) request(method, path string, param map[string]string, reqData []byte) (repsData []byte, err error) {
+	var mesg string
 	for i := 0; i < len(helper.masters); i++ {
 		var index int
 		if i+int(helper.leaderIdx) < len(helper.masters) {
@@ -83,6 +84,7 @@ func (helper *masterHelper) request(method, path string, param map[string]string
 		var resp *http.Response
 		resp, err = helper.httpRequest(method, fmt.Sprintf("http://%s%s", masterAddr, path), param, reqData)
 		if err != nil {
+			mesg = fmt.Sprintf("%v url(%v) err(%v),", mesg, fmt.Sprintf("http://%s%s", masterAddr, path), err.Error())
 			continue
 		}
 		stateCode := resp.StatusCode
@@ -96,7 +98,8 @@ func (helper *masterHelper) request(method, path string, param map[string]string
 			curMasterAddr := strings.TrimSpace(string(repsData))
 			curMasterAddr = strings.Replace(curMasterAddr, "\n", "", -1)
 			if len(curMasterAddr) == 0 {
-				err = ErrNoValidMaster
+				mesg = fmt.Sprintf("%v currentMasterAddr(%v) is null err,", mesg, curMasterAddr)
+				err = fmt.Errorf(mesg)
 				return
 			}
 			helper.updateMaster(curMasterAddr)
@@ -110,7 +113,7 @@ func (helper *masterHelper) request(method, path string, param map[string]string
 			continue
 		}
 	}
-	err = ErrNoValidMaster
+	err = fmt.Errorf(mesg)
 	return
 }
 

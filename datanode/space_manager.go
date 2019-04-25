@@ -299,6 +299,7 @@ func (s *DataNode) fillHeartBeatResponse(response *proto.DataNodeHeartBeatRespon
 			NeedCompare:          partition.loadExtentHeaderStatus == FinishLoadDataPartitionExtentHeader,
 			AvaliTinyExtentCnt:   partition.GetExtentStore().GetAvaliExtentLen(),
 			UnavaliTinyExtentCnt: partition.GetExtentStore().GetUnAvaliExtentLen(),
+			VolName:              partition.volumeId,
 		}
 		response.PartitionInfo = append(response.PartitionInfo, vr)
 		return true

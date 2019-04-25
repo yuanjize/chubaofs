@@ -57,6 +57,7 @@ func (s *DataNode) apiGetPartitions(w http.ResponseWriter, r *http.Request) {
 	partitions := make([]interface{}, 0)
 	s.space.RangePartitions(func(dp *DataPartition) bool {
 		partition := &struct {
+			Volname  string   `json:volname`
 			ID       uint32   `json:"id"`
 			Size     int      `json:"size"`
 			Used     int      `json:"used"`
@@ -70,6 +71,7 @@ func (s *DataNode) apiGetPartitions(w http.ResponseWriter, r *http.Request) {
 			Status:   dp.Status(),
 			Path:     dp.Path(),
 			Replicas: dp.ReplicaHosts(),
+			Volname:  dp.volumeId,
 		}
 		partitions = append(partitions, partition)
 		return true
@@ -114,6 +116,7 @@ func (s *DataNode) apiGetPartition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := &struct {
+		Volname   string              `json:volname`
 		ID        uint32              `json:"id"`
 		Size      int                 `json:"size"`
 		Used      int                 `json:"used"`
@@ -131,6 +134,7 @@ func (s *DataNode) apiGetPartition(w http.ResponseWriter, r *http.Request) {
 		Files:     files,
 		FileCount: len(files),
 		Replicas:  partition.ReplicaHosts(),
+		Volname:   partition.volumeId,
 	}
 	s.buildApiSuccessResp(w, result)
 }
