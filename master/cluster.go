@@ -330,6 +330,14 @@ func (c *Cluster) getDataPartitionByID(partitionID uint64) (dp *DataPartition, e
 	return
 }
 
+func (c *Cluster) getDataPartitionByIDAndVol(partitionID uint64, volName string) (dp *DataPartition, err error) {
+	vol, err := c.getVol(volName)
+	if err != nil {
+		return nil, VolNotFound
+	}
+	return vol.getDataPartitionByID(partitionID)
+}
+
 func (c *Cluster) getMetaPartitionByID(id uint64) (mp *MetaPartition, err error) {
 	vols := c.copyVols()
 	for _, vol := range vols {
@@ -665,7 +673,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	dp.isRecover = true
 	c.putBadDataPartitionIDs(replica, offlineAddr, dp.PartitionID)
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
