@@ -23,17 +23,19 @@ import (
 )
 
 type Vol struct {
-	Name           string
-	Owner          string
-	VolType        string
-	dpReplicaNum   uint8
-	mpReplicaNum   uint8
-	threshold      float32
-	Status         uint8
-	Capacity       uint64 //GB
-	MetaPartitions map[uint64]*MetaPartition
-	mpsLock        sync.RWMutex
-	dataPartitions *DataPartitionMap
+	Name                string
+	Owner               string
+	VolType             string
+	dpReplicaNum        uint8
+	mpReplicaNum        uint8
+	threshold           float32
+	Status              uint8
+	Capacity            uint64 //GB
+	AvailSpaceAllocated uint64 //GB
+	UsedSpace           uint64 //GB
+	MetaPartitions      map[uint64]*MetaPartition
+	mpsLock             sync.RWMutex
+	dataPartitions      *DataPartitionMap
 	sync.RWMutex
 }
 
@@ -231,9 +233,7 @@ func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 	if vol.getCapacity() == 0 {
 		return
 	}
-	usedSpace := vol.getTotalUsedSpace()
-	usedSpace = usedSpace / util.GB
-	if usedSpace >= vol.getCapacity() {
+	if vol.UsedSpace >= vol.getCapacity() {
 		vol.setAllDataPartitionsToReadOnly()
 		return
 	} else {
@@ -248,14 +248,19 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	if vol.Capacity == 0 {
 		vol.Capacity = vol.getTotalSpace() / util.GB
 	}
-	ratio := float64(vol.getTotalUsedSpace()) / float64(vol.Capacity*util.GB)
-	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || ratio > VolWarningRatio {
+	usedRatio := float64(vol.UsedSpace) / float64(vol.Capacity)
+	availRatio := float64(vol.AvailSpaceAllocated) / float64(vol.Capacity)
+	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) {
 		count := vol.calculateExpandNum()
-		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],ratio[%v]", vol.Name, count, ratio)
+		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],usedRatio[%v],availRatio[%v]", vol.Name, count, usedRatio, availRatio)
 		for i := 0; i < count; i++ {
 			c.createDataPartition(vol.Name, vol.VolType)
 		}
 	}
+}
+
+func (vol *Vol) isTooSmallAvailSpace(availRatio float64) bool {
+	return availRatio < VolMinAvailSpaceRatio && vol.AvailSpaceAllocated < util.TB && vol.AvailSpaceAllocated > 0
 }
 
 func (vol *Vol) calculateExpandNum() (count int) {

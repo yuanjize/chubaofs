@@ -97,11 +97,13 @@ func (c *Cluster) checkMetaNodeAvailSpace() {
 func (c *Cluster) checkVolAvailSpace() {
 	vols := c.copyVols()
 	for _, vol := range vols {
-		used, total := vol.getTotalUsedSpace(), vol.Capacity*util.GB
-		if total <= 0 {
+		if vol.Capacity <= 0 {
 			continue
 		}
-		useRate := float64(used) / float64(total)
-		c.volSpaceStat.Store(vol.Name, newVolSpaceStat(vol.Name, total/util.GB, used/util.GB, strconv.FormatFloat(useRate, 'f', 3, 32)))
+		used, totalSpaceAllocated := vol.statSpace()
+		vol.UsedSpace = used / util.GB
+		vol.AvailSpaceAllocated = (totalSpaceAllocated - used) / util.GB
+		useRate := float64(vol.UsedSpace) / float64(vol.Capacity)
+		c.volSpaceStat.Store(vol.Name, newVolSpaceStat(vol.Name, vol.Capacity, vol.UsedSpace, strconv.FormatFloat(useRate, 'f', 3, 32)))
 	}
 }

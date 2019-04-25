@@ -36,14 +36,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total           uint64
-	used            uint64
-	VolName         string
-	modifyTime      int64
-	createTime      int64
-	FileInCoreMap   map[string]*FileInCore
-	MissNodes       map[string]int64
-	FileMissReplica map[string]int64
+	total            uint64
+	used             uint64
+	VolName          string
+	modifyTime       int64
+	createTime       int64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	FileMissReplica  map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -291,7 +291,7 @@ func (partition *DataPartition) getFileCount() {
 	}
 
 	for _, replica := range partition.Replicas {
-		msg = fmt.Sprintf(GetDataReplicaFileCountInfo+"partitionID:%v  replicaAddr:%v  FileCount:%v  "+
+		msg = fmt.Sprintf(GetDataReplicaFileCountInfo + "partitionID:%v  replicaAddr:%v  FileCount:%v  "+
 			"NodeIsActive:%v  replicaIsActive:%v  .replicaStatusOnNode:%v ", partition.PartitionID, replica.Addr, replica.FileCount,
 			replica.GetReplicaNode().isActive, replica.IsActive(DefaultDataPartitionTimeOutSec), replica.Status)
 		log.LogInfo(msg)
@@ -491,15 +491,13 @@ func (partition *DataPartition) toJson() (body []byte, err error) {
 	return json.Marshal(partition)
 }
 
-func (partition *DataPartition) getMaxUsedSize() uint64 {
-	partition.Lock()
-	defer partition.Unlock()
+func (partition *DataPartition) getMaxUsedSize() (used uint64) {
 	for _, replica := range partition.Replicas {
-		if replica.Used > partition.used {
-			partition.used = replica.Used
+		if replica.Used > used {
+			used = replica.Used
 		}
 	}
-	return partition.used
+	return
 }
 
 func (partition *DataPartition) isNeedCompareData() (needCompare bool) {

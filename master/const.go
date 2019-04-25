@@ -66,6 +66,7 @@ const (
 	VolExpandDataPartitionStepRatio         = 0.1
 	VolMaxExpandDataPartitionCount          = 100
 	VolWarningRatio                         = 0.7
+	VolMinAvailSpaceRatio                   = 0.1
 )
 
 const (
