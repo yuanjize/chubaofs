@@ -306,10 +306,6 @@ func (partition *DataPartition) ReleaseDataPartition() {
 	for _, replica := range liveReplicas {
 		replica.LoadPartitionIsResponse = false
 	}
-	for name, fc := range partition.FileInCoreMap {
-		fc.Metas = nil
-		delete(partition.FileInCoreMap, name)
-	}
 	partition.FileInCoreMap = make(map[string]*FileInCore, 0)
 	for name, fileMissReplicaTime := range partition.FileMissReplica {
 		if time.Now().Unix()-fileMissReplicaTime > 2*LoadDataPartitionPeriod {
