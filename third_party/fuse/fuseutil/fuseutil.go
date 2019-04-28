@@ -1,7 +1,7 @@
-package fuseutil // import "github.com/chubaofs/cfs/third_party/fuse/fuseutil"
+package fuseutil // import "github.com/chubaofs/chubaofs/third_party/fuse/fuseutil"
 
 import (
-	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
 )
 
 // HandleRead handles a read request assuming that data is the entire file content.

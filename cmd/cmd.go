@@ -15,15 +15,15 @@
 package main
 
 import (
-	"github.com/chubaofs/cfs/datanode"
-	"github.com/chubaofs/cfs/master"
-	"github.com/chubaofs/cfs/metanode"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/datanode"
+	"github.com/chubaofs/chubaofs/master"
+	"github.com/chubaofs/chubaofs/metanode"
+	"github.com/chubaofs/chubaofs/util/log"
 	"strings"
 
 	"flag"
 	"fmt"
-	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/chubaofs/util/config"
 	"net/http"
 	_ "net/http/pprof"
 	"os"

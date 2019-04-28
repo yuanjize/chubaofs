@@ -11,7 +11,7 @@ import (
 )
 
 import (
-	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
 )
 
 // A Tree implements a basic read-only directory tree for FUSE.

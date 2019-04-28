@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fs"
-	"github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil"
-	"github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil/record"
-	"github.com/chubaofs/cfs/third_party/fuse/fuseutil"
-	"github.com/chubaofs/cfs/third_party/fuse/syscallx"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs/fstestutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs/fstestutil/record"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fuseutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse/syscallx"
 	"golang.org/x/net/context"
 )
 

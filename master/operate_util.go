@@ -19,10 +19,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/util"
-	"github.com/chubaofs/cfs/util/log"
-	"github.com/chubaofs/cfs/util/ump"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util"
+	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 func newCreateDataPartitionRequest(partitionType, volName string, ID uint64) (req *proto.CreateDataPartitionRequest) {

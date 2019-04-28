@@ -2,7 +2,7 @@ package master
 
 import (
 	"fmt"
-	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/chubaofs/util"
 	"strconv"
 )
 

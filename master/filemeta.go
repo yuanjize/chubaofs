@@ -16,7 +16,7 @@ package master
 
 import (
 	"fmt"
-	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 /*this struct define chunk file metadata on  dataNode */

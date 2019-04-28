@@ -16,9 +16,9 @@ package master
 
 import (
 	"fmt"
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/storage"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/storage"
+	"github.com/chubaofs/chubaofs/util/log"
 	"sort"
 	"strconv"
 	"time"

@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/chubaofs/cfs/util/config"
+	"github.com/chubaofs/chubaofs/util/config"
 	"io/ioutil"
 	"os"
 )

@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (

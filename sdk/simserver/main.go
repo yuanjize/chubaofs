@@ -34,8 +34,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/chubaofs/cfs/proto"
-	. "github.com/chubaofs/cfs/sdk/meta"
+	"github.com/chubaofs/chubaofs/proto"
+	. "github.com/chubaofs/chubaofs/sdk/meta"
 )
 
 const (

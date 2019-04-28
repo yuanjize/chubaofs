@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/chubaofs/cfs/raftstore"
-	"github.com/chubaofs/cfs/util/config"
+	. "github.com/chubaofs/chubaofs/raftstore"
+	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 )

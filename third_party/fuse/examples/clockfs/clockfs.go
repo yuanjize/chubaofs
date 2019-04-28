@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fs"
-	_ "github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil"
-	"github.com/chubaofs/cfs/third_party/fuse/fuseutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
+	_ "github.com/chubaofs/chubaofs/third_party/fuse/fs/fstestutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fuseutil"
 	"golang.org/x/net/context"
 )
 

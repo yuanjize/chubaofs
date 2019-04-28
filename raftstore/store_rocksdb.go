@@ -16,7 +16,7 @@ package raftstore
 
 import (
 	"fmt"
-	"github.com/chubaofs/cfs/third_party/gorocksdb"
+	"github.com/chubaofs/chubaofs/third_party/gorocksdb"
 )
 
 //#cgo CFLAGS:-I/usr/local/include

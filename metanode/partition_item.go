@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/chubaofs/cfs/third_party/btree"
+	"github.com/chubaofs/chubaofs/third_party/btree"
 )
 
 type MetaItem struct {

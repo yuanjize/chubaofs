@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chubaofs/cfs/util/config"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/util/config"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 func TestValidNodeID(t *testing.T) {

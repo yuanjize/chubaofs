@@ -19,13 +19,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fs"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
 	"golang.org/x/net/context"
 
-	"github.com/chubaofs/cfs/sdk/data/stream"
-	"github.com/chubaofs/cfs/sdk/meta"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/sdk/data/stream"
+	"github.com/chubaofs/chubaofs/sdk/meta"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type Super struct {

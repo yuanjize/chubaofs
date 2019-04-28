@@ -17,9 +17,9 @@ package meta
 import (
 	"fmt"
 
-	"github.com/chubaofs/cfs/third_party/btree"
+	"github.com/chubaofs/chubaofs/third_party/btree"
 
-	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 type MetaPartition struct {

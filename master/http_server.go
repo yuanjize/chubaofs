@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util/log"
 	"net/http/httputil"
 )
 

@@ -17,9 +17,9 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util"
+	"github.com/chubaofs/chubaofs/util/log"
 	"net/http"
 	"regexp"
 	"strconv"

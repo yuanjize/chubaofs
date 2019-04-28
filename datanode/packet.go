@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/storage"
-	"github.com/chubaofs/cfs/util"
-	"github.com/chubaofs/cfs/util/ump"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/storage"
+	"github.com/chubaofs/chubaofs/util"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 var (

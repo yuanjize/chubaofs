@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fs"
-	"github.com/chubaofs/cfs/third_party/fuse/fs/fstestutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs/fstestutil"
 	"golang.org/x/net/context"
 )
 

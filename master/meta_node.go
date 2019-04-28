@@ -16,7 +16,7 @@ package master
 
 import (
 	"encoding/json"
-	"github.com/chubaofs/cfs/proto"
+	"github.com/chubaofs/chubaofs/proto"
 	"math/rand"
 	"sync"
 	"time"

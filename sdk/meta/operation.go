@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/util/log"
-	"github.com/chubaofs/cfs/util/ump"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 // API implementations

@@ -17,9 +17,9 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	bsProto "github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util/log"
+	bsProto "github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/tiglabs/raft/proto"
 	"strconv"
 	"strings"

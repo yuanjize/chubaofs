@@ -17,8 +17,8 @@ package buf
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/chubaofs/cfs/storage"
-	"github.com/chubaofs/cfs/third_party/pool"
+	"github.com/chubaofs/chubaofs/storage"
+	"github.com/chubaofs/chubaofs/third_party/pool"
 	"hash/crc32"
 	"math/rand"
 	"testing"

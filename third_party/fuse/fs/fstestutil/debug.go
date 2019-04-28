@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
 )
 
 type flagDebug bool

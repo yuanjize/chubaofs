@@ -30,13 +30,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fs"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
 
-	bdfs "github.com/chubaofs/cfs/client/fs"
-	"github.com/chubaofs/cfs/util/config"
-	"github.com/chubaofs/cfs/util/log"
-	"github.com/chubaofs/cfs/util/ump"
+	bdfs "github.com/chubaofs/chubaofs/client/fs"
+	"github.com/chubaofs/chubaofs/util/config"
+	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 	"strconv"
 )
 

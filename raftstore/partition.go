@@ -15,7 +15,7 @@
 package raftstore
 
 import (
-	"github.com/chubaofs/cfs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 	"os"

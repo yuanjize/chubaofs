@@ -26,11 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chubaofs/cfs/master"
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/storage"
-	"github.com/chubaofs/cfs/third_party/juju/errors"
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/master"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/storage"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util/log"
 	"math/rand"
 	"syscall"
 )

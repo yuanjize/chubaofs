@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"encoding/json"
-	"github.com/chubaofs/cfs/proto"
-	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util"
 )
 
 const (

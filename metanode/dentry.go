@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/chubaofs/cfs/third_party/btree"
+	"github.com/chubaofs/chubaofs/third_party/btree"
 )
 
 // Dentry wraps necessary properties of `Dentry` information in file system.

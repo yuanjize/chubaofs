@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chubaofs/cfs/util"
+	"github.com/chubaofs/chubaofs/util"
 )
 
 func TestFsExtent_Write(t *testing.T) {

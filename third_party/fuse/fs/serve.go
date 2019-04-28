@@ -1,6 +1,6 @@
 // FUSE service loop, for servers that wish to use it.
 
-package fs // import "github.com/chubaofs/cfs/third_party/fuse/fs"
+package fs // import "github.com/chubaofs/chubaofs/third_party/fuse/fs"
 
 import (
 	"encoding/binary"
@@ -16,14 +16,14 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/chubaofs/cfs/util/log"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 import (
 	"bytes"
 
-	"github.com/chubaofs/cfs/third_party/fuse"
-	"github.com/chubaofs/cfs/third_party/fuse/fuseutil"
+	"github.com/chubaofs/chubaofs/third_party/fuse"
+	"github.com/chubaofs/chubaofs/third_party/fuse/fuseutil"
 )
 
 const (
