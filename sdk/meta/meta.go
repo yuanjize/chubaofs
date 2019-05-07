@@ -35,6 +35,9 @@ const (
 	GetClusterInfoURL    = "/admin/getIp"
 
 	RefreshMetaPartitionsInterval = time.Minute * 5
+
+	MaxRetryLimit = 5
+	RetryInterval = time.Second * 5
 )
 
 const (
@@ -82,9 +85,20 @@ func NewMetaWrapper(volname, masterHosts string) (*MetaWrapper, error) {
 	mw.ranges = btree.New(32)
 	mw.UpdateClusterInfo()
 	mw.UpdateVolStatInfo()
+
+	var limit int = MaxRetryLimit
+
+retry:
 	if err := mw.UpdateMetaPartitions(); err != nil {
-		return nil, err
+		if limit <= 0 {
+			return nil, err
+		} else {
+			limit--
+			time.Sleep(RetryInterval)
+			goto retry
+		}
 	}
+
 	go mw.refresh()
 	return mw, nil
 }
