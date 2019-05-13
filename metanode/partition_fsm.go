@@ -233,7 +233,10 @@ func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer,
 
 func (mp *metaPartition) HandleFatalEvent(err *raft.FatalError) {
 	// Panic while fatal event happen.
+	ump.Alarm(UMPKey, fmt.Sprintf("RaftPanic: partition=%d, "+
+		"error=%v", mp.config.PartitionId, err.Err))
 	log.LogFatalf("action[HandleFatalEvent] err[%v].", err)
+	panic(err.Err)
 }
 
 func (mp *metaPartition) HandleLeaderChange(leader uint64) {
