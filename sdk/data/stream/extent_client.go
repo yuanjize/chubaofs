@@ -27,6 +27,12 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"time"
+)
+
+const (
+	MaxRetryLimit = 5
+	RetryInterval = time.Second * 5
 )
 
 type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error
@@ -51,9 +57,19 @@ type ExtentClient struct {
 func NewExtentClient(volname, master string, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	client = new(ExtentClient)
+
+	var limit int = MaxRetryLimit
+
+retry:
 	gDataWrapper, err = wrapper.NewDataPartitionWrapper(volname, master)
 	if err != nil {
-		return nil, fmt.Errorf("init dp Wrapper failed (%v)", err.Error())
+		if limit <= 0 {
+			return nil, fmt.Errorf("init dp Wrapper failed (%v)", err.Error())
+		} else {
+			limit--
+			time.Sleep(RetryInterval)
+			goto retry
+		}
 	}
 	client.writers = make(map[uint64]*StreamWriter)
 	client.appendExtentKey = appendExtentKey
