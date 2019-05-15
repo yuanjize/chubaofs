@@ -26,6 +26,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
+	"sync/atomic"
 )
 
 const (
@@ -202,10 +204,21 @@ func (mp *metaPartition) loadApplyID() (err error) {
 		err = errors.Errorf("[loadApplyID]: ApplyID is empty")
 		return
 	}
-	if _, err = fmt.Sscanf(string(data), "%d", &mp.applyID); err != nil {
-		err = errors.Errorf("[loadApplyID] ReadApplyID: %s", err.Error())
+	var cursor uint64
+	if strings.Contains(string(data),"|"){
+		_, err = fmt.Sscanf(string(data), "%d|%d", &mp.applyID,&cursor)
+	}else {
+		_, err = fmt.Sscanf(string(data), "%d", &mp.applyID)
+	}
+	if err!=nil {
+		err = fmt.Errorf("[loadApplyID] ReadApplyID: %s", err.Error())
 		return
 	}
+
+	if cursor>atomic.LoadUint64(&mp.config.Cursor){
+		atomic.StoreUint64(&mp.config.Cursor,cursor)
+	}
+
 	return
 }
 
@@ -249,7 +262,7 @@ func (mp *metaPartition) storeApplyID(sm *storeMsg) (err error) {
 		fp.Close()
 		os.Remove(filename)
 	}()
-	if _, err = fp.WriteString(fmt.Sprintf("%d", sm.applyIndex)); err != nil {
+	if _, err = fp.WriteString(fmt.Sprintf("%d|%d", sm.applyIndex,atomic.LoadUint64(&mp.config.Cursor))); err != nil {
 		return
 	}
 	err = os.Rename(filename, path.Join(mp.config.RootDir, applyIDFile))
