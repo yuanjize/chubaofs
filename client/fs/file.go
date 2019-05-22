@@ -127,6 +127,14 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 		log.LogErrorf("Open: failed to get write authorization, ino(%v) req(%v) err(%v)", ino, req, err)
 		return nil, fuse.EPERM
 	}
+	if req.Flags.IsReadWrite() || req.Flags.IsReadOnly(){
+		stream, err := f.super.ec.OpenForRead(f.inode.ino)
+		if err != nil {
+			log.LogErrorf("Open for Read: ino(%v) err(%v)", f.inode.ino, err)
+			return nil,fuse.EPERM
+		}
+		f.setReadStream(stream)
+	}
 
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Open: ino(%v) flags(%v) (%v)ns", ino, req.Flags, elapsed.Nanoseconds())
