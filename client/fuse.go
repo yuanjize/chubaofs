@@ -91,6 +91,7 @@ func Mount(cfg *config.Config) error {
 	icacheTimeout := ParseConfigString(cfg, "icacheTimeout")
 	lookupValid := ParseConfigString(cfg, "lookupValid")
 	attrValid := ParseConfigString(cfg, "attrValid")
+	autoInvalData := ParseConfigString(cfg, "autoInvalData")
 	level := ParseLogLevel(loglvl)
 	_, err := log.InitLog(logpath, LoggerPrefix, level)
 	if err != nil {
@@ -107,6 +108,7 @@ func Mount(cfg *config.Config) error {
 		fuse.AllowOther(),
 		fuse.MaxReadahead(MaxReadAhead),
 		fuse.AsyncRead(),
+		fuse.AutoInvalData(autoInvalData),
 		fuse.FSName("cfs-" + volname),
 		fuse.LocalVolume(),
 		fuse.VolumeName("cfs-" + volname)}
