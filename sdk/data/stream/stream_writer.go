@@ -301,10 +301,14 @@ func (s *StreamWriter) autoTask() (autoExit bool) {
 	} else {
 		s.autoForgetCnt = 0
 	}
+	err := s.flushCurrExtentWriter()
+	if err == syscall.ENOENT {
+		autoExit = true
+		log.LogWarnf("ino(%v) has beeen delete meta", s.inode)
+	}
 
 	if s.autoForgetCnt >= MaxAutoForgetCnt {
 		autoExit = true
-		s.flushCurrExtentWriter()
 	}
 	if autoExit {
 		s.client.release(s.inode)
