@@ -16,7 +16,6 @@ package fs
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/chubaofs/chubaofs/third_party/fuse"
@@ -35,9 +34,6 @@ type Super struct {
 	mw      *meta.MetaWrapper
 	ec      *stream.ExtentClient
 	orphan  *OrphanInodeList
-
-	nodeCache map[uint64]fs.Node
-	fslock    sync.Mutex
 }
 
 //functions that Super needs to implement
@@ -74,7 +70,6 @@ func NewSuper(volname, master string, icacheTimeout, lookupValid, attrValid int6
 	}
 	s.ic = NewInodeCache(inodeExpiration, MaxInodeCache)
 	s.orphan = NewOrphanInodeList()
-	s.nodeCache = make(map[uint64]fs.Node)
 	log.LogInfof("NewSuper: cluster(%v) volname(%v) icacheExpiration(%v) LookupValidDuration(%v) AttrValidDuration(%v)", s.cluster, s.volname, inodeExpiration, LookupValidDuration, AttrValidDuration)
 	return s, nil
 }
