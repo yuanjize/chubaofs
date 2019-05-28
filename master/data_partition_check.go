@@ -56,7 +56,7 @@ record:
 
 func (partition *DataPartition) canWrite() bool {
 	avail := partition.total - partition.used
-	if avail > 10*util.GB {
+	if int64(avail) > 10*util.GB {
 		return true
 	}
 	return false
