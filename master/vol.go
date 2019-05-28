@@ -250,7 +250,7 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	}
 	usedRatio := float64(vol.UsedSpace) / float64(vol.Capacity)
 	availRatio := float64(vol.AvailSpaceAllocated) / float64(vol.Capacity)
-	if vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) {
+	if (vol.Capacity > 200000 && vol.dataPartitions.readWriteDataPartitions < 200) || vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) {
 		count := vol.calculateExpandNum()
 		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],usedRatio[%v],availRatio[%v]", vol.Name, count, usedRatio, availRatio)
 		for i := 0; i < count; i++ {
