@@ -52,7 +52,9 @@ const (
 )
 
 var (
-	Version = "0.01"
+	CommitID   string
+	BranchName string
+	BuildTime  string
 )
 
 var (
@@ -63,13 +65,17 @@ var (
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	ump.InitUmp(UmpModuleName)
 	flag.Parse()
 
 	if *configVersion {
-		fmt.Printf("CFS client verson: %s\n", Version)
+		fmt.Printf("CFS Client\n")
+		fmt.Printf("Branch: %s\n", BranchName)
+		fmt.Printf("Commit: %s\n", CommitID)
+		fmt.Printf("Build: %s %s %s %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH, BuildTime)
 		os.Exit(0)
 	}
+
+	ump.InitUmp(UmpModuleName)
 
 	cfg := config.LoadConfigFile(*configFile)
 	if err := Mount(cfg); err != nil {
