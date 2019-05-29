@@ -33,7 +33,9 @@ import (
 )
 
 var (
-	Version = "1.0"
+	CommitID   string
+	BranchName string
+	BuildTime  string
 )
 
 const (
@@ -110,8 +112,9 @@ func main() {
 
 	flag.Parse()
 
+	Version := fmt.Sprintf("ChubaoFS Server\nBranch: %s\nCommit: %s\nBuild: %s %s %s %s\n", BranchName, CommitID, runtime.Version(), runtime.GOOS, runtime.GOARCH, BuildTime)
 	if *configVersion {
-		fmt.Printf("CFS server version: %s\n", Version)
+		fmt.Printf("%v", Version)
 		os.Exit(0)
 	}
 
