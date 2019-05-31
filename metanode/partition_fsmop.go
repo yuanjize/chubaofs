@@ -134,10 +134,10 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 		go func(index uint64) {
 			for {
 				time.Sleep(time.Millisecond)
-				if mp.raftPartition.AppliedIndex() < index {
-					continue
-				}
 				if mp.raftPartition != nil {
+					if mp.raftPartition.AppliedIndex() < index {
+						continue
+					}
 					mp.raftPartition.Delete()
 				}
 				mp.Stop()
