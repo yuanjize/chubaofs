@@ -67,7 +67,7 @@ func (f *File) setReadStream(stream *stream.StreamReader) {
 	f.stream = stream
 }
 
-func NewFile(s *Super, i *Inode) *File {
+func NewFile(s *Super, i *Inode) fs.Node {
 	return &File{super: s, inode: i}
 }
 
@@ -95,6 +95,10 @@ func (f *File) Forget() {
 	defer func() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
+
+	f.super.fslock.Lock()
+	delete(f.super.nodeCache, ino)
+	f.super.fslock.Unlock()
 
 	if f.super.orphan.Evict(ino) {
 		if err := f.super.mw.Evict(ino); err != nil {
