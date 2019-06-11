@@ -111,6 +111,7 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	rc.Resolver = resolver
 	rc.RetainLogs = cfg.RetainLogs
 	rc.TickInterval = 300 * time.Millisecond
+	rc.ElectionTick = 3
 	rs, err := raft.NewRaftServer(rc)
 	if err != nil {
 		return
