@@ -29,6 +29,7 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 var (
@@ -162,6 +163,8 @@ func (d *Disk) updateSpaceInfo() (err error) {
 	currErrs := d.ReadErrs + d.WriteErrs
 	if currErrs >= uint64(d.MaxErrs) {
 		d.Status = proto.Unavaliable
+		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		ump.Alarm(umpKey,fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ",ClusterID,LocalIP,d.Path))
 	} else if d.Available <= 0 {
 		d.Status = proto.ReadOnly
 	} else {

@@ -17,7 +17,6 @@ package datanode
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -31,7 +30,6 @@ import (
 
 	"github.com/chubaofs/chubaofs/master"
 	"github.com/chubaofs/chubaofs/proto"
-	"github.com/chubaofs/chubaofs/storage"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/third_party/pool"
 	"github.com/chubaofs/chubaofs/util"
@@ -39,6 +37,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
 	"runtime/debug"
+	"syscall"
 )
 
 var (
@@ -50,6 +49,7 @@ var (
 
 	LocalIP      string
 	gConnPool    = pool.NewConnectPool()
+	ClusterID 	 string
 	MasterHelper = util.NewMasterHelper()
 )
 
@@ -230,6 +230,7 @@ func (s *DataNode) registerToMaster() {
 			json.Unmarshal(data, cInfo)
 			LocalIP = string(cInfo.Ip)
 			s.clusterId = cInfo.Cluster
+			ClusterID=s.clusterId
 			s.localServeAddr = fmt.Sprintf("%s:%v", LocalIP, s.port)
 			if !util.IP(LocalIP) {
 				log.LogErrorf("action[registerToMaster] got an invalid local ip[%v] from master[%v].",
@@ -350,21 +351,18 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	} else if flag == ReadFlag {
 		d.addReadErr()
 	}
+	d.Status=proto.Unavaliable
+	d.Lock()
+	defer d.Unlock()
+	for _,dp:=range d.partitionMap{
+		dp.partitionStatus=proto.Unavaliable
+	}
+
 }
 
 func (s *DataNode) isDiskErr(errMsg string) bool {
-	if strings.Contains(errMsg, storage.ErrorParamMismatch.Error()) || strings.Contains(errMsg, storage.ErrorFileNotFound.Error()) ||
-		strings.Contains(errMsg, storage.ErrorNoAvaliFile.Error()) || strings.Contains(errMsg, storage.ErrorObjNotFound.Error()) ||
-		strings.Contains(errMsg, storage.ErrorUnavaliExtent.Error()) ||
-		strings.Contains(errMsg, io.EOF.Error()) || strings.Contains(errMsg, storage.ErrSyscallNoSpace.Error()) ||
-		strings.Contains(errMsg, storage.ErrorHasDelete.Error()) || strings.Contains(errMsg, ErrPartitionNotExist.Error()) ||
-		strings.Contains(errMsg, storage.ErrObjectSmaller.Error()) || strings.Contains(errMsg, storage.ErrorExtentHasExsit.Error()) ||
-		strings.Contains(errMsg, storage.ErrPkgCrcMismatch.Error()) || strings.Contains(errMsg, ErrStoreTypeMismatch.Error()) ||
-		strings.Contains(errMsg, storage.ErrorNoUnAvaliFile.Error()) || strings.Contains(errMsg, ErrChunkOffsetMismatch.Error()) ||
-		strings.Contains(errMsg, storage.ErrExtentNameFormat.Error()) || strings.Contains(errMsg, storage.ErrorAgain.Error()) ||
-		strings.Contains(errMsg, storage.ErrorExtentNotFound.Error()) || strings.Contains(errMsg, storage.ErrorExtentHasFull.Error()) ||
-		strings.Contains(errMsg, storage.ErrorCompaction.Error()) || strings.Contains(errMsg, storage.ErrorPartitionReadOnly.Error()) {
-		return false
+	if strings.Contains(errMsg,syscall.EIO.Error()){
+		return true
 	}
-	return true
+	return false
 }
