@@ -105,36 +105,54 @@ func (client *ExtentClient) OpenStream(inode uint64, flag uint32) (err error) {
 	if !proto.IsWriteFlag(flag) {
 		return
 	}
+	request := openRequestPool.Get().(*OpenRequest)
+	request.done = make(chan struct{}, 1)
+	defer func() {
+		close(request.done)
+		openRequestPool.Put(request)
+	}()
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
 		s = NewStreamWriter(inode, client, client.appendExtentKey)
 		client.writers[inode] = s
 	}
-	return s.IssueOpenRequest(flag)
+	return s.IssueOpenRequest(request, flag)
 }
 
 func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
 	if !proto.IsWriteFlag(flag) {
 		return
 	}
+	request := releaseRequestPool.Get().(*ReleaseRequest)
+	request.done = make(chan struct{}, 1)
+	defer func() {
+		close(request.done)
+		releaseRequestPool.Put(request)
+	}()
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
 		client.writerLock.Unlock()
 		return
 	}
-	return s.IssueReleaseRequest(flag)
+	return s.IssueReleaseRequest(request, flag)
 }
 
 func (client *ExtentClient) EvictStream(inode uint64) error {
+	request := evictRequestPool.Get().(*EvictRequest)
+	request.done = make(chan struct{}, 1)
+	defer func() {
+		close(request.done)
+		evictRequestPool.Put(request)
+	}()
 	client.writerLock.Lock()
 	s, ok := client.writers[inode]
 	if !ok {
 		client.writerLock.Unlock()
 		return nil
 	}
-	err := s.IssueEvictRequest()
+	err := s.IssueEvictRequest(request)
 	if err != nil {
 		return err
 	}
