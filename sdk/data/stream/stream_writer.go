@@ -75,16 +75,13 @@ type EvictRequest struct {
 	done chan struct{}
 }
 
-func (s *StreamWriter) IssueOpenRequest(flag uint32) error {
-	request := openRequestPool.Get().(*OpenRequest)
-	request.done = make(chan struct{}, 1)
+func (s *StreamWriter) IssueOpenRequest(request *OpenRequest, flag uint32) error {
 	request.flag = flag
 	s.requestCh <- request
 	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
-	close(request.done)
-	openRequestPool.Put(request)
+
 	return err
 }
 
@@ -118,28 +115,22 @@ func (s *StreamWriter) IssueFlushRequest() error {
 	return err
 }
 
-func (s *StreamWriter) IssueReleaseRequest(flag uint32) error {
-	request := releaseRequestPool.Get().(*ReleaseRequest)
-	request.done = make(chan struct{}, 1)
+func (s *StreamWriter) IssueReleaseRequest(request *ReleaseRequest, flag uint32) error {
 	request.flag = flag
 	s.requestCh <- request
 	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
-	close(request.done)
-	releaseRequestPool.Put(request)
+
 	return err
 }
 
-func (s *StreamWriter) IssueEvictRequest() error {
-	request := evictRequestPool.Get().(*EvictRequest)
-	request.done = make(chan struct{}, 1)
+func (s *StreamWriter) IssueEvictRequest(request *EvictRequest) error {
 	s.requestCh <- request
 	s.client.writerLock.Unlock()
 	<-request.done
 	err := request.err
-	close(request.done)
-	evictRequestPool.Put(request)
+
 	return err
 }
 
