@@ -187,7 +187,10 @@ func setDataPartitions(vol *Vol, view *VolView, liveRate float32) (err error) {
 	lessThan := vol.getTotalUsedSpace() < (vol.Capacity * util.GB)
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
-	if vol.dataPartitions.readWriteDataPartitions == 0 && lessThan {
+	//var minRWDpCount float64
+	//minRWDpCount = float64(vol.dataPartitions.dataPartitionCount) * float64(VolReadWriteDataPartitionRatio)
+	//lessThanRwCount := vol.dataPartitions.readWriteDataPartitions < int(minRWDpCount)
+	if  vol.dataPartitions.readWriteDataPartitions == 0 && lessThan {
 		err = fmt.Errorf("action[setDataPartitions],vol[%v] no writeable data partitions", vol.Name)
 		log.LogWarn(err.Error())
 	} else {
