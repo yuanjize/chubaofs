@@ -40,6 +40,7 @@ type VolumeView struct {
 
 type ClusterInfo struct {
 	Cluster string
+	Ip      string
 }
 
 type VolStatInfo struct {
@@ -81,6 +82,7 @@ func (mw *MetaWrapper) UpdateClusterInfo() error {
 	}
 	log.LogInfof("ClusterInfo: %v", *info)
 	mw.cluster = info.Cluster
+	mw.localIP = info.Ip
 	return nil
 }
 

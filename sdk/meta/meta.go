@@ -54,6 +54,7 @@ const (
 type MetaWrapper struct {
 	sync.RWMutex
 	cluster string
+	localIP string
 	volname string
 	master  util.MasterHelper
 	conns   *pool.ConnectPool
@@ -105,6 +106,10 @@ retry:
 
 func (mw *MetaWrapper) Cluster() string {
 	return mw.cluster
+}
+
+func (mw *MetaWrapper) LocalIP() string {
+	return mw.localIP
 }
 
 func (mw *MetaWrapper) umpKey(act string) string {
