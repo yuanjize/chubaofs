@@ -67,10 +67,12 @@ const (
 	VolMaxExpandDataPartitionCount          = 100
 	VolWarningRatio                         = 0.7
 	VolMinAvailSpaceRatio                   = 0.1
+	VolReadWriteDataPartitionRatio          = 0.1
+	DefaultRackName                         = "default"
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 

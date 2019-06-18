@@ -524,6 +524,15 @@ func (c *Cluster) ChooseTargetDataHosts(replicaNum int) (hosts []string, err err
 		return nil, errors.Trace(err)
 	}
 
+	if len(racks) == 1 {
+		var newHosts []string
+		if newHosts, err = racks[0].getAvailDataNodeHosts(hosts, replicaNum); err != nil {
+			return nil, errors.Trace(err)
+		}
+		hosts = newHosts
+		return
+	}
+
 	if len(racks) == 2 {
 		masterRack := racks[0]
 		slaveRack := racks[1]
@@ -533,8 +542,10 @@ func (c *Cluster) ChooseTargetDataHosts(replicaNum int) (hosts []string, err err
 			return nil, errors.Trace(err)
 		}
 		hosts = append(hosts, masterAddr...)
-		if addrs, err = slaveRack.getAvailDataNodeHosts(hosts, slaveReplicaNum); err != nil {
-			return nil, errors.Trace(err)
+		if slaveReplicaNum > 0 {
+			if addrs, err = slaveRack.getAvailDataNodeHosts(hosts, slaveReplicaNum); err != nil {
+				return nil, errors.Trace(err)
+			}
 		}
 		hosts = append(hosts, addrs...)
 	} else if len(racks) == replicaNum {

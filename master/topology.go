@@ -95,6 +95,7 @@ func (t *Topology) removeRack(name string) {
 }
 
 func (t *Topology) putDataNode(dataNode *DataNode) {
+	dataNode.RackName = DefaultRackName
 	rack, err := t.getRack(dataNode.RackName)
 	if err != nil {
 		rack = NewRack(dataNode.RackName)
@@ -136,13 +137,16 @@ func (t *Topology) allocRacks(replicaNum int, excludeRack []string) (racks []*Ra
 		}
 		rName := t.getRackNameByIndex(t.rackIndex)
 		if contains(excludeRack, rName) {
+			t.rackIndex++
+			continue
+		}
+
+		var rack *Rack
+		if rack, err = t.getRack(t.racks[t.rackIndex]); err != nil {
+			t.rackIndex++
 			continue
 		}
 		t.rackIndex++
-		var rack *Rack
-		if rack, err = t.getRack(t.racks[t.rackIndex]); err != nil {
-			continue
-		}
 		if rack.canWrite(1) {
 			racks = append(racks, rack)
 		}

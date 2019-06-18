@@ -529,10 +529,9 @@ func (c *Cluster) dealDataNodeHeartbeatResp(nodeAddr string, resp *proto.DataNod
 		if oldRack, err = c.t.getRack(dataNode.RackName); err == nil {
 			oldRack.RemoveDataNode(dataNode.Addr)
 		}
-		dataNode.RackName = resp.RackName
+		//dataNode.RackName = resp.RackName
 		c.t.putDataNode(dataNode)
 	}
-
 	dataNode.UpdateNodeMetric(resp)
 	dataNode.setNodeAlive()
 	c.t.putDataNode(dataNode)
