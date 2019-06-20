@@ -15,6 +15,7 @@
 package fs
 
 import (
+	"fmt"
 	"io"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/chubaofs/chubaofs/sdk/data/stream"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 	"sync"
 )
 
@@ -127,11 +129,11 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 		log.LogErrorf("Open: failed to get write authorization, ino(%v) req(%v) err(%v)", ino, req, err)
 		return nil, fuse.EPERM
 	}
-	if req.Flags.IsReadWrite() || req.Flags.IsReadOnly(){
+	if req.Flags.IsReadWrite() || req.Flags.IsReadOnly() {
 		stream, err := f.super.ec.OpenForRead(f.inode.ino)
 		if err != nil {
 			log.LogErrorf("Open for Read: ino(%v) err(%v)", f.inode.ino, err)
-			return nil,fuse.EPERM
+			return nil, fuse.EPERM
 		}
 		f.setReadStream(stream)
 	}
@@ -175,7 +177,9 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	start := time.Now()
 	size, err := f.super.ec.Read(f.getReadStream(), f.inode.ino, resp.Data[fuse.OutHeaderSize:], int(req.Offset), req.Size)
 	if err != nil && err != io.EOF {
-		log.LogErrorf("Read: ino(%v) req(%v) err(%v) size(%v)", f.inode.ino, req, err, size)
+		errmsg := fmt.Sprintf("Read: failed, localIP(%v) ino(%v) req(%v) err(%v) size(%v)", f.super.localIP, f.inode.ino, req, err, size)
+		log.LogError(errmsg)
+		ump.Alarm(f.super.umpKey("Read"), errmsg)
 		return fuse.EIO
 	}
 	if size > req.Size {
@@ -213,7 +217,9 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	start := time.Now()
 	size, actualOffset, err := f.super.ec.Write(ino, int(req.Offset), req.Data)
 	if err != nil {
-		log.LogErrorf("Write: ino(%v) offset(%v) actualOffset(%v) len(%v) err(%v)", ino, req.Offset, actualOffset, reqlen, err)
+		errmsg := fmt.Sprintf("Write: failed, localIP(%v) ino(%v) offset(%v) actualOffset(%v) len(%v) err(%v)", f.super.localIP, ino, req.Offset, actualOffset, reqlen, err)
+		log.LogError(errmsg)
+		ump.Alarm(f.super.umpKey("Write"), errmsg)
 		return fuse.EIO
 	}
 	resp.Size = size
@@ -235,7 +241,9 @@ func (f *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) (err error) {
 	start := time.Now()
 	err = f.super.ec.Flush(f.inode.ino)
 	if err != nil {
-		log.LogErrorf("Fsync: ino(%v) err(%v)", f.inode.ino, err)
+		errmsg := fmt.Sprintf("Fsync: failed, localIP(%v) ino(%v) err(%v)", f.super.localIP, f.inode.ino, err)
+		log.LogError(errmsg)
+		ump.Alarm(f.super.umpKey("Fsync"), errmsg)
 		return fuse.EIO
 	}
 	f.super.ic.Delete(f.inode.ino)
