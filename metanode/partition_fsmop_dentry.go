@@ -15,6 +15,8 @@
 package metanode
 
 import (
+	"strings"
+
 	"github.com/chubaofs/chubaofs/proto"
 )
 
@@ -32,7 +34,23 @@ func NewResponseDentry() *ResponseDentry {
 // CreateDentry insert dentry into dentry tree.
 func (mp *metaPartition) createDentry(dentry *Dentry) (status uint8) {
 	status = proto.OpOk
-	if _, ok := mp.dentryTree.ReplaceOrInsert(dentry, false); !ok {
+	if item, ok := mp.dentryTree.ReplaceOrInsert(dentry, false); !ok {
+		/*
+		 * Do not allow directories and files to overwrite each
+		 * other when doing Rename
+		 */
+		d := item.(*Dentry)
+		if dentry.Type != d.Type {
+			status = proto.OpArgMismatchErr
+			return
+		}
+		if dentry.ParentId == d.ParentId && strings.Compare(dentry.Name, d.Name) == 0 && dentry.Inode == d.Inode {
+			/*
+			 * If the request is identical to what we have,
+			 * then treat the request as successful.
+			 */
+			return
+		}
 		status = proto.OpExistErr
 	}
 	return
