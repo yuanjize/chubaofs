@@ -152,13 +152,12 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 func (s *DataNode) handleCreateDataPartition(pkg *Packet) {
 	var (
 		err error
+		dp *DataPartition
 	)
 	defer func() {
 		if err != nil {
 			err = errors.Annotatef(err, "Request[%v] CreateDataPartition Error", pkg.GetUniqueLogId())
 			pkg.PackErrorBody(ActionCreateDataPartition, err.Error())
-		} else {
-			pkg.PackOkReply()
 		}
 	}()
 	task := &proto.AdminTask{}
@@ -181,11 +180,12 @@ func (s *DataNode) handleCreateDataPartition(pkg *Packet) {
 		err = fmt.Errorf("from master Task[%v] cannot unmash CreateDataPartitionRequest struct", task.ToString())
 		return
 	}
-	if _, err = s.space.CreatePartition(request.VolumeId, uint32(request.PartitionId),
+	if dp, err = s.space.CreatePartition(request.VolumeId, uint32(request.PartitionId),
 		request.PartitionSize, request.PartitionType); err != nil {
 		err = fmt.Errorf("from master Task[%v] cannot unmash CreateDataPartitionRequest struct", task.ToString())
 		return
 	}
+	pkg.PackOkWithBody([]byte(dp.Disk().Path))
 
 	return
 }
