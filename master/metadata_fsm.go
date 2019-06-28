@@ -33,8 +33,6 @@ type RaftLeaderChangeHandler func(leader uint64)
 
 type RaftPeerChangeHandler func(confChange *proto.ConfChange) (err error)
 
-type RaftCmdApplyHandler func(cmd *Metadata) (err error)
-
 type RaftApplySnapshotHandler func()
 
 type MetadataFsm struct {
@@ -42,7 +40,6 @@ type MetadataFsm struct {
 	applied             uint64
 	leaderChangeHandler RaftLeaderChangeHandler
 	peerChangeHandler   RaftPeerChangeHandler
-	applyHandler        RaftCmdApplyHandler
 	snapshotHandler     RaftApplySnapshotHandler
 }
 
@@ -58,10 +55,6 @@ func (mf *MetadataFsm) RegisterLeaderChangeHandler(handler RaftLeaderChangeHandl
 
 func (mf *MetadataFsm) RegisterPeerChangeHandler(handler RaftPeerChangeHandler) {
 	mf.peerChangeHandler = handler
-}
-
-func (mf *MetadataFsm) RegisterApplyHandler(handler RaftCmdApplyHandler) {
-	mf.applyHandler = handler
 }
 
 func (mf *MetadataFsm) RegisterApplySnapshotHandler(handler RaftApplySnapshotHandler) {
@@ -126,10 +119,8 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 			panic(err)
 		}
 	}
-	//if err = mf.applyHandler(cmd); err != nil {
-	//	panic(err)
-	//}
 	mf.applied = index
+	//todo truncate raft log
 	return
 }
 
@@ -166,10 +157,6 @@ func (mf *MetadataFsm) ApplySnapshot(peers []proto.Peer, iterator proto.SnapIter
 			goto errDeal
 		}
 		if _, err = mf.store.Put(cmd.K, cmd.V); err != nil {
-			goto errDeal
-		}
-
-		if err = mf.applyHandler(cmd); err != nil {
 			goto errDeal
 		}
 	}

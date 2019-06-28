@@ -41,8 +41,13 @@ func TestCheckBadDiskRecovery(t *testing.T) {
 	for _, dp := range commonVol.dataPartitions.dataPartitions {
 		dps = append(dps, dp)
 	}
+	dpsMapLen := len(commonVol.dataPartitions.dataPartitionMap)
 	commonVol.RUnlock()
 	dpsLen := len(dps)
+	if dpsLen != dpsMapLen {
+		t.Errorf("dpsLen[%v],dpsMapLen[%v]", dpsLen, dpsMapLen)
+		return
+	}
 	//simulate multi data partition decommission
 	for _, dp := range dps {
 		wg.Add(1)

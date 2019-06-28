@@ -92,13 +92,12 @@ func (m *Master) getDataPartitions(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusBadRequest
 		name string
 		vol  *Vol
-		ok   bool
 		err  error
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
@@ -153,12 +152,11 @@ func (m *Master) getVolStatInfo(w http.ResponseWriter, r *http.Request) {
 		err  error
 		name string
 		vol  *Vol
-		ok   bool
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
@@ -190,7 +188,7 @@ func setDataPartitions(vol *Vol, view *VolView, liveRate float32) (err error) {
 	//var minRWDpCount float64
 	//minRWDpCount = float64(vol.dataPartitions.dataPartitionCount) * float64(VolReadWriteDataPartitionRatio)
 	//lessThanRwCount := vol.dataPartitions.readWriteDataPartitions < int(minRWDpCount)
-	if  vol.dataPartitions.readWriteDataPartitions == 0 && lessThan {
+	if vol.dataPartitions.readWriteDataPartitions == 0 && lessThan {
 		err = fmt.Errorf("action[setDataPartitions],vol[%v] no writeable data partitions", vol.Name)
 		log.LogWarn(err.Error())
 	} else {
@@ -244,17 +242,16 @@ func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 		partitionID uint64
 		vol         *Vol
 		mp          *MetaPartition
-		ok          bool
 	)
 	if name, partitionID, err = parseGetMetaPartitionPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
 	}
-	if mp, ok = vol.MetaPartitions[partitionID]; !ok {
+	if mp, err = vol.getMetaPartition(partitionID); err != nil {
 		err = errors.Annotatef(MetaPartitionNotFound, "%v not found", partitionID)
 		code = http.StatusNotFound
 		goto errDeal

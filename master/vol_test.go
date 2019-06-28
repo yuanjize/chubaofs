@@ -13,6 +13,9 @@ func TestAutoCreateDataPartitions(t *testing.T) {
 	}
 	volCount := len(commonVol.dataPartitions.dataPartitions)
 	commonVol.dataPartitions.readWriteDataPartitions = 0
+	server.cluster.DisableAutoAlloc = false
+	fmt.Printf("status[%v],disableAutoAlloc[%v],used[%v],cap[%v]",
+		commonVol.Status,server.cluster.DisableAutoAlloc,commonVol.UsedSpace,commonVol.Capacity,)
 	commonVol.checkNeedAutoCreateDataPartitions(server.cluster)
 	newVolCount := len(commonVol.dataPartitions.dataPartitions)
 	if volCount == newVolCount {

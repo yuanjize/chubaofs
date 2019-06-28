@@ -68,10 +68,6 @@ func (m *Master) handlePeerChange(confChange *proto.ConfChange) (err error) {
 	return
 }
 
-func (m *Master) handleApply(cmd *Metadata) (err error) {
-	return m.cluster.handleApply(cmd)
-}
-
 func (m *Master) handleApplySnapshot() {
 	m.fsm.restore()
 	m.restoreIDAlloc()

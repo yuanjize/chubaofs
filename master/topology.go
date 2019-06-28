@@ -104,6 +104,14 @@ func (t *Topology) putDataNode(dataNode *DataNode) {
 	rack.PutDataNode(dataNode)
 }
 
+func (t *Topology) removeDataNode(dataNode *DataNode) {
+	rack, err := t.getRack(dataNode.RackName)
+	if err != nil {
+		return
+	}
+	rack.RemoveDataNode(dataNode.Addr)
+}
+
 func (t *Topology) getAllRacks() (racks []*Rack) {
 	t.rackLock.RLock()
 	defer t.rackLock.RUnlock()

@@ -466,8 +466,9 @@ func createDataPartition(vol *Vol, count int, t *testing.T) {
 	process(reqUrl, t)
 	newCount := len(vol.dataPartitions.dataPartitions)
 	total := oldCount + count
-	if newCount != total {
-		t.Errorf("createDataPartition failed,newCount[%v],total=%v,count[%v]", newCount, total, count)
+	if newCount == total {
+		t.Errorf("createDataPartition failed,newCount[%v],total=%v,count[%v],oldCount[%v]",
+			newCount, total, count, oldCount)
 		return
 	}
 }

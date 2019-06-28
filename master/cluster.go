@@ -607,6 +607,7 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode, destAddr string) {
 
 func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 	c.dataNodes.Delete(dataNode.Addr)
+	c.t.removeDataNode(dataNode)
 	go dataNode.clean()
 }
 
@@ -785,11 +786,9 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		c.deleteVol(name)
 		goto errDeal
 	}
-	vol.initDataPartitions(c)
-	readWriteDataPartitions = vol.checkDataPartitionStatus(c)
 	for retryCount := 0; readWriteDataPartitions < DefaultInitDataPartitions && retryCount < 3; retryCount++ {
 		vol.initDataPartitions(c)
-		readWriteDataPartitions = vol.checkDataPartitionStatus(c)
+		readWriteDataPartitions = len(vol.dataPartitions.dataPartitionMap)
 	}
 	vol.dataPartitions.readWriteDataPartitions = readWriteDataPartitions
 	log.LogInfof("action[createVol] vol[%v],readWriteDataPartitions[%v]", name, readWriteDataPartitions)

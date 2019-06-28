@@ -170,7 +170,6 @@ func (m *Master) createRaftServer() (err error) {
 	fsm := newMetadataFsm(m.storeDir)
 	fsm.RegisterLeaderChangeHandler(m.handleLeaderChange)
 	fsm.RegisterPeerChangeHandler(m.handlePeerChange)
-	fsm.RegisterApplyHandler(m.handleApply)
 	fsm.RegisterApplySnapshotHandler(m.handleApplySnapshot)
 	fsm.restore()
 	m.fsm = fsm
