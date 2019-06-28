@@ -522,10 +522,8 @@ func (c *Cluster) dealDataNodeHeartbeatResp(nodeAddr string, resp *proto.DataNod
 	if dataNode, err = c.getDataNode(nodeAddr); err != nil {
 		goto errDeal
 	}
-
+	dataNode.RackName = DefaultRackName
 	if dataNode.RackName != "" && dataNode.RackName != resp.RackName {
-		Warn(c.Name, fmt.Sprintf("ClusterID[%s] DataNode[%v] rack from [%v] to [%v]!",
-			c.Name, nodeAddr, dataNode.RackName, resp.RackName))
 		if oldRack, err = c.t.getRack(dataNode.RackName); err == nil {
 			oldRack.RemoveDataNode(dataNode.Addr)
 		}
