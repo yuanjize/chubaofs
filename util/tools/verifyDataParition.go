@@ -10,11 +10,11 @@ import (
 	"time"
 	"github.com/chubaofs/chubaofs/util"
 	"flag"
-	"strconv"
+	//"strconv"
 )
 
 var (
-	maxPartitionId  = 68732
+	maxPartitionId  = 189451
 	verifyPartition chan int
 	isOnlyCheckSize=flag.Bool("checkSize",true,"isonly check dataPartitionSize")
 )
@@ -24,14 +24,15 @@ var (
 )
 
 func main() {
+	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	verifyPartition = make(chan int, 10)
 	for i := 1; i <= 10; i++ {
 		go verifyWorker()
 	}
-	arr:=strings.Split(aa," ")
-	for i:=0;i<len(arr);i++ {
-		partitionId,_:=strconv.Atoi(arr[i])
+	// arr:=strings.Split(aa," ")
+	for i:=1;i<maxPartitionId;i++ {
+		partitionId:=i
 		verifyPartition <- partitionId
 	}
 	for {
@@ -132,6 +133,26 @@ func getDataPartitionResult(partitionId int) (err error) {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v json unmash %v", partitionId, resp.StatusCode, err.Error())
 		return
 	}
+	maxUsed:=0
+	var maxReportTime int64
+	for i:=0;i<len(dp.Replica);i++{
+		if maxUsed<dp.Replica[i].UsedSize{
+			maxUsed=dp.Replica[i].UsedSize
+		}
+		if maxReportTime<dp.Replica[i].ReportTime{
+			maxReportTime=dp.Replica[i].ReportTime
+		}
+	}
+	for i:=0;i<len(dp.Replica);i++{
+		if maxUsed-dp.Replica[i].UsedSize>util.MB{
+			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
+				dp.PartitionID,dp.Replica[i].Addr,maxUsed,dp.Replica[i].UsedSize))
+		}
+		if maxReportTime-dp.Replica[i].ReportTime>3600{
+			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
+				dp.PartitionID,dp.Replica[i].Addr,maxReportTime,dp.Replica[i].ReportTime))
+		}
+	}
 	if len(dp.FileInCoreMap) == 0 {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v fileInCoremap 0 ", partitionId, resp.StatusCode)
 		return err
@@ -149,6 +170,8 @@ func getDataPartitionResult(partitionId int) (err error) {
 				}
 			}
 		}
+
+	
 		fmt.Println(fmt.Sprintf("file %v_%v success verify", partitionId, file.Name))
 	}
 	return nil
@@ -175,15 +198,23 @@ func checkDataPartitionSize(partitionId int) (err error) {
 		return
 	}
 	maxUsed:=0
+	var maxReportTime int64
 	for i:=0;i<len(dp.Replica);i++{
 		if maxUsed<dp.Replica[i].UsedSize{
 			maxUsed=dp.Replica[i].UsedSize
+		}
+		if maxReportTime<dp.Replica[i].ReportTime{
+			maxReportTime=dp.Replica[i].ReportTime
 		}
 	}
 	for i:=0;i<len(dp.Replica);i++{
 		if maxUsed-dp.Replica[i].UsedSize>util.MB{
 			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
 				dp.PartitionID,dp.Replica[i].Addr,maxUsed,dp.Replica[i].UsedSize))
+		}
+		if maxReportTime-dp.Replica[i].ReportTime>3600{
+			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
+				dp.PartitionID,dp.Replica[i].Addr,maxReportTime,dp.Replica[i].ReportTime))
 		}
 	}
 

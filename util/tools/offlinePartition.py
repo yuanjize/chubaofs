@@ -5,7 +5,7 @@ import requests
 import os
 import time
 import json
-vols=[]
+dataPartitions=[]
 f=open("/home/guowl/2.log","r")
 data=f.read()
 f.close()
@@ -13,10 +13,10 @@ f.close()
 data=data.split('\n')
 for d in data:
     if str(d).isdigit():
-        vols.append(int(d))
+        dataPartitions.append(int(d))
     
 url='http://dbbak.jd.local/dataPartition/get?id={}'
-for v in vols:
+for v in dataPartitions:
     geturl=url.format(v)
     resp=requests.get(geturl)
     respdict=json.loads(resp.text)
@@ -25,14 +25,14 @@ for v in vols:
     name=respdict["VolName"]
     if name=="":
         print ('{} failed get'.format(v))
-    offlineUrl='http://dbbak.jd.local/dataPartition/offline?id={}&addr={}&name={}'.format(v,"11.3.36.170:6000",name)
+    offlineUrl='http://dbbak.jd.local/dataPartition/offline?id={}&addr={}&name={}'.format(v,"11.3.33.130:6000",name)
     print(offlineUrl)
     resp=requests.get(offlineUrl)
     print (resp.text)
     resp=requests.get(geturl)
     getResp=str(resp.text)
     while True:
-        if getResp.find("11.3.36.170:6000")==-1:
+        if getResp.find("11.3.33.130:6000")==-1:
             break
         else:
             time.sleep(1)
