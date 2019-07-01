@@ -160,9 +160,7 @@ func (d *Disk) updateSpaceInfo() (err error) {
 	if err = syscall.Statfs(d.Path, &statsInfo); err != nil {
 		d.addReadErr()
 	}
-	currErrs := d.ReadErrs + d.WriteErrs
-	if currErrs >= uint64(d.MaxErrs) {
-		d.Status = proto.Unavaliable
+	if d.Status==proto.Unavaliable{
 		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
 		ump.Alarm(umpKey,fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ",ClusterID,LocalIP,d.Path))
 	} else if d.Available <= 0 {
