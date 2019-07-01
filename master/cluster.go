@@ -32,6 +32,7 @@ type Cluster struct {
 	dataNodes           sync.Map
 	metaNodes           sync.Map
 	createDpLock        sync.Mutex
+	createVolLock       sync.Mutex
 	volsLock            sync.RWMutex
 	leaderInfo          *LeaderInfo
 	cfg                 *ClusterConfig
@@ -666,9 +667,17 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		goto errDeal
 	}
 	newAddr = newHosts[0]
+	if err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
+		goto errDeal
+	}
+	if err = dp.createDataPartitionSuccessTriggerOperator(newAddr, c); err != nil {
+		goto errDeal
+	}
 	if err = dp.updateForOffline(offlineAddr, newAddr, volName, c); err != nil {
 		goto errDeal
 	}
+	dp.isRecover = true
+	c.putBadDataPartitionIDs(replica, offlineAddr, dp.PartitionID)
 	replica, _ = dp.getReplica(offlineAddr)
 	dp.offLineInMem(offlineAddr)
 	dp.checkAndRemoveMissReplica(offlineAddr)
@@ -676,14 +685,6 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	tasks = make([]*proto.AdminTask, 0)
 	tasks = append(tasks, task)
 	c.putDataNodeTasks(tasks)
-	if err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
-		goto errDeal
-	}
-	if err = dp.createDataPartitionSuccessTriggerOperator(newAddr, c); err != nil {
-		goto errDeal
-	}
-	dp.isRecover = true
-	c.putBadDataPartitionIDs(replica, offlineAddr, dp.PartitionID)
 errDeal:
 	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
@@ -801,6 +802,8 @@ errDeal:
 }
 
 func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
+	c.createVolLock.Lock()
+	defer c.createVolLock.Unlock()
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
