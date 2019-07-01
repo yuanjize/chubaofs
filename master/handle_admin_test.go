@@ -345,13 +345,16 @@ func TestMetaPartition(t *testing.T) {
 }
 
 func offlineMetaPartition(vol *Vol, id uint64, t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v", hostAddr, AdminGetCluster)
+	fmt.Println(reqUrl)
+	process(reqUrl, t)
 	mp, err := vol.getMetaPartition(id)
 	if err != nil {
 		t.Errorf("offlineMetaPartition,err [%v]", err)
 		return
 	}
 	offlineAddr := mp.PersistenceHosts[0]
-	reqUrl := fmt.Sprintf("%v%v?name=%v&id=%v&addr=%v",
+	reqUrl = fmt.Sprintf("%v%v?name=%v&id=%v&addr=%v",
 		hostAddr, AdminMetaPartitionOffline, vol.Name, id, offlineAddr)
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
@@ -474,7 +477,7 @@ func createDataPartition(vol *Vol, count int, t *testing.T) {
 }
 
 func TestDisk(t *testing.T) {
-	addr := "127.0.0.1:9110"
+	addr := mds5Addr
 	disk := "/cfs"
 	diskOffline(addr, disk, t)
 }

@@ -22,6 +22,13 @@ func (c *Cluster) startCheckBadDiskRecovery() {
 }
 
 func (c *Cluster) checkBadDiskRecovery() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkBadDiskRecovery occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkBadDiskRecovery occurred panic")
+		}
+	}()
 	var minus float64
 	c.BadDataPartitionIds.Range(func(key, value interface{}) bool {
 		badDataPartitionIds := value.([]uint64)

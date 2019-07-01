@@ -129,6 +129,13 @@ func (c *Cluster) startCheckDataPartitions() {
 }
 
 func (c *Cluster) checkCreateDataPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkCreateDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkCreateDataPartitions occurred panic")
+		}
+	}()
 	vols := c.copyVols()
 	for _, vol := range vols {
 		vol.checkNeedAutoCreateDataPartitions(c)
@@ -136,6 +143,13 @@ func (c *Cluster) checkCreateDataPartitions() {
 }
 
 func (c *Cluster) checkDataPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkDataPartitions occurred panic")
+		}
+	}()
 	vols := c.getAllNormalVols()
 	for _, vol := range vols {
 		readWrites := vol.checkDataPartitions(c)
@@ -158,6 +172,13 @@ func (c *Cluster) startCheckBackendLoadDataPartitions() {
 }
 
 func (c *Cluster) backendLoadDataPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("backendLoadDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"backendLoadDataPartitions occurred panic")
+		}
+	}()
 	vols := c.getAllNormalVols()
 	for _, vol := range vols {
 		vol.LoadDataPartition(c)
@@ -176,6 +197,13 @@ func (c *Cluster) startCheckReleaseDataPartitions() {
 }
 
 func (c *Cluster) releaseDataPartitionAfterLoad() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("releaseDataPartitionAfterLoad occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"releaseDataPartitionAfterLoad occurred panic")
+		}
+	}()
 	vols := c.copyVols()
 	for _, vol := range vols {
 		vol.ReleaseDataPartitions(c.cfg.everyReleaseDataPartitionCount, c.cfg.releaseDataPartitionAfterLoadSeconds)
@@ -209,6 +237,13 @@ func (c *Cluster) checkLeaderAddr() {
 }
 
 func (c *Cluster) checkDataNodeHeartbeat() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkDataNodeHeartbeat occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkDataNodeHeartbeat occurred panic")
+		}
+	}()
 	tasks := make([]*proto.AdminTask, 0)
 	c.dataNodes.Range(func(addr, dataNode interface{}) bool {
 		node := dataNode.(*DataNode)
@@ -221,6 +256,13 @@ func (c *Cluster) checkDataNodeHeartbeat() {
 }
 
 func (c *Cluster) checkMetaNodeHeartbeat() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkMetaNodeHeartbeat occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkMetaNodeHeartbeat occurred panic")
+		}
+	}()
 	tasks := make([]*proto.AdminTask, 0)
 	c.metaNodes.Range(func(addr, metaNode interface{}) bool {
 		node := metaNode.(*MetaNode)
@@ -244,6 +286,13 @@ func (c *Cluster) startCheckMetaPartitions() {
 }
 
 func (c *Cluster) checkMetaPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkMetaPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkMetaPartitions occurred panic")
+		}
+	}()
 	vols := c.getAllNormalVols()
 	for _, vol := range vols {
 		vol.checkMetaPartitions(c)
@@ -676,9 +725,11 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	if err = dp.updateForOffline(offlineAddr, newAddr, volName, c); err != nil {
 		goto errDeal
 	}
+	if replica, err = dp.getReplica(offlineAddr); err != nil {
+		goto errDeal
+	}
 	dp.isRecover = true
-	c.putBadDataPartitionIDs(replica, offlineAddr, dp.PartitionID)
-	replica, _ = dp.getReplica(offlineAddr)
+	c.putBadDataPartitionIDs(replica, dataNode, dp.PartitionID)
 	dp.offLineInMem(offlineAddr)
 	dp.checkAndRemoveMissReplica(offlineAddr)
 	task = dp.GenerateDeleteTask(offlineAddr)
@@ -696,13 +747,15 @@ errDeal:
 	return
 }
 
-func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica, offlineAddr string, partitionID uint64) {
+func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica, dataNode *DataNode, partitionID uint64) {
+	dataNode.Lock()
+	defer dataNode.Unlock()
 	var key string
 	newBadPartitionIDs := make([]uint64, 0)
 	if replica != nil {
-		key = fmt.Sprintf("%s:%s", offlineAddr, replica.DiskPath)
+		key = fmt.Sprintf("%s:%s", dataNode.Addr, replica.DiskPath)
 	} else {
-		key = fmt.Sprintf("%s:%s", offlineAddr, "")
+		key = fmt.Sprintf("%s:%s", dataNode.Addr, "")
 	}
 	badPartitionIDs, ok := c.BadDataPartitionIds.Load(key)
 	if ok {

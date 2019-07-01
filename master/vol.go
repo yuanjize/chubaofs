@@ -289,6 +289,13 @@ func (vol *Vol) getTotalSpace() uint64 {
 }
 
 func (vol *Vol) checkStatus(c *Cluster) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("vol checkStatus occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"vol checkStatus occurred panic")
+		}
+	}()
 	vol.Lock()
 	defer vol.Unlock()
 	if vol.Status == VolMarkDelete {

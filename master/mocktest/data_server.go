@@ -154,7 +154,7 @@ func (mds *MockDataServer) handleHeartbeats(conn net.Conn, pkg *proto.Packet) (e
 			PartitionStatus:      proto.ReadWrite,
 			Total:                120 * util.GB,
 			Used:                 20 * util.GB,
-			DiskPath:             "/export",
+			DiskPath:             "/cfs",
 			ExtentCount:          10,
 			NeedCompare:          true,
 			AvaliTinyExtentCnt:   5,
