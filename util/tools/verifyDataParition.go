@@ -118,7 +118,7 @@ func getDataPartitionResult(partitionId int) (err error) {
 	loadUrl := fmt.Sprintf("http://dbbak.jd.local/dataPartition/get?id=%v", partitionId)
 	resp, err := http.Get(loadUrl)
 	if err != nil {
-		err = fmt.Errorf("cannot get partitonId %v result", partitionId)
+		err = fmt.Errorf("cannot get partitonId %v result %v", partitionId,err)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -144,14 +144,27 @@ func getDataPartitionResult(partitionId int) (err error) {
 		}
 	}
 	for i:=0;i<len(dp.Replica);i++{
+		var (
+			err1,err2 error
+		)
 		if maxUsed-dp.Replica[i].UsedSize>util.MB{
-			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
+			err1=fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
 				dp.PartitionID,dp.Replica[i].Addr,maxUsed,dp.Replica[i].UsedSize))
 		}
 		if maxReportTime-dp.Replica[i].ReportTime>3600{
-			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
+			err2=fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
 				dp.PartitionID,dp.Replica[i].Addr,maxReportTime,dp.Replica[i].ReportTime))
 		}
+		if err1!=nil && err2!=nil {
+			return fmt.Errorf("error1 %v error2 %v",err1.Error(),err2.Error())
+		}
+		if err1!=nil {
+			return err1
+		}
+		if err2!=nil {
+			return err2
+		}
+
 	}
 	if len(dp.FileInCoreMap) == 0 {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v fileInCoremap 0 ", partitionId, resp.StatusCode)
