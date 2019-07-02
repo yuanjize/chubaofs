@@ -52,6 +52,8 @@ const (
 // NOTE: NodeID and Resolver must be required.Other parameter has default value.
 type Config struct {
 	TransportConfig
+	// ClusterID is the user module ID
+	ClusterID string
 	// NodeID is the identity of the local node. NodeID cannot be 0.
 	// This parameter is required.
 	NodeID uint64

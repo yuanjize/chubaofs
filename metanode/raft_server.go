@@ -35,6 +35,7 @@ func (m *MetaNode) startRaftServer() (err error) {
 	replicatePort, _ := strconv.Atoi(m.raftReplicatePort)
 
 	raftConf := &raftstore.Config{
+		ClusterID:     clusterInfo.Cluster + "_metaNode",
 		NodeID:        m.nodeId,
 		WalPath:       m.raftDir,
 		IpAddr:        m.localAddr,
