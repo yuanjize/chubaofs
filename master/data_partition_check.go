@@ -99,6 +99,9 @@ func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec
 				"miss time > %v  lastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v So Migrate by manual",
 				clusterID, partition.PartitionID, replica.Addr, dataPartitionMissSec, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("/dataPartition/offline?name=%v&id=%v&addr=%v",
+				partition.VolName, partition.PartitionID, replica.Addr)
+			log.LogRead(msg)
 		}
 	}
 
@@ -107,6 +110,9 @@ func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec
 			msg := fmt.Sprintf("action[checkMissErr], clusterID[%v] partitionID:%v  on Node:%v  "+
 				"miss time  > :%v  but server not exsit So Migrate", clusterID, partition.PartitionID, addr, dataPartitionMissSec)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("/dataPartition/offline?name=%v&id=%v&addr=%v",
+				partition.VolName, partition.PartitionID, addr)
+			log.LogRead(msg)
 		}
 	}
 }
@@ -158,6 +164,9 @@ func (partition *DataPartition) checkDiskError(clusterID string) (diskErrorAddrs
 		msg := fmt.Sprintf("action[%v],clusterID[%v],partitionID:%v  On :%v  Disk Error,So Remove it From RocksDBHost",
 			CheckDataPartitionDiskErrorErr, clusterID, partition.PartitionID, diskAddr)
 		Warn(clusterID, msg)
+		msg = fmt.Sprintf("/dataPartition/offline?name=%v&id=%v&addr=%v",
+			partition.VolName, partition.PartitionID, diskAddr)
+		log.LogRead(msg)
 	}
 
 	return

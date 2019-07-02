@@ -346,6 +346,8 @@ func TestMetaPartition(t *testing.T) {
 	getMetaPartition(commonVol.Name, maxPartitionID, t)
 	isManual := false
 	updateMetaPartition(commonVol, maxPartitionID, isManual, t)
+	server.cluster.checkMetaNodeHeartbeat()
+	time.Sleep(5 * time.Second)
 	offlineMetaPartition(commonVol, maxPartitionID, t)
 }
 
