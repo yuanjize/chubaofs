@@ -87,16 +87,16 @@ func (mds *MockDataServer) serveConn(rc net.Conn) {
 	switch req.Opcode {
 	case proto.OpCreateDataPartition:
 		err = mds.handleCreateDataPartition(conn, req, adminTask)
-		fmt.Printf("data node [%v] create data partition,err:%v\n", mds.TcpAddr, err)
+		fmt.Printf("data node [%v] create data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	case proto.OpDeleteDataPartition:
 		err = mds.handleDeleteDataPartition(conn, req)
-		fmt.Printf("data node [%v] delete data partition,err:%v\n", mds.TcpAddr, err)
+		fmt.Printf("data node [%v] delete data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	case proto.OpDataNodeHeartbeat:
 		err = mds.handleHeartbeats(conn, req)
 		fmt.Printf("data node [%v] report heartbeat to master,err:%v\n", mds.TcpAddr, err)
 	case proto.OpLoadDataPartition:
 		err = mds.handleLoadDataPartition(conn, req)
-		fmt.Printf("data node [%v] load data partition,err:%v\n", mds.TcpAddr, err)
+		fmt.Printf("data node [%v] load data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	}
 }
 

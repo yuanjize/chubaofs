@@ -43,6 +43,9 @@ const (
 	mms1Addr      = "127.0.0.1:8101"
 	mms2Addr      = "127.0.0.1:8102"
 	mms3Addr      = "127.0.0.1:8103"
+	mms4Addr      = "127.0.0.1:8104"
+	mms5Addr      = "127.0.0.1:8105"
+	mms6Addr      = "127.0.0.1:8106"
 	commonVolName = "commonVol"
 )
 
@@ -104,6 +107,8 @@ func createMasterServer() *Master {
 	addMetaServer(mms1Addr)
 	addMetaServer(mms2Addr)
 	addMetaServer(mms3Addr)
+	addMetaServer(mms4Addr)
+	addMetaServer(mms5Addr)
 	time.Sleep(5 * time.Second)
 	server.cluster.checkDataNodeHeartbeat()
 	server.cluster.checkMetaNodeHeartbeat()
@@ -209,7 +214,7 @@ func offlineDataNode(addr string, t *testing.T) {
 
 func TestMetaNode(t *testing.T) {
 	// /metaNode/add and /metaNode/response processed by mock meta server
-	addr := "127.0.0.1:8106"
+	addr := mms6Addr
 	addMetaServer(addr)
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)

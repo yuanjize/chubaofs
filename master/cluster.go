@@ -1024,6 +1024,15 @@ func (c *Cluster) DataNodeCount() (len int) {
 	return
 }
 
+func (c *Cluster) MetaNodeCount() (len int) {
+
+	c.metaNodes.Range(func(key, value interface{}) bool {
+		len++
+		return true
+	})
+	return
+}
+
 func (c *Cluster) getAllDataNodes() (dataNodes []DataNodeView) {
 	dataNodes = make([]DataNodeView, 0)
 	c.dataNodes.Range(func(addr, node interface{}) bool {
