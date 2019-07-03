@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
-	"math"
 	"time"
 )
 
@@ -48,12 +47,7 @@ func (c *Cluster) checkBadDiskRecovery() {
 				newBadDpIds = append(newBadDpIds, partitionID)
 				continue
 			}
-			used := partition.Replicas[0].Used
-			for _, replica := range partition.Replicas {
-				if math.Abs(float64(replica.Used)-float64(used)) > minus {
-					minus = math.Abs(float64(replica.Used) - float64(used))
-				}
-			}
+			minus = partition.getMinus()
 			if minus < util.GB {
 				Warn(c.Name, fmt.Sprintf("clusterID[%v],partitionID[%v] has recovered success", c.Name, partitionID))
 				partition.isRecover = false

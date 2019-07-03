@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"math"
 )
 
 type DataPartition struct {
@@ -36,14 +37,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total           uint64
-	used            uint64
-	VolName         string
-	modifyTime      int64
-	createTime      int64
-	FileInCoreMap   map[string]*FileInCore
-	MissNodes       map[string]int64
-	FileMissReplica map[string]int64
+	total            uint64
+	used             uint64
+	VolName          string
+	modifyTime       int64
+	createTime       int64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	FileMissReplica  map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -291,7 +292,7 @@ func (partition *DataPartition) getFileCount() {
 	}
 
 	for _, replica := range partition.Replicas {
-		msg = fmt.Sprintf(GetDataReplicaFileCountInfo+"partitionID:%v  replicaAddr:%v  FileCount:%v  "+
+		msg = fmt.Sprintf(GetDataReplicaFileCountInfo + "partitionID:%v  replicaAddr:%v  FileCount:%v  "+
 			"NodeIsActive:%v  replicaIsActive:%v  .replicaStatusOnNode:%v ", partition.PartitionID, replica.Addr, replica.FileCount,
 			replica.GetReplicaNode().isActive, replica.IsActive(DefaultDataPartitionTimeOutSec), replica.Status)
 		log.LogInfo(msg)
@@ -523,4 +524,16 @@ func (partition *DataPartition) createDataPartitionSuccessTriggerOperator(nodeAd
 	partition.AddMember(replica)
 	partition.checkAndRemoveMissReplica(replica.Addr)
 	return
+}
+
+func (partition *DataPartition) getMinus() (minus float64) {
+	partition.RLock()
+	defer partition.RUnlock()
+	used := partition.Replicas[0].Used
+	for _, replica := range partition.Replicas {
+		if math.Abs(float64(replica.Used)-float64(used)) > minus {
+			minus = math.Abs(float64(replica.Used) - float64(used))
+		}
+	}
+	return minus
 }

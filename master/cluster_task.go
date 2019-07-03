@@ -556,7 +556,7 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 	}
 }
 
-func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.MetaPartitionReport, threshold bool) {
+func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.MetaPartitionReport, hasArriveThreshold bool) {
 	for _, mr := range metaPartitions {
 		if mr == nil {
 			continue
@@ -567,19 +567,23 @@ func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.Met
 			err = nil
 			continue
 		}
+		//send latest end to replica
+		if mr.End != mp.End {
+			tasks := make([]*proto.AdminTask, 0)
+			t := mp.generateUpdateMetaReplicaTask(c.Name, mp.PartitionID, mp.End)
+			//if no leader,don't update end
+			if t != nil {
+				tasks = append(tasks, t)
+				c.putMetaNodeTasks(tasks)
+			}
+		}
 		mp.UpdateMetaPartition(mr, metaNode)
-		c.updateEnd(mp, mr, threshold, metaNode)
+		c.updateEnd(mp, mr, hasArriveThreshold, metaNode)
 	}
 }
 
-func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, threshold bool, metaNode *MetaNode) {
-	if !threshold {
-		return
-	}
-	mp.Lock()
-	defer mp.Unlock()
-	if _, err := mp.getLeaderMetaReplica(); err != nil {
-		log.LogWarnf("action[updateEnd] vol[%v] id[%v] no leader", mp.volName, mp.PartitionID)
+func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, hasArriveThreshold bool, metaNode *MetaNode) {
+	if !hasArriveThreshold {
 		return
 	}
 	var (
@@ -590,25 +594,12 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, th
 		log.LogWarnf("action[updateEnd] vol[%v] not found", mp.volName)
 		return
 	}
-	maxPartitionID := vol.getMaxPartitionID()
-	if mp.PartitionID < maxPartitionID {
-		log.LogWarnf("action[updateEnd] vol[%v] id[%v] less than maxId[%v]", mp.volName, mp.PartitionID, maxPartitionID)
-		return
+	var end uint64
+	if mr.MaxInodeID <= 0 {
+		end = mr.Start + DefaultMetaPartitionInodeIDStep
+	} else {
+		end = mr.MaxInodeID + DefaultMetaPartitionInodeIDStep
 	}
-
-	if mp.Start != mr.Start {
-		Warn(c.Name, fmt.Sprintf("mpid[%v],start[%v],mrStart[%v],addr[%v]", mp.PartitionID, mp.Start, mr.Start, metaNode.Addr))
-	}
-
-	hasEnough := c.hasEnoughWritableMetaHosts(int(vol.mpReplicaNum))
-	if mp.End == DefaultMaxMetaPartitionInodeID && hasEnough {
-		var end uint64
-		if mr.MaxInodeID <= 0 {
-			end = mr.Start + DefaultMetaPartitionInodeIDStep
-		} else {
-			end = mr.MaxInodeID + DefaultMetaPartitionInodeIDStep
-		}
-		log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
-		mp.UpdateEnd(c, end)
-	}
+	log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
+	vol.splitMetaPartition(c, mp, end)
 }

@@ -835,8 +835,7 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 	if vol.VolType == proto.TinyPartition {
 		return
 	}
-
-	if err = c.CreateMetaPartition(name, 0, DefaultMaxMetaPartitionInodeID); err != nil {
+	if err = vol.createMetaPartition(c, 0, DefaultMaxMetaPartitionInodeID); err != nil {
 		c.deleteVol(name)
 		goto errDeal
 	}
@@ -889,17 +888,7 @@ func (c *Cluster) CreateMetaPartitionForManual(volName string, start uint64) (er
 	if partition, err = vol.getMetaPartition(maxPartitionID); err != nil {
 		return errors.Annotatef(err, "get meta partition [%v] err", maxPartitionID)
 	}
-	if start < partition.MaxNodeID {
-		err = errors.Errorf("next meta partition start must be larger than %v", partition.MaxNodeID)
-		return
-	}
-	if _, err := partition.getLeaderMetaReplica(); err != nil {
-		return errors.Annotate(err, "can't execute")
-	}
-	partition.Lock()
-	defer partition.Unlock()
-	partition.UpdateEnd(c, start)
-	return
+	return vol.splitMetaPartition(c, partition, start)
 }
 
 func (c *Cluster) CreateMetaPartition(volName string, start, end uint64) (err error) {
@@ -975,16 +964,6 @@ func (c *Cluster) syncCreateMetaPartitionToMataNode(host string, mp *MetaPartiti
 	}
 	metaNode.Sender.connPool.Put(conn, false)
 	return
-}
-
-func (c *Cluster) hasEnoughWritableMetaHosts(replicaNum int) bool {
-	maxTotal := c.GetMetaNodeMaxTotal()
-	excludeHosts := make([]string, 0)
-	nodeTabs, _ := c.GetAvailCarryMetaNodeTab(maxTotal, excludeHosts)
-	if nodeTabs != nil && len(nodeTabs) >= replicaNum {
-		return true
-	}
-	return false
 }
 
 func (c *Cluster) ChooseTargetMetaHosts(replicaNum int) (hosts []string, peers []proto.Peer, err error) {

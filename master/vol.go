@@ -20,6 +20,7 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
+	"github.com/juju/errors"
 )
 
 type Vol struct {
@@ -36,6 +37,7 @@ type Vol struct {
 	MetaPartitions      map[uint64]*MetaPartition
 	mpsLock             sync.RWMutex
 	dataPartitions      *DataPartitionMap
+	createMpLock        sync.Mutex
 	sync.RWMutex
 }
 
@@ -368,5 +370,85 @@ func (vol *Vol) getDeleteDataTasks() (tasks []*proto.AdminTask) {
 			tasks = append(tasks, dp.GenerateDeleteTask(replica.Addr))
 		}
 	}
+	return
+}
+
+func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (err error) {
+	vol.createMpLock.Lock()
+	defer vol.createMpLock.Unlock()
+	maxPartitionID := vol.getMaxPartitionID()
+	if maxPartitionID != mp.PartitionID {
+		err = fmt.Errorf("mp[%v] is not the last meta partition[%v]", mp.PartitionID, maxPartitionID)
+		return
+	}
+	if err = mp.updateEnd(c, end); err != nil {
+		return
+	}
+	if err = vol.createMetaPartition(c, mp.End+1, DefaultMaxMetaPartitionInodeID); err != nil {
+		Warn(c.Name, fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
+			c.Name, mp.PartitionID, err))
+		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
+		return
+	}
+	return
+}
+
+func (vol *Vol) createMetaPartition(c *Cluster, start, end uint64) (err error) {
+	vol.createMpLock.Lock()
+	defer vol.createMpLock.Unlock()
+	var mp *MetaPartition
+	if mp, err = vol.doCreateMetaPartition(c, start, end); err != nil {
+		return
+	}
+	vol.AddMetaPartition(mp)
+	return
+}
+
+func (vol *Vol) doCreateMetaPartition(c *Cluster, start, end uint64) (mp *MetaPartition, err error) {
+	var (
+		hosts       []string
+		partitionID uint64
+		peers       []proto.Peer
+		wg          sync.WaitGroup
+	)
+	errChannel := make(chan error, vol.mpReplicaNum)
+	if hosts, peers, err = c.ChooseTargetMetaHosts(int(vol.mpReplicaNum)); err != nil {
+		return nil, errors.Trace(err)
+	}
+	log.LogInfof("target meta hosts:%v,peers:%v", hosts, peers)
+	if partitionID, err = c.idAlloc.allocateMetaPartitionID(); err != nil {
+		return nil, errors.Trace(err)
+	}
+	mp = NewMetaPartition(partitionID, start, end, vol.mpReplicaNum, vol.Name)
+	mp.setPersistenceHosts(hosts)
+	mp.setPeers(peers)
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer func() {
+				wg.Done()
+			}()
+			if err = c.syncCreateMetaPartitionToMataNode(host, mp); err != nil {
+				errChannel <- err
+				return
+			}
+			mp.Lock()
+			defer mp.Unlock()
+			if err = mp.createPartitionSuccessTriggerOperator(host, c); err != nil {
+				errChannel <- err
+			}
+		}(host)
+	}
+	wg.Wait()
+	select {
+	case err = <-errChannel:
+		return nil, errors.Trace(err)
+	default:
+		mp.Status = proto.ReadWrite
+	}
+	if err = c.syncAddMetaPartition(vol.Name, mp); err != nil {
+		return nil, errors.Trace(err)
+	}
+	log.LogInfof("action[CreateMetaPartition] success,volName[%v],partition[%v]", vol.Name, partitionID)
 	return
 }
