@@ -28,6 +28,23 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 )
 
+type MountOption struct {
+	MountPoint    string
+	Volname       string
+	Owner         string
+	Master        string
+	Logpath       string
+	Loglvl        string
+	Profport      string
+	Rdonly        bool
+	IcacheTimeout int64
+	LookupValid   int64
+	AttrValid     int64
+	EnSyncWrite   int64
+	AutoInvalData int64
+	UmpDatadir    string
+}
+
 type Super struct {
 	cluster string
 	volname string
@@ -47,32 +64,32 @@ var (
 	_ fs.FSStatfser = (*Super)(nil)
 )
 
-func NewSuper(volname, master string, icacheTimeout, lookupValid, attrValid int64) (s *Super, err error) {
+func NewSuper(opt *MountOption) (s *Super, err error) {
 	s = new(Super)
-	s.mw, err = meta.NewMetaWrapper(volname, master)
+	s.mw, err = meta.NewMetaWrapper(opt.Volname, opt.Master)
 	if err != nil {
 		log.LogErrorf("NewMetaWrapper failed! %v", err.Error())
 		return nil, err
 	}
 
-	s.ec, err = stream.NewExtentClient(volname, master, s.mw.AppendExtentKey, s.mw.GetExtents)
+	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, s.mw.AppendExtentKey, s.mw.GetExtents)
 	if err != nil {
 		log.LogErrorf("NewExtentClient failed! %v", err.Error())
 		return nil, err
 	}
 
-	s.volname = volname
+	s.volname = opt.Volname
 	s.cluster = s.mw.Cluster()
 	s.localIP = s.mw.LocalIP()
 	inodeExpiration := DefaultInodeExpiration
-	if icacheTimeout >= 0 {
-		inodeExpiration = time.Duration(icacheTimeout) * time.Second
+	if opt.IcacheTimeout >= 0 {
+		inodeExpiration = time.Duration(opt.IcacheTimeout) * time.Second
 	}
-	if lookupValid >= 0 {
-		LookupValidDuration = time.Duration(lookupValid) * time.Second
+	if opt.LookupValid >= 0 {
+		LookupValidDuration = time.Duration(opt.LookupValid) * time.Second
 	}
-	if attrValid >= 0 {
-		AttrValidDuration = time.Duration(attrValid) * time.Second
+	if opt.AttrValid >= 0 {
+		AttrValidDuration = time.Duration(opt.AttrValid) * time.Second
 	}
 	s.ic = NewInodeCache(inodeExpiration, MaxInodeCache)
 	s.orphan = NewOrphanInodeList()
