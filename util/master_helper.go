@@ -126,7 +126,7 @@ func (helper *masterHelper) Nodes() []string {
 func (helper *masterHelper) httpRequest(method, url string, param map[string]string, reqData []byte) (resp *http.Response, err error) {
 	client := &http.Client{}
 	reader := bytes.NewReader(reqData)
-	client.Timeout = time.Second * 3
+	client.Timeout = time.Second * 30
 	var req *http.Request
 	fullUrl := helper.mergeRequestUrl(url, param)
 	log.LogDebugf("action[httpRequest] method[%v] url[%v] reqBodyLen[%v].", method, fullUrl, len(reqData))
