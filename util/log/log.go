@@ -480,7 +480,8 @@ func (l *Log) checkLogRotation(logDir, module string) {
 			allLogName := l.getAllLogFileName(module)
 			doDelete := false
 			for _, logName := range allLogName {
-				if strings.Contains(info.Name(), logName) {
+				if strings.Contains(info.Name(), logName) &&
+					!strings.HasSuffix(info.Name(),logName) && (now.Unix() - info.ModTime().Unix()) > RetentionTime{
 					doDelete = true
 					break
 				}
@@ -488,7 +489,7 @@ func (l *Log) checkLogRotation(logDir, module string) {
 			if !doDelete {
 				continue
 			}
-			if (now.Unix() - info.ModTime().Unix()) > RetentionTime {
+			if _,err=os.Stat(path.Join(logDir, info.Name()));err==nil {
 				os.Remove(path.Join(logDir, info.Name()))
 			}
 		}
