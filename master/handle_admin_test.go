@@ -114,7 +114,7 @@ func createMasterServer() *Master {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	server.cluster.startCheckAvailSpace()
-	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100)
+	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100,2)
 	vol, err := server.cluster.getVol(commonVolName)
 	if err != nil {
 		panic(err)
@@ -259,7 +259,7 @@ func TestVol(t *testing.T) {
 }
 
 func createVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&replicas=3&type=extent&capacity=100&owner=cfs", hostAddr, AdminCreateVol, name)
+	reqUrl := fmt.Sprintf("%v%v?name=%v&replicas=3&type=extent&capacity=100&owner=cfs&mpCount=2", hostAddr, AdminCreateVol, name)
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
 }

@@ -384,11 +384,43 @@ func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (e
 	if err = mp.updateEnd(c, end); err != nil {
 		return
 	}
-	if err = vol.createMetaPartition(c, mp.End+1, DefaultMaxMetaPartitionInodeID); err != nil {
+	if err = vol.createMetaPartition(c, mp.End+1, defaultMaxMetaPartitionInodeID); err != nil {
 		Warn(c.Name, fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
 			c.Name, mp.PartitionID, err))
 		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
 		return
+	}
+	return
+}
+
+func (vol *Vol) batchCreateMetaPartition(c *Cluster, count int) (err error) {
+	// initialize k meta partitionMap at a time
+	var (
+		start uint64
+		end   uint64
+	)
+	if count < defaultInitMetaPartitionCount {
+		count = defaultInitMetaPartitionCount
+	}
+	if count > defaultMaxInitMetaPartitionCount {
+		count = defaultMaxInitMetaPartitionCount
+	}
+	for index := 0; index < count; index++ {
+		if index != 0 {
+			start = end + 1
+		}
+		end = defaultMetaPartitionInodeIDStep * uint64(index+1)
+		if index == count-1 {
+			end = defaultMaxMetaPartitionInodeID
+		}
+		if err = vol.createMetaPartition(c, start, end); err != nil {
+			log.LogErrorf("action[initMetaPartitions] vol[%v] init meta partition err[%v]", vol.Name, err)
+			break
+		}
+	}
+	if len(vol.MetaPartitions) != count {
+		err = fmt.Errorf("action[initMetaPartitions] vol[%v] init meta partition failed,mpCount[%v],expectCount[%v]",
+			vol.Name, len(vol.MetaPartitions), count)
 	}
 	return
 }

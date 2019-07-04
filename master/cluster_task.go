@@ -603,9 +603,9 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, ha
 	}
 	var end uint64
 	if mr.MaxInodeID <= 0 {
-		end = mr.Start + DefaultMetaPartitionInodeIDStep
+		end = mr.Start + defaultMetaPartitionInodeIDStep
 	} else {
-		end = mr.MaxInodeID + DefaultMetaPartitionInodeIDStep
+		end = mr.MaxInodeID + defaultMetaPartitionInodeIDStep
 	}
 	log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
 	vol.splitMetaPartition(c, mp, end)

@@ -67,7 +67,7 @@ func TestPanicCheckMetaPartitions(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	mp := NewMetaPartition(partitionID, 1, DefaultMaxMetaPartitionInodeID, vol.mpReplicaNum, vol.Name)
+	mp := NewMetaPartition(partitionID, 1, defaultMaxMetaPartitionInodeID, vol.mpReplicaNum, vol.Name)
 	vol.AddMetaPartition(mp)
 	mp = nil
 	c.checkMetaPartitions()

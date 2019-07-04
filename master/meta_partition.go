@@ -138,14 +138,14 @@ func (mp *MetaPartition) updateEnd(c *Cluster, end uint64) (err error) {
 		return
 	}
 	//to prevent overflow
-	if end > (DefaultMaxMetaPartitionInodeID - DefaultMetaPartitionInodeIDStep) {
+	if end > (defaultMaxMetaPartitionInodeID - defaultMetaPartitionInodeIDStep) {
 		msg := fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] nextStart[%v] "+
 			"to prevent overflow ,not update end", c.Name, mp.PartitionID, end)
 		log.LogWarn(msg)
 		err = fmt.Errorf(msg)
 		return
 	}
-	if _, err := mp.getLeaderMetaReplica(); err != nil {
+	if _, err = mp.getLeaderMetaReplica(); err != nil {
 		log.LogWarnf("action[updateEnd] vol[%v] id[%v] no leader", mp.volName, mp.PartitionID)
 		return
 	}
@@ -190,9 +190,9 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 		log.LogWarnf("action[checkEnd] partition[%v] not max partition[%v]", mp.PartitionID, curMaxPartitionID)
 		return
 	}
-	if mp.End != DefaultMaxMetaPartitionInodeID {
+	if mp.End != defaultMaxMetaPartitionInodeID {
 		oldEnd := mp.End
-		mp.End = DefaultMaxMetaPartitionInodeID
+		mp.End = defaultMaxMetaPartitionInodeID
 		if err := c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
 			mp.End = oldEnd
 			log.LogErrorf("action[checkEnd] partitionID[%v] err[%v]", mp.PartitionID, err)

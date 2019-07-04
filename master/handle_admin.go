@@ -486,16 +486,17 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		err        error
 		msg        string
 		volType    string
+		mpCount    int
 		replicaNum int
 		capacity   int
 		vol        *Vol
 	)
 
-	if name, owner, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
+	if name, owner, volType, mpCount, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
 
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity,mpCount); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -1005,7 +1006,7 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, er
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, owner, volType string, replicaNum, capacity int, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1030,6 +1031,11 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, replicaNu
 	if owner = r.FormValue(ParaVolOwner); owner == "" {
 		err = paraNotFound(ParaVolOwner)
 		return
+	}
+	if mpCountStr := r.FormValue(metaPartitionCountKey); mpCountStr != "" {
+		if mpCount, err = strconv.Atoi(mpCountStr); err != nil {
+			mpCount = defaultInitMetaPartitionCount
+		}
 	}
 	return
 }

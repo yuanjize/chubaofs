@@ -823,7 +823,7 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity int) (err error) {
+func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity,mpCount int) (err error) {
 	var (
 		vol                     *Vol
 		readWriteDataPartitions int
@@ -835,7 +835,7 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 	if vol.VolType == proto.TinyPartition {
 		return
 	}
-	if err = vol.createMetaPartition(c, 0, DefaultMaxMetaPartitionInodeID); err != nil {
+	if err = vol.createMetaPartition(c, 0, defaultMaxMetaPartitionInodeID); err != nil {
 		c.deleteVol(name)
 		goto errDeal
 	}
