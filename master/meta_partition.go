@@ -407,7 +407,7 @@ func (mp *MetaPartition) needWarnMissReplica(addr string, warnInterval int64) (i
 	return false
 }
 
-func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, warnInterval int64) {
+func (mp *MetaPartition) checkReplicaMiss(clusterID, leaderAddr string, partitionMissSec, warnInterval int64) {
 	mp.Lock()
 	defer mp.Unlock()
 	//has report
@@ -426,6 +426,9 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, wa
 				"miss time > :%v  vlocLastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v",
 				clusterID, mp.volName, mp.PartitionID, replica.Addr, partitionMissSec, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, mp.volName, mp.PartitionID, replica.Addr)
+			log.LogRead(msg)
 		}
 	}
 	// never report
@@ -435,6 +438,9 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, wa
 				"miss time  > %v ",
 				clusterID, mp.volName, mp.PartitionID, addr, DefaultMetaPartitionTimeOutSec)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, mp.volName, mp.PartitionID, addr)
+			log.LogRead(msg)
 		}
 	}
 }

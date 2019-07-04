@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-
+	_ "net/http/pprof"
 	"github.com/chubaofs/chubaofs/master/mocktest"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
@@ -72,6 +72,7 @@ func createMasterServer() *Master {
 	logDir := cfg.GetString(ConfigKeyLogDir)
 	walDir := cfg.GetString(WalDir)
 	storeDir := cfg.GetString(StoreDir)
+	profPort := cfg.GetString("prof")
 	os.RemoveAll(logDir)
 	os.RemoveAll(walDir)
 	os.RemoveAll(storeDir)
@@ -93,6 +94,14 @@ func createMasterServer() *Master {
 	}
 	if _, err := log.InitLog(logDir, "master", level); err != nil {
 		fmt.Println("Fatal: failed to start the chubaofs daemon - ", err)
+	}
+	if profPort != "" {
+		go func() {
+			err := http.ListenAndServe(fmt.Sprintf(":%v", profPort), nil)
+			if err != nil {
+				panic(fmt.Sprintf("cannot listen pprof %v err %v", profPort, err.Error()))
+			}
+		}()
 	}
 	server.Start(cfg)
 	time.Sleep(5 * time.Second)

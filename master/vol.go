@@ -133,12 +133,12 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 	for _, dp := range vol.dataPartitions.dataPartitionMap {
 		dp.checkReplicaStatus(c.cfg.DataPartitionTimeOutSec)
 		dp.checkStatus(c.Name, true, c.cfg.DataPartitionTimeOutSec)
-		dp.checkMiss(c.Name, c.cfg.DataPartitionMissSec, c.cfg.DataPartitionWarnInterval)
+		dp.checkMiss(c.Name, c.leaderInfo.addr, c.cfg.DataPartitionMissSec, c.cfg.DataPartitionWarnInterval)
 		dp.checkReplicaNum(c, vol.Name)
 		if dp.Status == proto.ReadWrite {
 			readWriteDataPartitions++
 		}
-		dp.checkDiskError(c.Name)
+		dp.checkDiskError(c.Name, c.leaderInfo.addr)
 		tasks := dp.checkReplicationTask(c.Name)
 		if len(tasks) != 0 {
 			c.putDataNodeTasks(tasks)
@@ -178,7 +178,7 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) {
 		mp.checkReplicaLeader()
 		mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
 		mp.checkEnd(c, maxPartitionID)
-		mp.checkReplicaMiss(c.Name, DefaultMetaPartitionTimeOutSec, DefaultMetaPartitionWarnInterval)
+		mp.checkReplicaMiss(c.Name, c.leaderInfo.addr, DefaultMetaPartitionTimeOutSec, DefaultMetaPartitionWarnInterval)
 		tasks = append(tasks, mp.GenerateReplicaTask(c.Name, vol.Name)...)
 	}
 	c.putMetaNodeTasks(tasks)
@@ -384,12 +384,14 @@ func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (e
 	if err = mp.updateEnd(c, end); err != nil {
 		return
 	}
-	if err = vol.createMetaPartition(c, mp.End+1, defaultMaxMetaPartitionInodeID); err != nil {
+	var nextMp *MetaPartition
+	if nextMp, err = vol.doCreateMetaPartition(c, mp.End+1, defaultMaxMetaPartitionInodeID); err != nil {
 		Warn(c.Name, fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
 			c.Name, mp.PartitionID, err))
 		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
 		return
 	}
+	vol.AddMetaPartition(nextMp)
 	return
 }
 
