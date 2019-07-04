@@ -471,7 +471,9 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 		partition.AddMember(replica)
 	}
 	partition.total = vr.Total
-	partition.used = vr.Used
+	if vr.Used > partition.used {
+		partition.used = vr.Used
+	}
 	replica.Status = int8(vr.PartitionStatus)
 	replica.Total = vr.Total
 	replica.Used = vr.Used
@@ -489,12 +491,7 @@ func (partition *DataPartition) toJson() (body []byte, err error) {
 }
 
 func (partition *DataPartition) getMaxUsedSize() (used uint64) {
-	for _, replica := range partition.Replicas {
-		if replica.Used > used {
-			used = replica.Used
-		}
-	}
-	return
+	return used
 }
 
 func (partition *DataPartition) isNeedCompareData() (needCompare bool) {

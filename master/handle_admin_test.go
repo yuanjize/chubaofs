@@ -123,7 +123,7 @@ func createMasterServer() *Master {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	server.cluster.startCheckAvailSpace()
-	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100,2)
+	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 2)
 	vol, err := server.cluster.getVol(commonVolName)
 	if err != nil {
 		panic(err)
@@ -610,4 +610,14 @@ func TestDataPartitionOffline(t *testing.T) {
 		t.Errorf("offlineAddr[%v],hosts[%v]", offlineAddr, partition.PersistenceHosts)
 		return
 	}
+}
+
+func TestGetAllVols(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v", hostAddr, GetALLVols)
+	process(reqUrl, t)
+}
+
+func TestGetMetaPartitions(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v?name=%v", hostAddr, ClientMetaPartitions, commonVolName)
+	process(reqUrl, t)
 }

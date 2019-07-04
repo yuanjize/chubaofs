@@ -29,7 +29,7 @@ import (
 
 const (
 	MinTaskLen         = 30
-	TaskWorkerInterval = time.Microsecond * time.Duration(200)
+	TaskWorkerInterval = time.Second * time.Duration(1)
 	ForceCloseConnect  = true
 	NoCloseConnect     = false
 )
@@ -47,8 +47,8 @@ type AdminTaskSender struct {
 	targetAddr string
 	TaskMap    map[string]*proto.AdminTask
 	sync.Mutex
-	exitCh   chan struct{}
-	connPool *pool.ConnectPool
+	exitCh     chan struct{}
+	connPool   *pool.ConnectPool
 }
 
 func NewAdminTaskSender(targetAddr, clusterID string) (sender *AdminTaskSender) {
@@ -112,7 +112,6 @@ func (sender *AdminTaskSender) getNeedDeleteTasks() (delTasks []*proto.AdminTask
 func (sender *AdminTaskSender) doSendTasks() {
 	tasks := sender.getNeedDealTask()
 	if len(tasks) == 0 {
-		time.Sleep(time.Second)
 		return
 	}
 	sender.sendTasks(tasks)

@@ -21,6 +21,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
 	"github.com/juju/errors"
+	"encoding/json"
 )
 
 type Vol struct {
@@ -37,6 +38,8 @@ type Vol struct {
 	MetaPartitions      map[uint64]*MetaPartition
 	mpsLock             sync.RWMutex
 	dataPartitions      *DataPartitionMap
+	mpsCache            []byte
+	viewCache           []byte
 	createMpLock        sync.Mutex
 	sync.RWMutex
 }
@@ -53,6 +56,7 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64) (vol
 		vol.mpReplicaNum = replicaNum
 	}
 	vol.Capacity = capacity
+	vol.viewCache = make([]byte, 0)
 	return
 }
 
@@ -115,6 +119,7 @@ func (vol *Vol) initDataPartitions(c *Cluster) {
 	}
 	return
 }
+
 func (vol *Vol) checkDataPartitionStatus(c *Cluster) (readWriteDataPartitions int) {
 	vol.dataPartitions.RLock()
 	defer vol.dataPartitions.RUnlock()
@@ -290,6 +295,65 @@ func (vol *Vol) getTotalSpace() uint64 {
 	return vol.dataPartitions.getTotalSpace()
 }
 
+func (vol *Vol) updateViewCache(c *Cluster) {
+	liveMetaNodesRate := c.getLiveMetaNodesRate()
+	liveDataNodesRate := c.getLiveDataNodesRate()
+	if liveMetaNodesRate < NodesAliveRate || liveDataNodesRate < NodesAliveRate {
+		return
+	}
+	view := NewVolView(vol.Name, vol.VolType, vol.Status)
+	mpViews := vol.getMetaPartitionsView()
+	view.MetaPartitions = mpViews
+	mpsBody, err := json.Marshal(mpViews)
+	if err != nil {
+		log.LogErrorf("action[updateViewCache] failed,vol[%v],err[%v]", vol.Name, err)
+		return
+	}
+	vol.setMpsCache(mpsBody)
+	dpResps := vol.dataPartitions.GetDataPartitionsView(0)
+	view.DataPartitions = dpResps
+	body, err := json.Marshal(view)
+	if err != nil {
+		log.LogErrorf("action[updateViewCache] failed,vol[%v],err[%v]", vol.Name, err)
+		return
+	}
+	vol.setViewCache(body)
+}
+
+func (vol *Vol) getMetaPartitionsView() (mpViews []*MetaPartitionView) {
+	vol.mpsLock.RLock()
+	defer vol.mpsLock.RUnlock()
+	mpViews = make([]*MetaPartitionView, 0)
+	for _, mp := range vol.MetaPartitions {
+		mpViews = append(mpViews, getMetaPartitionView(mp))
+	}
+	return
+}
+
+func (vol *Vol) setMpsCache(body []byte) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.mpsCache = body
+}
+
+func (vol *Vol) getMpsCache() []byte {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.mpsCache
+}
+
+func (vol *Vol) setViewCache(body []byte) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.viewCache = body
+}
+
+func (vol *Vol) getViewCache() []byte {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.viewCache
+}
+
 func (vol *Vol) checkStatus(c *Cluster) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -298,8 +362,10 @@ func (vol *Vol) checkStatus(c *Cluster) {
 				"vol checkStatus occurred panic")
 		}
 	}()
+	vol.updateViewCache(c)
 	vol.Lock()
 	defer vol.Unlock()
+
 	if vol.Status == VolMarkDelete {
 		metaTasks := vol.getDeleteMetaTasks()
 		dataTasks := vol.getDeleteDataTasks()

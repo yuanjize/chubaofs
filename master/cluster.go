@@ -166,7 +166,7 @@ func (c *Cluster) startCheckBackendLoadDataPartitions() {
 			if c.partition.IsLeader() {
 				c.backendLoadDataPartitions()
 			}
-			time.Sleep(time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 }
@@ -823,7 +823,7 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity,mpCount int) (err error) {
+func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity, mpCount int) (err error) {
 	var (
 		vol                     *Vol
 		readWriteDataPartitions int
@@ -844,6 +844,7 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		readWriteDataPartitions = len(vol.dataPartitions.dataPartitionMap)
 	}
 	vol.dataPartitions.readWriteDataPartitions = readWriteDataPartitions
+	vol.updateViewCache(c)
 	log.LogInfof("action[createVol] vol[%v],readWriteDataPartitions[%v]", name, readWriteDataPartitions)
 	return
 errDeal:

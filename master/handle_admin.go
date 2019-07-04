@@ -971,7 +971,7 @@ func parseTaskResponse(r *http.Request) (tr *proto.AdminTask, err error) {
 		return
 	}
 	tr = &proto.AdminTask{}
-	decoder := json.NewDecoder(bytes.NewBuffer([]byte(body)))
+	decoder := json.NewDecoder(bytes.NewBuffer(body))
 	decoder.UseNumber()
 	err = decoder.Decode(tr)
 	return
