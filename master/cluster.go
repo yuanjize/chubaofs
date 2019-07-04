@@ -891,66 +891,14 @@ func (c *Cluster) CreateMetaPartitionForManual(volName string, start uint64) (er
 	return vol.splitMetaPartition(c, partition, start)
 }
 
-func (c *Cluster) CreateMetaPartition(volName string, start, end uint64) (err error) {
-	var (
-		vol         *Vol
-		mp          *MetaPartition
-		hosts       []string
-		partitionID uint64
-		peers       []proto.Peer
-		wg          sync.WaitGroup
-	)
-	if vol, err = c.getVol(volName); err != nil {
-		log.LogWarnf("action[CreateMetaPartition] get vol [%v] err", volName)
-		return
-	}
-	errChannel := make(chan error, vol.mpReplicaNum)
-	if hosts, peers, err = c.ChooseTargetMetaHosts(int(vol.mpReplicaNum)); err != nil {
-		return errors.Trace(err)
-	}
-	log.LogInfof("target meta hosts:%v,peers:%v", hosts, peers)
-	if partitionID, err = c.idAlloc.allocateMetaPartitionID(); err != nil {
-		return errors.Trace(err)
-	}
-	mp = NewMetaPartition(partitionID, start, end, vol.mpReplicaNum, volName)
-	mp.setPersistenceHosts(hosts)
-	mp.setPeers(peers)
-	for _, host := range hosts {
-		wg.Add(1)
-		go func(host string) {
-			defer func() {
-				wg.Done()
-			}()
-			if err = c.syncCreateMetaPartitionToMataNode(host, mp); err != nil {
-				errChannel <- err
-				return
-			}
-			mp.Lock()
-			defer mp.Unlock()
-			if err = mp.createPartitionSuccessTriggerOperator(host, c); err != nil {
-				errChannel <- err
-			}
-		}(host)
-	}
-	wg.Wait()
-	select {
-	case err = <-errChannel:
-		return errors.Trace(err)
-	default:
-		mp.Status = proto.ReadWrite
-	}
-	if err = c.syncAddMetaPartition(volName, mp); err != nil {
-		return errors.Trace(err)
-	}
-	vol.AddMetaPartition(mp)
-	log.LogInfof("action[CreateMetaPartition] success,volName[%v],partition[%v]", volName, partitionID)
-	return
-}
-
-func (c *Cluster) syncCreateMetaPartitionToMataNode(host string, mp *MetaPartition) (err error) {
+func (c *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaPartition) (err error) {
 	hosts := make([]string, 0)
 	hosts = append(hosts, host)
 	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.volName)
+	return c.doSyncCreateMetaPartitionToMetaNode(host, tasks)
+}
+
+func (c *Cluster) doSyncCreateMetaPartitionToMetaNode(host string, tasks []*proto.AdminTask) (err error) {
 	metaNode, err := c.getMetaNode(host)
 	if err != nil {
 		return

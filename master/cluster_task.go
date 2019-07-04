@@ -199,6 +199,13 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 	}
 
 	tasks = mp.generateCreateMetaPartitionTasks(onlineAddrs, newPeers, volName)
+	if err = c.doSyncCreateMetaPartitionToMetaNode(onlineAddrs[0], tasks); err != nil {
+		goto errDeal
+	}
+	if err = mp.createPartitionSuccessTriggerOperator(onlineAddrs[0], c); err != nil {
+		goto errDeal
+	}
+	tasks = make([]*proto.AdminTask, 0)
 	if t, err = mp.generateOfflineTask(volName, removePeer, newPeers[0]); err != nil {
 		goto errDeal
 	}

@@ -428,7 +428,7 @@ func (vol *Vol) doCreateMetaPartition(c *Cluster, start, end uint64) (mp *MetaPa
 			defer func() {
 				wg.Done()
 			}()
-			if err = c.syncCreateMetaPartitionToMataNode(host, mp); err != nil {
+			if err = c.syncCreateMetaPartitionToMetaNode(host, mp); err != nil {
 				errChannel <- err
 				return
 			}
