@@ -173,6 +173,21 @@ func (t *Topology) allocRacks(replicaNum int, excludeRack []string) (racks []*Ra
 	return
 }
 
+func (t *Topology) clear() {
+	t.rackLock.RLock()
+	defer t.rackLock.RUnlock()
+	for _, rack := range t.rackMap {
+		rack.clear()
+	}
+}
+
+func (rack *Rack) clear() {
+	rack.dataNodes.Range(func(key, value interface{}) bool {
+		rack.dataNodes.Delete(key)
+		return true
+	})
+}
+
 func (rack *Rack) canWrite(replicaNum uint8) (can bool) {
 	rack.RLock()
 	defer rack.RUnlock()

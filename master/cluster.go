@@ -1079,3 +1079,23 @@ func (c *Cluster) clearVols() {
 	defer c.volsLock.Unlock()
 	c.vols = make(map[string]*Vol, 0)
 }
+
+func (c *Cluster) clearTopology() {
+	c.t.clear()
+}
+
+func (c *Cluster) clearDataNodes() {
+	c.dataNodes.Range(func(key, value interface{}) bool {
+		dataNode := value.(*DataNode)
+		dataNode.clean()
+		return true
+	})
+}
+
+func (c *Cluster) clearMetaNodes() {
+	c.metaNodes.Range(func(key, value interface{}) bool {
+		metaNode := value.(*MetaNode)
+		metaNode.clean()
+		return true
+	})
+}
