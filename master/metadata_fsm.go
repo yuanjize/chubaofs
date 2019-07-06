@@ -37,15 +37,19 @@ type RaftApplySnapshotHandler func()
 
 type MetadataFsm struct {
 	store               *raftstore.RocksDBStore
+	rs                  *raft.RaftServer
 	applied             uint64
+	retainLogs          uint64
 	leaderChangeHandler RaftLeaderChangeHandler
 	peerChangeHandler   RaftPeerChangeHandler
 	snapshotHandler     RaftApplySnapshotHandler
 }
 
-func newMetadataFsm(dir string) (fsm *MetadataFsm) {
+func newMetadataFsm(dir string, retainsLog uint64, rs *raft.RaftServer) (fsm *MetadataFsm) {
 	fsm = new(MetadataFsm)
 	fsm.store = raftstore.NewRocksDBStore(dir)
+	fsm.rs = rs
+	fsm.retainLogs = retainsLog
 	return
 }
 
@@ -120,7 +124,10 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 		}
 	}
 	mf.applied = index
-	//todo truncate raft log
+	if mf.applied > 0 && (mf.applied%mf.retainLogs) == 0 {
+		log.LogWarnf("action[Apply],truncate raft log,retainLogs[%v],index[%v]", mf.retainLogs, mf.applied)
+		mf.rs.Truncate(GroupId, mf.applied)
+	}
 	return
 }
 

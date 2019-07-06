@@ -167,7 +167,7 @@ func (m *Master) createRaftServer() (err error) {
 	if m.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
 		return errors.Annotatef(err, "NewRaftStore failed! id[%v] walPath[%v]", m.id, m.walDir)
 	}
-	fsm := newMetadataFsm(m.storeDir)
+	fsm := newMetadataFsm(m.storeDir, m.retainLogs, m.raftStore.RaftServer())
 	fsm.RegisterLeaderChangeHandler(m.handleLeaderChange)
 	fsm.RegisterPeerChangeHandler(m.handlePeerChange)
 	fsm.RegisterApplySnapshotHandler(m.handleApplySnapshot)
