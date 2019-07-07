@@ -107,7 +107,7 @@ func (m *Master) setCompactStatus(w http.ResponseWriter, r *http.Request) {
 	if status, err = parseCompactPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.syncPutCluster(); err != nil {
+	if err = m.cluster.syncCompactStatus(status); err != nil {
 		goto errDeal
 	}
 	io.WriteString(w, fmt.Sprintf("set compact status to %v success", status))

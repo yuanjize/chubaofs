@@ -107,11 +107,11 @@ func createMasterServer() *Master {
 	time.Sleep(5 * time.Second)
 	fmt.Println(server.config.peerAddrs, server.leaderInfo.addr)
 	//add data node
-	addDataServer(mds1Addr)
-	addDataServer(mds2Addr)
-	addDataServer(mds3Addr)
-	addDataServer(mds4Addr)
-	addDataServer(mds5Addr)
+	addDataServer(mds1Addr, "rack1")
+	addDataServer(mds2Addr, "rack1")
+	addDataServer(mds3Addr, "rack2")
+	addDataServer(mds4Addr, "rack2")
+	addDataServer(mds5Addr, "rack2")
 	// add meta node
 	addMetaServer(mms1Addr)
 	addMetaServer(mms2Addr)
@@ -133,8 +133,8 @@ func createMasterServer() *Master {
 	return server
 }
 
-func addDataServer(addr string) {
-	mds := mocktest.NewMockDataServer(addr)
+func addDataServer(addr, rackName string) {
+	mds := mocktest.NewMockDataServer(addr, rackName)
 	mds.Start()
 }
 
@@ -194,85 +194,6 @@ func TestGetIpAndClusterName(t *testing.T) {
 	process(reqUrl, t)
 }
 
-func TestDataNode(t *testing.T) {
-	// /dataNode/add and /dataNode/response processed by mock data server
-	addr := "127.0.0.1:9096"
-	addDataServer(addr)
-	server.cluster.checkDataNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	getDataNodeInfo(addr, t)
-	offlineDataNode(addr, t)
-	_, err := server.cluster.getDataNode(addr)
-	if err == nil {
-		t.Errorf("offline datanode [%v] failed", addr)
-	}
-	server.cluster.dataNodes.Delete(addr)
-}
-
-func getDataNodeInfo(addr string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?addr=%v", hostAddr, GetDataNode, addr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func offlineDataNode(addr string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?addr=%v", hostAddr, DataNodeOffline, addr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func TestMetaNode(t *testing.T) {
-	// /metaNode/add and /metaNode/response processed by mock meta server
-	addr := mms6Addr
-	addMetaServer(addr)
-	server.cluster.checkMetaNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	getMetaNodeInfo(addr, t)
-	offlineMetaNode(addr, t)
-}
-
-func getMetaNodeInfo(addr string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?addr=%v", hostAddr, GetMetaNode, addr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func offlineMetaNode(addr string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?addr=%v", hostAddr, MetaNodeOffline, addr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func TestVol(t *testing.T) {
-	cap := 200
-	name := "test1"
-	createVol(name, t)
-	//report mp/dp info to master
-	server.cluster.checkDataNodeHeartbeat()
-	server.cluster.checkDataNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	//check status
-	server.cluster.checkMetaPartitions()
-	server.cluster.checkDataPartitions()
-	vol, err := server.cluster.getVol(name)
-	if err != nil {
-		t.Errorf("err is %v", err)
-		return
-	}
-	vol.checkStatus(server.cluster)
-	getVol(name, t)
-	updateVol(name, cap, t)
-	statVol(name, t)
-	markDeleteVol(name, t)
-	getSimpleVol(name, t)
-}
-
-func createVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&replicas=3&type=extent&capacity=100&owner=cfs&mpCount=2", hostAddr, AdminCreateVol, name)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
 func process(reqUrl string, t *testing.T) {
 	resp, err := http.Get(reqUrl)
 	if err != nil {
@@ -292,204 +213,6 @@ func process(reqUrl string, t *testing.T) {
 		return
 	}
 	return
-}
-
-func getVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v", hostAddr, ClientVol, name)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func getSimpleVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v", hostAddr, AdminGetVol, name)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func updateVol(name string, capacity int, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&capacity=%v&authKey=%v",
-		hostAddr, AdminUpdateVol, name, capacity, buildAuthKey())
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	vol, err := server.cluster.getVol(name)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if vol.Capacity != uint64(capacity) {
-		t.Errorf("update vol failed,expect[%v],real[%v]", capacity, vol.Capacity)
-		return
-	}
-}
-
-func statVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v",
-		hostAddr, ClientVolStat, name)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func markDeleteVol(name string, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&authKey=%v",
-		hostAddr, AdminDeleteVol, name, buildAuthKey())
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	vol, err := server.cluster.getVol(name)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if vol.Status != VolMarkDelete {
-		t.Errorf("markDeleteVol failed,expect[%v],real[%v]", VolMarkDelete, vol.Status)
-		return
-	}
-}
-
-func TestMetaPartition(t *testing.T) {
-	server.cluster.checkDataNodeHeartbeat()
-	server.cluster.checkMetaNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	server.cluster.checkMetaPartitions()
-	createMetaPartition(commonVol, 10000, t)
-	maxPartitionID := commonVol.getMaxPartitionID()
-	getMetaPartition(commonVol.Name, maxPartitionID, t)
-	isManual := false
-	updateMetaPartition(commonVol, maxPartitionID, isManual, t)
-	server.cluster.checkMetaNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	offlineMetaPartition(commonVol, maxPartitionID, t)
-}
-
-func offlineMetaPartition(vol *Vol, id uint64, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v", hostAddr, AdminGetCluster)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	mp, err := vol.getMetaPartition(id)
-	if err != nil {
-		t.Errorf("offlineMetaPartition,err [%v]", err)
-		return
-	}
-	offlineAddr := mp.PersistenceHosts[0]
-	reqUrl = fmt.Sprintf("%v%v?name=%v&id=%v&addr=%v",
-		hostAddr, AdminMetaPartitionOffline, vol.Name, id, offlineAddr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	if contains(mp.PersistenceHosts, offlineAddr) {
-		t.Errorf("offlineMetaPartition failed,offlineAddr[%v],hosts[%v]", offlineAddr, mp.PersistenceHosts)
-		return
-	}
-}
-
-func updateMetaPartition(vol *Vol, id uint64, isManual bool, t *testing.T) {
-
-	reqUrl := fmt.Sprintf("%v%v?id=%v&isManual=%v",
-		hostAddr, AdminMetaPartitionUpdate, id, isManual)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	mp, err := vol.getMetaPartition(id)
-	if err != nil {
-		t.Errorf("updateMetaPartition,err [%v]", err)
-		return
-	}
-	if mp.IsManual != isManual {
-		t.Errorf("expect isManual[%v],mp.IsManual[%v],not equal", isManual, mp.IsManual)
-		return
-	}
-}
-
-func getMetaPartition(volName string, id uint64, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&id=%v",
-		hostAddr, ClientMetaPartition, volName, id)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func createMetaPartition(vol *Vol, start int, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&start=%v",
-		hostAddr, AdminCreateMP, vol.Name, start)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	maxPartitionID := vol.getMaxPartitionID()
-	mp, err := vol.getMetaPartition(maxPartitionID)
-	if err != nil {
-		t.Errorf("createMetaPartition,err [%v]", err)
-		return
-	}
-	start = start + 1
-	if mp.Start != uint64(start) {
-		t.Errorf("expect start[%v],mp.start[%v],not equal", start, mp.Start)
-		return
-	}
-
-}
-
-func TestDataPartition(t *testing.T) {
-	server.cluster.checkDataNodeHeartbeat()
-	server.cluster.checkMetaNodeHeartbeat()
-	time.Sleep(5 * time.Second)
-	server.cluster.checkDataPartitions()
-	count := 20
-	createDataPartition(commonVol, count, t)
-	if len(commonVol.dataPartitions.dataPartitions) <= 0 {
-		t.Errorf("getDataPartition no dp")
-		return
-	}
-	partition := commonVol.dataPartitions.dataPartitions[0]
-	getDataPartition(partition.PartitionID, t)
-	isManual := false
-	updateDataPartition(commonVol, partition.PartitionID, isManual, t)
-	offlineDataPartition(partition, t)
-}
-
-func offlineDataPartition(p *DataPartition, t *testing.T) {
-	offlineAddr := p.PersistenceHosts[0]
-	reqUrl := fmt.Sprintf("%v%v?name=%v&id=%v&addr=%v",
-		hostAddr, AdminDataPartitionOffline, p.VolName, p.PartitionID, offlineAddr)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	if contains(p.PersistenceHosts, offlineAddr) {
-		t.Errorf("offlineDataPartition failed,offlineAddr[%v],hosts[%v]", offlineAddr, p.PersistenceHosts)
-		return
-	}
-}
-
-func updateDataPartition(vol *Vol, id uint64, isManual bool, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?id=%v&isManual=%v",
-		hostAddr, AdminDataPartitionUpdate, id, isManual)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	dp, err := vol.getDataPartitionByID(id)
-	if err != nil {
-		t.Errorf("updateDataPartition,err [%v]", err)
-		return
-	}
-	if dp.IsManual != isManual {
-		t.Errorf("expect isManual[%v],dp.IsManual[%v],not equal", isManual, dp.IsManual)
-		return
-	}
-}
-
-func getDataPartition(id uint64, t *testing.T) {
-
-	reqUrl := fmt.Sprintf("%v%v?id=%v",
-		hostAddr, AdminGetDataPartition, id)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-}
-
-func createDataPartition(vol *Vol, count int, t *testing.T) {
-	oldCount := len(vol.dataPartitions.dataPartitions)
-	reqUrl := fmt.Sprintf("%v%v?count=%v&name=%v&type=extent",
-		hostAddr, AdminCreateDataPartition, count, vol.Name)
-	fmt.Println(reqUrl)
-	process(reqUrl, t)
-	newCount := len(vol.dataPartitions.dataPartitions)
-	total := oldCount + count
-	if newCount != total {
-		t.Errorf("createDataPartition failed,newCount[%v],total=%v,count[%v],oldCount[%v]",
-			newCount, total, count, oldCount)
-		return
-	}
 }
 
 func TestDisk(t *testing.T) {
@@ -542,7 +265,7 @@ func TestCreateMetaPartition(t *testing.T) {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	commonVol.checkMetaPartitions(server.cluster)
-	createMetaPartition(commonVol, 10000, t)
+	createMetaPartition(commonVol, t)
 }
 
 func TestUpdateMetaPartition(t *testing.T) {
@@ -610,14 +333,4 @@ func TestDataPartitionOffline(t *testing.T) {
 		t.Errorf("offlineAddr[%v],hosts[%v]", offlineAddr, partition.PersistenceHosts)
 		return
 	}
-}
-
-func TestGetAllVols(t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v", hostAddr, GetALLVols)
-	process(reqUrl, t)
-}
-
-func TestGetMetaPartitions(t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v", hostAddr, ClientMetaPartitions, commonVolName)
-	process(reqUrl, t)
 }

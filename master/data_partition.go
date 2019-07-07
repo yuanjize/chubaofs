@@ -73,14 +73,6 @@ func (partition *DataPartition) AddMember(replica *DataReplica) {
 	partition.Replicas = append(partition.Replicas, replica)
 }
 
-func (partition *DataPartition) GenerateCreateTasks() (tasks []*proto.AdminTask) {
-	tasks = make([]*proto.AdminTask, 0)
-	for _, addr := range partition.PersistenceHosts {
-		tasks = append(tasks, partition.generateCreateTask(addr))
-	}
-	return
-}
-
 func (partition *DataPartition) generateCreateTask(addr string) (task *proto.AdminTask) {
 	task = proto.NewAdminTask(proto.OpCreateDataPartition, addr, newCreateDataPartitionRequest(partition.PartitionType, partition.VolName, partition.PartitionID))
 	partition.resetTaskID(task)
@@ -266,38 +258,6 @@ func (partition *DataPartition) checkLoadResponse(timeOutSec int64) (isResponse 
 
 func (partition *DataPartition) getReplicaByIndex(index uint8) (replica *DataReplica) {
 	return partition.Replicas[int(index)]
-}
-
-func (partition *DataPartition) getFileCount() {
-	var msg string
-	needDelFiles := make([]string, 0)
-	partition.Lock()
-	defer partition.Unlock()
-	for _, replica := range partition.Replicas {
-		replica.FileCount = 0
-	}
-	for _, fc := range partition.FileInCoreMap {
-		if len(fc.Metas) == 0 {
-			needDelFiles = append(needDelFiles, fc.Name)
-		}
-		for _, vfNode := range fc.Metas {
-			replica := partition.getReplicaByIndex(vfNode.locIndex)
-			replica.FileCount++
-		}
-
-	}
-
-	for _, vfName := range needDelFiles {
-		delete(partition.FileInCoreMap, vfName)
-	}
-
-	for _, replica := range partition.Replicas {
-		msg = fmt.Sprintf(GetDataReplicaFileCountInfo + "partitionID:%v  replicaAddr:%v  FileCount:%v  "+
-			"NodeIsActive:%v  replicaIsActive:%v  .replicaStatusOnNode:%v ", partition.PartitionID, replica.Addr, replica.FileCount,
-			replica.GetReplicaNode().isActive, replica.IsActive(DefaultDataPartitionTimeOutSec), replica.Status)
-		log.LogInfo(msg)
-	}
-
 }
 
 func (partition *DataPartition) ReleaseDataPartition() {

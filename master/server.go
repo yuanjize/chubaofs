@@ -24,6 +24,7 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"sync"
+	"regexp"
 )
 
 //config keys
@@ -40,6 +41,8 @@ const (
 	CfgRetainLogs     = "retainLogs"
 	DefaultRetainLogs = 20000
 )
+
+var volNameRegexp *regexp.Regexp
 
 type Master struct {
 	id           uint64
@@ -70,6 +73,12 @@ func (m *Master) Start(cfg *config.Config) (err error) {
 	m.reverseProxy = m.newReverseProxy()
 	if err = m.checkConfig(cfg); err != nil {
 		log.LogError(errors.ErrorStack(err))
+		return
+	}
+	pattern := "^[a-zA-Z0-9_-]{3,256}$"
+	volNameRegexp, err = regexp.Compile(pattern)
+	if err != nil {
+		log.LogError(err)
 		return
 	}
 	ump.InitUmp(fmt.Sprintf("%v_%v", m.clusterName, UmpModuleName))

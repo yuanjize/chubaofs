@@ -548,14 +548,6 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.setLastReportTime()
 }
 
-func (mp *MetaPartition) updateMetricByRaft(mpv *MetaPartitionValue) {
-	mp.Start = mpv.Start
-	mp.End = mpv.End
-	mp.Peers = mpv.Peers
-	mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
-	mp.IsManual = mpv.IsManual
-}
-
 // the caller must add lock
 func (mp *MetaPartition) createPartitionSuccessTriggerOperator(nodeAddr string, c *Cluster) (err error) {
 	metaNode, err := c.getMetaNode(nodeAddr)

@@ -86,6 +86,7 @@ func TestPanicCheckAvailSpace(t *testing.T) {
 
 func TestCheckCreateDataPartitions(t *testing.T) {
 	server.cluster.checkCreateDataPartitions()
+	//time.Sleep(150 * time.Second)
 }
 
 func TestPanicCheckCreateDataPartitions(t *testing.T) {

@@ -128,6 +128,7 @@ type MetaPartitionReport struct {
 	Status      int
 	MaxInodeID  uint64
 	IsLeader    bool
+	VolName     string
 }
 
 type MetaNodeHeartbeatResponse struct {

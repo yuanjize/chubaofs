@@ -41,6 +41,7 @@ type Vol struct {
 	mpsCache            []byte
 	viewCache           []byte
 	createMpLock        sync.Mutex
+	createDpLock        sync.Mutex
 	sync.RWMutex
 }
 
@@ -73,18 +74,12 @@ func (vol *Vol) AddMetaPartition(mp *MetaPartition) {
 	}
 }
 
-func (vol *Vol) AddMetaPartitionByRaft(mp *MetaPartition) {
-	vol.mpsLock.Lock()
-	defer vol.mpsLock.Unlock()
-	vol.MetaPartitions[mp.PartitionID] = mp
-}
-
 func (vol *Vol) getMetaPartition(partitionID uint64) (mp *MetaPartition, err error) {
 	vol.mpsLock.RLock()
 	defer vol.mpsLock.RUnlock()
 	mp, ok := vol.MetaPartitions[partitionID]
 	if !ok {
-		err = metaPartitionNotFound(partitionID)
+		err = MetaPartitionNotFound
 	}
 	return
 }
@@ -116,18 +111,6 @@ func (vol *Vol) initDataPartitions(c *Cluster) {
 	//init ten data partitions
 	for i := 0; i < DefaultInitDataPartitions; i++ {
 		c.createDataPartition(vol.Name, vol.VolType)
-	}
-	return
-}
-
-func (vol *Vol) checkDataPartitionStatus(c *Cluster) (readWriteDataPartitions int) {
-	vol.dataPartitions.RLock()
-	defer vol.dataPartitions.RUnlock()
-	for _, dp := range vol.dataPartitions.dataPartitionMap {
-		dp.checkStatus(c.Name, true, c.cfg.DataPartitionTimeOutSec)
-		if dp.Status == proto.ReadWrite {
-			readWriteDataPartitions++
-		}
 	}
 	return
 }
@@ -296,6 +279,9 @@ func (vol *Vol) getTotalSpace() uint64 {
 }
 
 func (vol *Vol) updateViewCache(c *Cluster) {
+	if vol.Status == VolMarkDelete {
+		return
+	}
 	liveMetaNodesRate := c.getLiveMetaNodesRate()
 	liveDataNodesRate := c.getLiveDataNodesRate()
 	if liveMetaNodesRate < NodesAliveRate || liveDataNodesRate < NodesAliveRate {
@@ -442,11 +428,16 @@ func (vol *Vol) getDeleteDataTasks() (tasks []*proto.AdminTask) {
 func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (err error) {
 	vol.createMpLock.Lock()
 	defer vol.createMpLock.Unlock()
+	if end < mp.Start {
+		err = fmt.Errorf("end[%v] less than mp.start[%v]", end, mp.Start)
+		return
+	}
 	maxPartitionID := vol.getMaxPartitionID()
 	if maxPartitionID != mp.PartitionID {
 		err = fmt.Errorf("mp[%v] is not the last meta partition[%v]", mp.PartitionID, maxPartitionID)
 		return
 	}
+	log.LogWarnf("action[splitMetaPartition],partition[%v],start[%v],end[%v]", mp.PartitionID, mp.Start, mp.End)
 	if err = mp.updateEnd(c, end); err != nil {
 		return
 	}
@@ -458,6 +449,7 @@ func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (e
 		return
 	}
 	vol.AddMetaPartition(nextMp)
+	log.LogWarnf("action[splitMetaPartition],next partition[%v],start[%v],end[%v]", nextMp.PartitionID, nextMp.Start, nextMp.End)
 	return
 }
 

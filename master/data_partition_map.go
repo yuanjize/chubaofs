@@ -52,7 +52,7 @@ func (dpMap *DataPartitionMap) getDataPartition(ID uint64) (*DataPartition, erro
 	if v, ok := dpMap.dataPartitionMap[ID]; ok {
 		return v, nil
 	}
-	return nil, errors.Annotatef(DataPartitionNotFound, "[%v] not found in [%v]", ID, dpMap.volName)
+	return nil, DataPartitionNotFound
 }
 
 func (dpMap *DataPartitionMap) putDataPartition(dp *DataPartition) {

@@ -19,7 +19,6 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
-	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
 	"time"
@@ -482,11 +481,11 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 		targetHosts []string
 		wg          sync.WaitGroup
 	)
-	c.createDpLock.Lock()
-	defer c.createDpLock.Unlock()
 	if vol, err = c.getVol(volName); err != nil {
 		return
 	}
+	vol.createDpLock.Lock()
+	defer vol.createDpLock.Unlock()
 	errChannel := make(chan error, vol.dpReplicaNum)
 	if targetHosts, err = c.ChooseTargetDataHosts(int(vol.dpReplicaNum)); err != nil {
 		goto errDeal
@@ -539,15 +538,7 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartiti
 	if err != nil {
 		return
 	}
-	conn, err := dataNode.Sender.connPool.Get(dataNode.Addr)
-	if err != nil {
-		return
-	}
-	if err = dataNode.Sender.syncCreatePartition(task, conn); err != nil {
-		return
-	}
-	dataNode.Sender.connPool.Put(conn, false)
-	return
+	return dataNode.Sender.syncCreatePartition(task)
 }
 
 func (c *Cluster) ChooseTargetDataHosts(replicaNum int) (hosts []string, err error) {
@@ -828,14 +819,14 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		vol                     *Vol
 		readWriteDataPartitions int
 	)
+	if volType == proto.TinyPartition {
+		err = fmt.Errorf("vol type must be extent")
+		goto errDeal
+	}
 	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity); err != nil {
 		goto errDeal
 	}
-
-	if vol.VolType == proto.TinyPartition {
-		return
-	}
-	if err = vol.createMetaPartition(c, 0, defaultMaxMetaPartitionInodeID); err != nil {
+	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
 		c.deleteVol(name)
 		goto errDeal
 	}
@@ -904,15 +895,7 @@ func (c *Cluster) doSyncCreateMetaPartitionToMetaNode(host string, tasks []*prot
 	if err != nil {
 		return
 	}
-	conn, err := metaNode.Sender.connPool.Get(metaNode.Addr)
-	if err != nil {
-		return
-	}
-	if err = metaNode.Sender.syncCreatePartition(tasks[0], conn); err != nil {
-		return
-	}
-	metaNode.Sender.connPool.Put(conn, false)
-	return
+	return metaNode.Sender.syncCreatePartition(tasks[0])
 }
 
 func (c *Cluster) ChooseTargetMetaHosts(replicaNum int) (hosts []string, peers []proto.Peer, err error) {
@@ -940,15 +923,6 @@ func (c *Cluster) ChooseTargetMetaHosts(replicaNum int) (hosts []string, peers [
 	if len(hosts) != replicaNum {
 		return nil, nil, NoAnyMetaNodeForCreateMetaPartition
 	}
-	return
-}
-
-func (c *Cluster) DataNodeCount() (len int) {
-
-	c.dataNodes.Range(func(key, value interface{}) bool {
-		len++
-		return true
-	})
 	return
 }
 
@@ -1040,17 +1014,6 @@ func (c *Cluster) getAllNormalVols() (vols map[string]*Vol) {
 			vols[name] = vol
 		}
 	}
-	return
-}
-
-func (c *Cluster) getDataPartitionCapacity(vol *Vol) (count int) {
-	var totalCount uint64
-	c.dataNodes.Range(func(addr, value interface{}) bool {
-		dataNode := value.(*DataNode)
-		totalCount = totalCount + dataNode.Total/util.DefaultDataPartitionSize
-		return true
-	})
-	count = int(totalCount / uint64(vol.dpReplicaNum))
 	return
 }
 

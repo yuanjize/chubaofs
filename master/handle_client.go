@@ -16,12 +16,10 @@ package master
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"net/http"
-	"regexp"
 	"strconv"
 	"io"
 )
@@ -87,7 +85,7 @@ func NewMetaPartitionView(partitionID, start, end uint64, status int8) (mpView *
 	return
 }
 
-func (m *Master) getAllVols(w http.ResponseWriter,r *http.Request) {
+func (m *Master) getAllVols(w http.ResponseWriter, r *http.Request) {
 	var (
 		body []byte
 		err  error
@@ -128,8 +126,6 @@ errDeal:
 	HandleError(logMsg, err, code, w)
 	return
 }
-
-
 
 func (m *Master) getDataPartitions(w http.ResponseWriter, r *http.Request) {
 	var (
@@ -173,10 +169,6 @@ func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
-		goto errDeal
-	}
-	if vol.dataPartitions.readWriteDataPartitions == 0 {
-		err = fmt.Errorf("action[getVol],vol[%v] no writeable data partitions", vol.Name)
 		goto errDeal
 	}
 	w.Write(vol.getViewCache())
@@ -313,14 +305,7 @@ func checkVolPara(r *http.Request) (name string, err error) {
 		err = paraNotFound(ParaName)
 		return
 	}
-
-	pattern := "^[a-zA-Z0-9_-]{3,256}$"
-	reg, err := regexp.Compile(pattern)
-	if err != nil {
-		return "", err
-	}
-
-	if !reg.MatchString(name) {
+	if !volNameRegexp.MatchString(name) {
 		return "", errors.New("name can only be number and letters")
 	}
 

@@ -11,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"bytes"
+	"sync"
 )
 
 type MockMetaServer struct {
 	NodeID     uint64
 	TcpAddr    string
 	partitions map[uint64]*MockMetaPartition // Key: metaRangeId, Val: metaPartition
+	sync.RWMutex
 }
 
 func NewMockMetaServer(addr string) *MockMetaServer {
@@ -53,21 +55,21 @@ func (mms *MockMetaServer) register() {
 
 func (mms *MockMetaServer) start() {
 	s := strings.Split(mms.TcpAddr, ColonSeparator)
-	listener, err := net.Listen("tcp", ":" +s[1])
+	listener, err := net.Listen("tcp", ":"+s[1])
 	if err != nil {
 		panic(err)
 	}
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("accept conn occurred error,err is [%v]",err)
+			fmt.Printf("accept conn occurred error,err is [%v]", err)
 		}
 		go mms.serveConn(conn)
 	}
 }
 
 func (mms *MockMetaServer) serveConn(rc net.Conn) {
-	fmt.Printf("remote[%v],local[%v]\n",rc.RemoteAddr(),rc.LocalAddr())
+	fmt.Printf("remote[%v],local[%v]\n", rc.RemoteAddr(), rc.LocalAddr())
 	conn, ok := rc.(*net.TCPConn)
 	if !ok {
 		rc.Close()
@@ -76,12 +78,12 @@ func (mms *MockMetaServer) serveConn(rc net.Conn) {
 	conn.SetKeepAlive(true)
 	conn.SetNoDelay(true)
 	req := proto.NewPacket()
-	err := req.ReadFromConn(conn, proto.ReadDeadlineTime)
+	err := req.ReadFromConn(conn, proto.NoReadDeadlineTime)
 	if err != nil {
-		fmt.Printf("remote [%v] err is [%v]\n",conn.RemoteAddr(),err)
+		fmt.Printf("remote [%v] err is [%v]\n", conn.RemoteAddr(), err)
 		return
 	}
-	fmt.Printf("remote [%v] req [%v]\n",conn.RemoteAddr(),req.GetOpMsg())
+	fmt.Printf("remote [%v] req [%v]\n", conn.RemoteAddr(), req.GetOpMsg())
 	adminTask := &proto.AdminTask{}
 	decode := json.NewDecoder(bytes.NewBuffer(req.Data))
 	decode.UseNumber()
@@ -109,7 +111,7 @@ func (mms *MockMetaServer) serveConn(rc net.Conn) {
 		err = mms.handleOfflineMetaPartition(conn, req, adminTask)
 		fmt.Printf("meta node [%v] offline meta partition,err:%v\n", mms.TcpAddr, err)
 	default:
-		fmt.Printf("unknown code [%v]\n",req.Opcode)
+		fmt.Printf("unknown code [%v]\n", req.Opcode)
 	}
 }
 
@@ -140,7 +142,9 @@ func (mms *MockMetaServer) handleCreateMetaPartition(conn net.Conn, p *proto.Pac
 		Cursor:      req.Start,
 		Members:     req.Members,
 	}
+	mms.Lock()
 	mms.partitions[req.PartitionID] = partition
+	mms.Unlock()
 	return
 }
 
@@ -167,6 +171,7 @@ func (mms *MockMetaServer) handleHeartbeats(conn net.Conn, p *proto.Packet, admi
 	resp.Total = 10 * util.GB
 	resp.Used = 1 * util.GB
 	// every partition used
+	mms.RLock()
 	for id, partition := range mms.partitions {
 		mpr := &proto.MetaPartitionReport{
 			PartitionID: id,
@@ -179,8 +184,13 @@ func (mms *MockMetaServer) handleHeartbeats(conn net.Conn, p *proto.Packet, admi
 		mpr.IsLeader = true
 		resp.MetaPartitionInfo = append(resp.MetaPartitionInfo, mpr)
 	}
+	mms.RUnlock()
 	resp.Status = proto.TaskSuccess
 end:
+	return mms.postResponseToMaster(adminTask, resp)
+}
+
+func (mms *MockMetaServer) postResponseToMaster(adminTask *proto.AdminTask, resp interface{}) (err error) {
 	adminTask.Request = nil
 	adminTask.Response = resp
 	data, err := json.Marshal(adminTask)
@@ -195,17 +205,86 @@ end:
 }
 
 func (mms *MockMetaServer) handleDeleteMetaPartition(conn net.Conn, p *proto.Packet, adminTask *proto.AdminTask) (err error) {
-	return
+	responseAckOKToMaster(conn, p)
+	req := &proto.DeleteMetaPartitionRequest{}
+	reqData, err := json.Marshal(adminTask.Request)
+	if err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	if err = json.Unmarshal(reqData, req); err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	resp := &proto.DeleteMetaPartitionResponse{
+		PartitionID: req.PartitionID,
+		Status:      proto.TaskSuccess,
+	}
+	return mms.postResponseToMaster(adminTask, resp)
 }
 
 func (mms *MockMetaServer) handleUpdateMetaPartition(conn net.Conn, p *proto.Packet, adminTask *proto.AdminTask) (err error) {
-	return
+	responseAckOKToMaster(conn, p)
+	req := &proto.UpdateMetaPartitionRequest{}
+	reqData, err := json.Marshal(adminTask.Request)
+	if err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	if err = json.Unmarshal(reqData, req); err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	resp := &proto.UpdateMetaPartitionResponse{
+		VolName:     req.VolName,
+		PartitionID: req.PartitionID,
+		End:         req.End,
+	}
+	mms.Lock()
+	partition := mms.partitions[req.PartitionID]
+	partition.End = req.End
+	mms.Unlock()
+	return mms.postResponseToMaster(adminTask, resp)
 }
 
 func (mms *MockMetaServer) handleLoadMetaPartition(conn net.Conn, p *proto.Packet, adminTask *proto.AdminTask) (err error) {
-	return
+	responseAckOKToMaster(conn, p)
+	req := &proto.LoadMetaPartitionMetricRequest{}
+	reqData, err := json.Marshal(adminTask.Request)
+	if err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	if err = json.Unmarshal(reqData, req); err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	resp := &proto.LoadMetaPartitionMetricResponse{
+	}
+	return mms.postResponseToMaster(adminTask, resp)
 }
 
 func (mms *MockMetaServer) handleOfflineMetaPartition(conn net.Conn, p *proto.Packet, adminTask *proto.AdminTask) (err error) {
-	return
+	responseAckOKToMaster(conn, p)
+	req := &proto.MetaPartitionOfflineRequest{}
+	reqData, err := json.Marshal(adminTask.Request)
+	if err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	if err = json.Unmarshal(reqData, req); err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		responseAckErrToMaster(conn, p, err)
+		return
+	}
+	resp := &proto.MetaPartitionOfflineResponse{
+	}
+	return mms.postResponseToMaster(adminTask, resp)
 }

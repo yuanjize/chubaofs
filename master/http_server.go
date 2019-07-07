@@ -101,7 +101,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(MetaNodeOffline, m.handlerWithInterceptor())
 	http.Handle(GetDataNode, m.handlerWithInterceptor())
 	http.Handle(GetMetaNode, m.handlerWithInterceptor())
-	//http.Handle(AdminLoadMetaPartition, m.handlerWithInterceptor())
+	http.Handle(AdminLoadMetaPartition, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionUpdate, m.handlerWithInterceptor())
 	http.Handle(ClientDataPartitions, m.handlerWithInterceptor())
