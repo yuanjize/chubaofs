@@ -95,6 +95,7 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	newRaftLogger(cfg.WalPath)
 
 	rc := raft.DefaultConfig()
+	rc.ClusterID = cfg.ClusterID
 	rc.NodeID = cfg.NodeID
 	rc.LeaseCheck = true
 	if cfg.HeartbeatPort <= 0 {
