@@ -175,12 +175,20 @@ func (mp *metaPartition) appendExtents(ino *Inode) (status uint8) {
 		status = proto.OpNotExistErr
 		return
 	}
+
+	/*
+	 * Record mtime since ino will be changed.
+	 */
+	modifyTime := ino.ModifyTime
+
+	/*
+	 * Note that ino is changed.
+	 */
 	ino = item.(*Inode)
 	if ino.MarkDelete == 1 {
 		status = proto.OpNotExistErr
 		return
 	}
-	modifyTime := ino.ModifyTime
 	exts.Range(func(i int, ext proto.ExtentKey) bool {
 		ino.AppendExtents(ext)
 		return true
