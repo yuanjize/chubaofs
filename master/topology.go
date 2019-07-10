@@ -95,13 +95,20 @@ func (t *Topology) removeRack(name string) {
 }
 
 func (t *Topology) putDataNode(dataNode *DataNode) {
-	dataNode.RackName = DefaultRackName
 	rack, err := t.getRack(dataNode.RackName)
 	if err != nil {
 		rack = NewRack(dataNode.RackName)
 		rack = t.putRack(rack)
 	}
 	rack.PutDataNode(dataNode)
+}
+
+func (t *Topology) removeDataNode(dataNode *DataNode) {
+	rack, err := t.getRack(dataNode.RackName)
+	if err != nil {
+		return
+	}
+	rack.RemoveDataNode(dataNode.Addr)
 }
 
 func (t *Topology) getAllRacks() (racks []*Rack) {
@@ -130,7 +137,7 @@ func (t *Topology) allocRacks(replicaNum int, excludeRack []string) (racks []*Ra
 	if t.isSingleRack() {
 		return racks, nil
 	}
-
+	chosenRacks := make([]*Rack, 0)
 	for i := 0; i < len(racks); i++ {
 		if t.rackIndex >= len(racks) {
 			t.rackIndex = 0
@@ -147,22 +154,38 @@ func (t *Topology) allocRacks(replicaNum int, excludeRack []string) (racks []*Ra
 			continue
 		}
 		t.rackIndex++
-		if rack.canWrite(1) {
-			racks = append(racks, rack)
+		if rack.canWrite(uint8(replicaNum)) {
+			chosenRacks = append(chosenRacks, rack)
 		}
-		if len(racks) >= int(replicaNum) {
+		if len(chosenRacks) >= int(replicaNum) {
 			break
 		}
 	}
-	if len(racks) == 0 {
+	if len(chosenRacks) == 0 {
 		log.LogError(fmt.Sprintf("action[allocRacks],err:%v", NoRackForCreateDataPartition))
 		return nil, NoRackForCreateDataPartition
 	}
-	if len(racks) > int(replicaNum) {
-		racks = racks[:int(replicaNum)]
+	if len(chosenRacks) > int(replicaNum) {
+		chosenRacks = chosenRacks[:int(replicaNum)]
 	}
+	racks = chosenRacks
 	err = nil
 	return
+}
+
+func (t *Topology) clear() {
+	t.rackLock.RLock()
+	defer t.rackLock.RUnlock()
+	for _, rack := range t.rackMap {
+		rack.clear()
+	}
+}
+
+func (rack *Rack) clear() {
+	rack.dataNodes.Range(func(key, value interface{}) bool {
+		rack.dataNodes.Delete(key)
+		return true
+	})
 }
 
 func (rack *Rack) canWrite(replicaNum uint8) (can bool) {
@@ -185,15 +208,6 @@ func (rack *Rack) canWrite(replicaNum uint8) (can bool) {
 
 func (rack *Rack) PutDataNode(dataNode *DataNode) {
 	rack.dataNodes.Store(dataNode.Addr, dataNode)
-}
-
-func (rack *Rack) GetDataNode(addr string) (dataNode *DataNode, err error) {
-	value, ok := rack.dataNodes.Load(addr)
-	if !ok {
-		return nil, errors.Annotatef(DataNodeNotFound, "%v not found", addr)
-	}
-	dataNode = value.(*DataNode)
-	return
 }
 
 func (rack *Rack) RemoveDataNode(addr string) {

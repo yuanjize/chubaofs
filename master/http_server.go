@@ -48,6 +48,8 @@ const (
 	ClientVol            = "/client/vol"
 	ClientMetaPartition  = "/client/metaPartition"
 	ClientVolStat        = "/client/volStat"
+	ClientMetaPartitions = "/client/metaPartitions"
+	GetALLVols           = "/admin/listVols"
 
 	//raft node APIs
 	RaftNodeAdd    = "/raftNode/add"
@@ -99,11 +101,13 @@ func (m *Master) handleFunctions() {
 	http.Handle(MetaNodeOffline, m.handlerWithInterceptor())
 	http.Handle(GetDataNode, m.handlerWithInterceptor())
 	http.Handle(GetMetaNode, m.handlerWithInterceptor())
-	//http.Handle(AdminLoadMetaPartition, m.handlerWithInterceptor())
+	http.Handle(AdminLoadMetaPartition, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionUpdate, m.handlerWithInterceptor())
 	http.Handle(ClientDataPartitions, m.handlerWithInterceptor())
 	http.Handle(ClientVol, m.handlerWithInterceptor())
+	http.Handle(GetALLVols, m.handlerWithInterceptor())
+	http.Handle(ClientMetaPartitions, m.handlerWithInterceptor())
 	http.Handle(ClientMetaPartition, m.handlerWithInterceptor())
 	http.Handle(DataNodeResponse, m.handlerWithInterceptor())
 	http.Handle(MetaNodeResponse, m.handlerWithInterceptor())
@@ -202,6 +206,10 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.getDataPartitions(w, r)
 	case ClientVol:
 		m.getVol(w, r)
+	case ClientMetaPartitions:
+		m.getMetaPartitions(w, r)
+	case GetALLVols:
+		m.getAllVols(w, r)
 	case ClientMetaPartition:
 		m.getMetaPartition(w, r)
 	case ClientVolStat:

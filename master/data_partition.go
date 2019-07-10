@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"math"
 )
 
 type DataPartition struct {
@@ -36,14 +37,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total           uint64
-	used            uint64
-	VolName         string
-	modifyTime      int64
-	createTime      int64
-	FileInCoreMap   map[string]*FileInCore
-	MissNodes       map[string]int64
-	FileMissReplica map[string]int64
+	total            uint64
+	used             uint64
+	VolName          string
+	modifyTime       int64
+	createTime       int64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	FileMissReplica  map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -70,14 +71,6 @@ func (partition *DataPartition) AddMember(replica *DataReplica) {
 		}
 	}
 	partition.Replicas = append(partition.Replicas, replica)
-}
-
-func (partition *DataPartition) GenerateCreateTasks() (tasks []*proto.AdminTask) {
-	tasks = make([]*proto.AdminTask, 0)
-	for _, addr := range partition.PersistenceHosts {
-		tasks = append(tasks, partition.generateCreateTask(addr))
-	}
-	return
 }
 
 func (partition *DataPartition) generateCreateTask(addr string) (task *proto.AdminTask) {
@@ -267,38 +260,6 @@ func (partition *DataPartition) getReplicaByIndex(index uint8) (replica *DataRep
 	return partition.Replicas[int(index)]
 }
 
-func (partition *DataPartition) getFileCount() {
-	var msg string
-	needDelFiles := make([]string, 0)
-	partition.Lock()
-	defer partition.Unlock()
-	for _, replica := range partition.Replicas {
-		replica.FileCount = 0
-	}
-	for _, fc := range partition.FileInCoreMap {
-		if len(fc.Metas) == 0 {
-			needDelFiles = append(needDelFiles, fc.Name)
-		}
-		for _, vfNode := range fc.Metas {
-			replica := partition.getReplicaByIndex(vfNode.locIndex)
-			replica.FileCount++
-		}
-
-	}
-
-	for _, vfName := range needDelFiles {
-		delete(partition.FileInCoreMap, vfName)
-	}
-
-	for _, replica := range partition.Replicas {
-		msg = fmt.Sprintf(GetDataReplicaFileCountInfo+"partitionID:%v  replicaAddr:%v  FileCount:%v  "+
-			"NodeIsActive:%v  replicaIsActive:%v  .replicaStatusOnNode:%v ", partition.PartitionID, replica.Addr, replica.FileCount,
-			replica.GetReplicaNode().isActive, replica.IsActive(DefaultDataPartitionTimeOutSec), replica.Status)
-		log.LogInfo(msg)
-	}
-
-}
-
 func (partition *DataPartition) ReleaseDataPartition() {
 	partition.Lock()
 	defer partition.Unlock()
@@ -470,7 +431,9 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 		partition.AddMember(replica)
 	}
 	partition.total = vr.Total
-	partition.used = vr.Used
+	if vr.Used > partition.used {
+		partition.used = vr.Used
+	}
 	replica.Status = int8(vr.PartitionStatus)
 	replica.Total = vr.Total
 	replica.Used = vr.Used
@@ -488,12 +451,7 @@ func (partition *DataPartition) toJson() (body []byte, err error) {
 }
 
 func (partition *DataPartition) getMaxUsedSize() (used uint64) {
-	for _, replica := range partition.Replicas {
-		if replica.Used > used {
-			used = replica.Used
-		}
-	}
-	return
+	return used
 }
 
 func (partition *DataPartition) isNeedCompareData() (needCompare bool) {
@@ -523,4 +481,16 @@ func (partition *DataPartition) createDataPartitionSuccessTriggerOperator(nodeAd
 	partition.AddMember(replica)
 	partition.checkAndRemoveMissReplica(replica.Addr)
 	return
+}
+
+func (partition *DataPartition) getMinus() (minus float64) {
+	partition.RLock()
+	defer partition.RUnlock()
+	used := partition.Replicas[0].Used
+	for _, replica := range partition.Replicas {
+		if math.Abs(float64(replica.Used)-float64(used)) > minus {
+			minus = math.Abs(float64(replica.Used) - float64(used))
+		}
+	}
+	return minus
 }

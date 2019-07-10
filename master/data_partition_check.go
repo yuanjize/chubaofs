@@ -81,7 +81,7 @@ func (partition *DataPartition) checkReplicaStatus(timeOutSec int64) {
 
 }
 
-func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec, dataPartitionWarnInterval int64) {
+func (partition *DataPartition) checkMiss(clusterID, leaderAddr string, dataPartitionMissSec, dataPartitionWarnInterval int64) {
 	partition.Lock()
 	defer partition.Unlock()
 	for _, replica := range partition.Replicas {
@@ -99,6 +99,9 @@ func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec
 				"miss time > %v  lastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v So Migrate by manual",
 				clusterID, partition.PartitionID, replica.Addr, dataPartitionMissSec, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/dataPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, partition.VolName, partition.PartitionID, replica.Addr)
+			log.LogRead(msg)
 		}
 	}
 
@@ -107,6 +110,9 @@ func (partition *DataPartition) checkMiss(clusterID string, dataPartitionMissSec
 			msg := fmt.Sprintf("action[checkMissErr], clusterID[%v] partitionID:%v  on Node:%v  "+
 				"miss time  > :%v  but server not exsit So Migrate", clusterID, partition.PartitionID, addr, dataPartitionMissSec)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/dataPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, partition.VolName, partition.PartitionID, addr)
+			log.LogRead(msg)
 		}
 	}
 }
@@ -136,7 +142,7 @@ func (partition *DataPartition) missDataPartition(addr string) (isMiss bool) {
 	return
 }
 
-func (partition *DataPartition) checkDiskError(clusterID string) (diskErrorAddrs []string) {
+func (partition *DataPartition) checkDiskError(clusterID, leaderAddr string) (diskErrorAddrs []string) {
 	diskErrorAddrs = make([]string, 0)
 	partition.Lock()
 	defer partition.Unlock()
@@ -158,6 +164,9 @@ func (partition *DataPartition) checkDiskError(clusterID string) (diskErrorAddrs
 		msg := fmt.Sprintf("action[%v],clusterID[%v],partitionID:%v  On :%v  Disk Error,So Remove it From RocksDBHost",
 			CheckDataPartitionDiskErrorErr, clusterID, partition.PartitionID, diskAddr)
 		Warn(clusterID, msg)
+		msg = fmt.Sprintf("http://%v/dataPartition/offline?name=%v&id=%v&addr=%v",
+			leaderAddr, partition.VolName, partition.PartitionID, diskAddr)
+		log.LogRead(msg)
 	}
 
 	return

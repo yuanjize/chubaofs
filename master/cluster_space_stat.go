@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/util"
 	"strconv"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type DataNodeSpaceStat struct {
@@ -37,6 +38,13 @@ func newVolSpaceStat(name string, total, used uint64, ratio string) *VolSpaceSta
 }
 
 func (c *Cluster) checkAvailSpace() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkAvailSpace occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkAvailSpace occurred panic")
+		}
+	}()
 	c.checkDataNodeAvailSpace()
 	c.checkMetaNodeAvailSpace()
 	c.checkVolAvailSpace()

@@ -32,6 +32,7 @@ type RaftStore interface {
 	Stop()
 	RaftConfig() *raft.Config
 	NodeManager
+	RaftServer() *raft.RaftServer
 }
 
 type raftStore struct {
@@ -125,6 +126,10 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 		walPath:    cfg.WalPath,
 	}
 	return
+}
+
+func (s *raftStore) RaftServer() *raft.RaftServer {
+	return s.raftServer
 }
 
 func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {

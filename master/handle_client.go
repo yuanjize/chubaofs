@@ -16,13 +16,12 @@ package master
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"net/http"
-	"regexp"
 	"strconv"
+	"io"
 )
 
 type VolStatInfo struct {
@@ -86,19 +85,60 @@ func NewMetaPartitionView(partitionID, start, end uint64, status int8) (mpView *
 	return
 }
 
+func (m *Master) getAllVols(w http.ResponseWriter, r *http.Request) {
+	var (
+		body []byte
+		err  error
+	)
+
+	vols := m.cluster.getAllVols()
+	if body, err = json.Marshal(vols); err != nil {
+		goto errDeal
+	}
+	io.WriteString(w, string(body))
+	return
+
+errDeal:
+	logMsg := getReturnMessage("getAllVols", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
+func (m *Master) getMetaPartitions(w http.ResponseWriter, r *http.Request) {
+	var (
+		code = http.StatusBadRequest
+		name string
+		vol  *Vol
+		err  error
+	)
+	if name, err = parseGetVolPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
+		goto errDeal
+	}
+	w.Write(vol.getMpsCache())
+	return
+errDeal:
+	logMsg := getReturnMessage("getMetaPartitions", r.RemoteAddr, err.Error(), code)
+	HandleError(logMsg, err, code, w)
+	return
+}
+
 func (m *Master) getDataPartitions(w http.ResponseWriter, r *http.Request) {
 	var (
 		body []byte
 		code = http.StatusBadRequest
 		name string
 		vol  *Vol
-		ok   bool
 		err  error
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
@@ -117,28 +157,21 @@ errDeal:
 
 func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		body []byte
 		code = http.StatusBadRequest
 		err  error
 		name string
 		vol  *Vol
-		view *VolView
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
 	}
+
 	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
 	}
-	if view, err = m.getVolView(vol); err != nil {
-		goto errDeal
-	}
-	if body, err = json.Marshal(view); err != nil {
-		goto errDeal
-	}
-	w.Write(body)
+	w.Write(vol.getViewCache())
 	return
 errDeal:
 	logMsg := getReturnMessage("getVol", r.RemoteAddr, err.Error(), code)
@@ -153,12 +186,11 @@ func (m *Master) getVolStatInfo(w http.ResponseWriter, r *http.Request) {
 		err  error
 		name string
 		vol  *Vol
-		ok   bool
 	)
 	if name, err = parseGetVolPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
@@ -172,42 +204,6 @@ errDeal:
 	logMsg := getReturnMessage("getVolStatInfo", r.RemoteAddr, err.Error(), code)
 	HandleError(logMsg, err, code, w)
 	return
-}
-
-func (m *Master) getVolView(vol *Vol) (view *VolView, err error) {
-	view = NewVolView(vol.Name, vol.VolType, vol.Status)
-	setMetaPartitions(vol, view, m.cluster.getLiveMetaNodesRate())
-	err = setDataPartitions(vol, view, m.cluster.getLiveDataNodesRate())
-	return
-}
-func setDataPartitions(vol *Vol, view *VolView, liveRate float32) (err error) {
-	if liveRate < NodesAliveRate {
-		return
-	}
-	lessThan := vol.getTotalUsedSpace() < (vol.Capacity * util.GB)
-	vol.dataPartitions.RLock()
-	defer vol.dataPartitions.RUnlock()
-	//var minRWDpCount float64
-	//minRWDpCount = float64(vol.dataPartitions.dataPartitionCount) * float64(VolReadWriteDataPartitionRatio)
-	//lessThanRwCount := vol.dataPartitions.readWriteDataPartitions < int(minRWDpCount)
-	if  vol.dataPartitions.readWriteDataPartitions == 0 && lessThan {
-		err = fmt.Errorf("action[setDataPartitions],vol[%v] no writeable data partitions", vol.Name)
-		log.LogWarn(err.Error())
-	} else {
-		dpResps := vol.dataPartitions.GetDataPartitionsView(0)
-		view.DataPartitions = dpResps
-	}
-	return
-}
-func setMetaPartitions(vol *Vol, view *VolView, liveRate float32) {
-	if liveRate < NodesAliveRate {
-		return
-	}
-	vol.mpsLock.RLock()
-	defer vol.mpsLock.RUnlock()
-	for _, mp := range vol.MetaPartitions {
-		view.MetaPartitions = append(view.MetaPartitions, getMetaPartitionView(mp))
-	}
 }
 
 func volStat(vol *Vol) (stat *VolStatInfo) {
@@ -226,12 +222,14 @@ func getMetaPartitionView(mp *MetaPartition) (mpView *MetaPartitionView) {
 	mpView = NewMetaPartitionView(mp.PartitionID, mp.Start, mp.End, mp.Status)
 	mp.Lock()
 	defer mp.Unlock()
-	for _, metaReplica := range mp.Replicas {
-		mpView.Members = append(mpView.Members, metaReplica.Addr)
-		if metaReplica.IsLeader {
-			mpView.LeaderAddr = metaReplica.Addr
-		}
+	for _, host := range mp.PersistenceHosts {
+		mpView.Members = append(mpView.Members, host)
 	}
+	mr, err := mp.getLeaderMetaReplica()
+	if err != nil {
+		return
+	}
+	mpView.LeaderAddr = mr.Addr
 	return
 }
 
@@ -244,17 +242,16 @@ func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 		partitionID uint64
 		vol         *Vol
 		mp          *MetaPartition
-		ok          bool
 	)
 	if name, partitionID, err = parseGetMetaPartitionPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, ok = m.cluster.vols[name]; !ok {
+	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
 		goto errDeal
 	}
-	if mp, ok = vol.MetaPartitions[partitionID]; !ok {
+	if mp, err = vol.getMetaPartition(partitionID); err != nil {
 		err = errors.Annotatef(MetaPartitionNotFound, "%v not found", partitionID)
 		code = http.StatusNotFound
 		goto errDeal
@@ -308,14 +305,7 @@ func checkVolPara(r *http.Request) (name string, err error) {
 		err = paraNotFound(ParaName)
 		return
 	}
-
-	pattern := "^[a-zA-Z0-9_-]{3,256}$"
-	reg, err := regexp.Compile(pattern)
-	if err != nil {
-		return "", err
-	}
-
-	if !reg.MatchString(name) {
+	if !volNameRegexp.MatchString(name) {
 		return "", errors.New("name can only be number and letters")
 	}
 

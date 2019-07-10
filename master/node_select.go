@@ -92,7 +92,7 @@ func (c *Cluster) getAvailMetaNodeHosts(excludeHosts []string, replicaNum int) (
 	nodeTabs, availCarryCount := c.GetAvailCarryMetaNodeTab(maxTotal, excludeHosts)
 	if len(nodeTabs) < replicaNum {
 		err = fmt.Errorf(GetAvailMetaNodeHostsErr+" err:%v ,ActiveNodeCount:%v  MatchNodeCount:%v  ",
-			NoHaveAnyMetaNodeToWrite, c.DataNodeCount(), len(nodeTabs))
+			NoHaveAnyMetaNodeToWrite, c.MetaNodeCount(), len(nodeTabs))
 		return
 	}
 
