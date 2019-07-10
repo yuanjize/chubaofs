@@ -1,0 +1,12 @@
+{
+    "master": "192.168.0.11:17010,192.168.0.12:17010,192.168.0.13:17010",
+	"mountpoint": "/cfs/mnt",
+	"volname": "ltptest",
+    "owner": "ltptest",
+	"logpath": "/cfs/log",
+	"loglvl": "info",
+    "warnLogDir":"/cfs/log",
+    "consulAddr": "http://192.168.0.100:8500",
+    "exporterPort": 9500,
+	"profport": "17410"
+}

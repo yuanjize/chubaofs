@@ -18,3 +18,4 @@
 # vim swap
 *.swp
 java-stream-sdk/.idea/
+docker/bin
