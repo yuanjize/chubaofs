@@ -433,6 +433,7 @@ func (dp *DataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []stri
 	)
 	params := make(map[string]string)
 	params["id"] = strconv.Itoa(int(dp.partitionId))
+	params["name"]=dp.volumeId
 	if HostsBuf, err = MasterHelper.Request("GET", AdminGetDataPartition, params, nil); err != nil {
 		isLeader = false
 		return
