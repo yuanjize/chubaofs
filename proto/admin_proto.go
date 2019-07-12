@@ -61,6 +61,7 @@ type LoadDataPartitionRequest struct {
 type LoadDataPartitionResponse struct {
 	PartitionType     string
 	PartitionId       uint64
+	VolName             string
 	Used              uint64
 	PartitionSnapshot []*File
 	Status            uint8

@@ -277,6 +277,7 @@ func (s *DataNode) asyncLoadDataPartition(task *proto.AdminTask) {
 			log.LogErrorf("from master Task[%v] failed,error[%v]", task.ToString(), response.Result)
 		} else {
 			response = dp.Load()
+			response.VolName=dp.volumeId
 			response.PartitionId = uint64(request.PartitionId)
 			response.Status = proto.TaskSuccess
 		}
