@@ -348,14 +348,20 @@ func (m *Master) getDataPartition(w http.ResponseWriter, r *http.Request) {
 		body        []byte
 		dp          *DataPartition
 		partitionID uint64
+		volName     string
 		err         error
 	)
-	if partitionID, err = parseDataPartitionID(r); err != nil {
+	if partitionID, volName, err = parseGetDataPartition(r); err != nil {
 		goto errDeal
 	}
-
-	if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
-		goto errDeal
+	if volName != "" {
+		if dp, err = m.cluster.getDataPartitionByIDAndVol(partitionID, volName); err != nil {
+			goto errDeal
+		}
+	} else {
+		if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
+			goto errDeal
+		}
 	}
 	if body, err = dp.toJson(); err != nil {
 		goto errDeal
@@ -1084,6 +1090,15 @@ func parseDataPartitionType(r *http.Request) (partitionType string, err error) {
 func parseDataPartitionID(r *http.Request) (ID uint64, err error) {
 	r.ParseForm()
 	return checkDataPartitionID(r)
+}
+
+func parseGetDataPartition(r *http.Request) (ID uint64, name string, err error) {
+	r.ParseForm()
+	if ID, err = checkDataPartitionID(r); err != nil {
+		return
+	}
+	name = r.FormValue(ParaName)
+	return
 }
 
 func parseDataPartitionIDAndVol(r *http.Request) (ID uint64, name string, err error) {
