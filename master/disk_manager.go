@@ -66,20 +66,16 @@ func (c *Cluster) checkBadDiskRecovery() {
 	})
 }
 
-func (c *Cluster) diskOffLine(dataNode *DataNode, destAddr, badDiskPath string, badPartitionIds []uint64) {
+func (c *Cluster) diskOffLine(dataNode *DataNode, destAddr, badDiskPath string, badPartitions []*DataPartition) (err error){
 	msg := fmt.Sprintf("action[diskOffLine], Node[%v] OffLine,disk[%v]", dataNode.Addr, badDiskPath)
 	log.LogWarn(msg)
-	safeVols := c.getAllNormalVols()
-	for _, vol := range safeVols {
-		for _, dp := range vol.dataPartitions.dataPartitions {
-			for _, bad := range badPartitionIds {
-				if bad == dp.PartitionID {
-					c.dataPartitionOffline(dataNode.Addr, destAddr, vol.Name, dp, DiskOfflineInfo)
-				}
-			}
+	for _, dp := range badPartitions {
+		if err = c.dataPartitionOffline(dataNode.Addr, destAddr, dp.VolName, dp, DiskOfflineInfo); err != nil {
+			return
 		}
 	}
 	msg = fmt.Sprintf("action[diskOffLine],clusterID[%v] Node[%v] OffLine success",
 		c.Name, dataNode.Addr)
 	Warn(c.Name, msg)
+	return
 }

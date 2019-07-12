@@ -418,7 +418,7 @@ func (partition *DataPartition) updateForOffline(offlineAddr, newAddr, volName s
 	return
 }
 
-func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode *DataNode) {
+func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode *DataNode, c *Cluster) {
 
 	if !partition.isInPersistenceHosts(dataNode.Addr) {
 		return
@@ -439,6 +439,15 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 	replica.Used = vr.Used
 	replica.FileCount = uint32(vr.ExtentCount)
 	replica.NeedCompare = vr.NeedCompare
+
+	if vr.DiskPath != replica.DiskPath {
+		oldDiskPath := replica.DiskPath
+		replica.DiskPath = oldDiskPath
+		err = c.syncUpdateDataPartition(partition.VolName, partition)
+		if err != nil {
+			replica.DiskPath = oldDiskPath
+		}
+	}
 	replica.DiskPath = vr.DiskPath
 	replica.SetAlive()
 	partition.checkAndRemoveMissReplica(dataNode.Addr)
@@ -471,13 +480,14 @@ func (partition *DataPartition) isNeedCompareData() (needCompare bool) {
 }
 
 // the caller must add lock
-func (partition *DataPartition) createDataPartitionSuccessTriggerOperator(nodeAddr string, c *Cluster) (err error) {
+func (partition *DataPartition) afterCreation(nodeAddr, diskPath string, c *Cluster) (err error) {
 	dataNode, err := c.getDataNode(nodeAddr)
 	if err != nil {
 		return err
 	}
 	replica := NewDataReplica(dataNode)
 	replica.Status = proto.ReadWrite
+	replica.DiskPath = diskPath
 	partition.AddMember(replica)
 	partition.checkAndRemoveMissReplica(replica.Addr)
 	return
@@ -493,4 +503,15 @@ func (partition *DataPartition) getMinus() (minus float64) {
 		}
 	}
 	return minus
+}
+
+func (partition *DataPartition) containsBadDisk(diskPath string, nodeAddr string) bool {
+	partition.RLock()
+	defer partition.RUnlock()
+	for _, replica := range partition.Replicas {
+		if nodeAddr == replica.Addr && diskPath == replica.DiskPath {
+			return true
+		}
+	}
+	return false
 }

@@ -501,13 +501,14 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			defer func() {
 				wg.Done()
 			}()
-			if err = c.syncCreateDataPartitionToDataNode(host, dp); err != nil {
+			var diskPath string
+			if diskPath, err = c.syncCreateDataPartitionToDataNode(host, dp); err != nil {
 				errChannel <- err
 				return
 			}
 			dp.Lock()
 			defer dp.Unlock()
-			if err = dp.createDataPartitionSuccessTriggerOperator(host, c); err != nil {
+			if err = dp.afterCreation(host, diskPath, c); err != nil {
 				errChannel <- err
 			}
 		}(host)
@@ -516,6 +517,18 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	select {
 	case err = <-errChannel:
 		goto errDeal
+		for _, host := range targetHosts {
+			wg.Add(1)
+			go func(host string) {
+				defer func() {
+					wg.Done()
+				}()
+				task := dp.GenerateDeleteTask(host)
+				tasks := make([]*proto.AdminTask, 0)
+				tasks = append(tasks, task)
+				c.putDataNodeTasks(tasks)
+			}(host)
+		}
 	default:
 		dp.Status = proto.ReadWrite
 	}
@@ -532,13 +545,17 @@ errDeal:
 	return
 }
 
-func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartition) (err error) {
+func (c *Cluster) syncCreateDataPartitionToDataNode(host string, dp *DataPartition) (diskPath string, err error) {
 	task := dp.generateCreateTask(host)
 	dataNode, err := c.getDataNode(host)
 	if err != nil {
 		return
 	}
-	return dataNode.Sender.syncCreatePartition(task)
+	replicaDiskPath, err := dataNode.Sender.syncSendAdminTask(task)
+	if err != nil {
+		return
+	}
+	return string(replicaDiskPath), nil
 }
 
 func (c *Cluster) ChooseTargetDataHosts(replicaNum int) (hosts []string, err error) {
@@ -624,17 +641,19 @@ func (c *Cluster) getMetaNode(addr string) (metaNode *MetaNode, err error) {
 	return
 }
 
-func (c *Cluster) dataNodeOffLine(dataNode *DataNode, destAddr string) {
+func (c *Cluster) dataNodeOffLine(dataNode *DataNode, destAddr string) (err error) {
 	msg := fmt.Sprintf("action[dataNodeOffLine], Node[%v] OffLine", dataNode.Addr)
 	log.LogWarn(msg)
 
 	safeVols := c.getAllNormalVols()
 	for _, vol := range safeVols {
 		for _, dp := range vol.dataPartitions.dataPartitions {
-			c.dataPartitionOffline(dataNode.Addr, destAddr, vol.Name, dp, DataNodeOfflineInfo)
+			if err = c.dataPartitionOffline(dataNode.Addr, destAddr, vol.Name, dp, DataNodeOfflineInfo); err != nil {
+				return
+			}
 		}
 	}
-	if err := c.syncDeleteDataNode(dataNode); err != nil {
+	if err = c.syncDeleteDataNode(dataNode); err != nil {
 		msg = fmt.Sprintf("action[dataNodeOffLine],clusterID[%v] Node[%v] OffLine failed,err[%v]",
 			c.Name, dataNode.Addr, err)
 		Warn(c.Name, msg)
@@ -644,6 +663,7 @@ func (c *Cluster) dataNodeOffLine(dataNode *DataNode, destAddr string) {
 	msg = fmt.Sprintf("action[dataNodeOffLine],clusterID[%v] Node[%v] OffLine success",
 		c.Name, dataNode.Addr)
 	Warn(c.Name, msg)
+	return
 }
 
 func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
@@ -652,14 +672,14 @@ func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 	go dataNode.clean()
 }
 
-func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) {
+func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) (err error) {
 	var (
 		newHosts []string
 		newAddr  string
 		msg      string
+		diskPath string
 		tasks    []*proto.AdminTask
 		task     *proto.AdminTask
-		err      error
 		dataNode *DataNode
 		rack     *Rack
 		vol      *Vol
@@ -707,10 +727,10 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		goto errDeal
 	}
 	newAddr = newHosts[0]
-	if err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
+	if diskPath, err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
 		goto errDeal
 	}
-	if err = dp.createDataPartitionSuccessTriggerOperator(newAddr, c); err != nil {
+	if err = dp.afterCreation(newAddr, diskPath, c); err != nil {
 		goto errDeal
 	}
 	if err = dp.updateForOffline(offlineAddr, newAddr, volName, c); err != nil {
@@ -895,7 +915,8 @@ func (c *Cluster) doSyncCreateMetaPartitionToMetaNode(host string, tasks []*prot
 	if err != nil {
 		return
 	}
-	return metaNode.Sender.syncCreatePartition(tasks[0])
+	_, err = metaNode.Sender.syncSendAdminTask(tasks[0])
+	return
 }
 
 func (c *Cluster) ChooseTargetMetaHosts(replicaNum int) (hosts []string, peers []proto.Peer, err error) {
@@ -1051,6 +1072,7 @@ func (c *Cluster) clearDataNodes() {
 	c.dataNodes.Range(func(key, value interface{}) bool {
 		dataNode := value.(*DataNode)
 		dataNode.clean()
+		c.dataNodes.Delete(key)
 		return true
 	})
 }
@@ -1059,6 +1081,7 @@ func (c *Cluster) clearMetaNodes() {
 	c.metaNodes.Range(func(key, value interface{}) bool {
 		metaNode := value.(*MetaNode)
 		metaNode.clean()
+		c.dataNodes.Delete(key)
 		return true
 	})
 }

@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type MetaNode struct {
@@ -50,8 +51,11 @@ func NewMetaNode(addr, clusterID string) (node *MetaNode) {
 }
 
 func (metaNode *MetaNode) clean() {
-	metaNode.Lock()
-	defer metaNode.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogError("clean panic")
+		}
+	}()
 	metaNode.Sender.exitCh <- struct{}{}
 }
 

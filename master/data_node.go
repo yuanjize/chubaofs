@@ -22,10 +22,7 @@ import (
 	"encoding/json"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
-)
-
-const (
-	ReservedVolCount = 1
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type DataNode struct {
@@ -40,12 +37,12 @@ type DataNode struct {
 	ReportTime                time.Time
 	isActive                  bool
 	sync.RWMutex
-	Ratio              float64
-	SelectCount        uint64
-	Carry              float64
-	Sender             *AdminTaskSender
-	dataPartitionInfos []*proto.PartitionReport
-	DataPartitionCount uint32
+	Ratio                     float64
+	SelectCount               uint64
+	Carry                     float64
+	Sender                    *AdminTaskSender
+	dataPartitionInfos        []*proto.PartitionReport
+	DataPartitionCount        uint32
 }
 
 func NewDataNode(addr, clusterID string) (dataNode *DataNode) {
@@ -140,8 +137,11 @@ func (dataNode *DataNode) SelectNodeForWrite() {
 }
 
 func (dataNode *DataNode) clean() {
-	dataNode.Lock()
-	defer dataNode.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogError("clean panic")
+		}
+	}()
 	dataNode.Sender.exitCh <- struct{}{}
 }
 
@@ -151,6 +151,19 @@ func (dataNode *DataNode) generateHeartbeatTask(masterAddr string) (task *proto.
 		MasterAddr: masterAddr,
 	}
 	task = proto.NewAdminTask(proto.OpDataNodeHeartbeat, dataNode.Addr, request)
+	return
+}
+
+func (dataNode *DataNode) badPartitions(diskPath string, c *Cluster) (partitions []*DataPartition) {
+	partitions = make([]*DataPartition, 0)
+	vols := c.copyVols()
+	if len(vols) == 0 {
+		return partitions
+	}
+	for _, vol := range vols {
+		dps := vol.dataPartitions.checkBadDiskDataPartitions(diskPath, dataNode.Addr)
+		partitions = append(partitions, dps...)
+	}
 	return
 }
 

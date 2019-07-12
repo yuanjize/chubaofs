@@ -243,3 +243,15 @@ func (dpMap *DataPartitionMap) setAllDataPartitionsToReadOnly() {
 		dp.Status = proto.ReadOnly
 	}
 }
+
+func (dpMap *DataPartitionMap) checkBadDiskDataPartitions(diskPath, nodeAddr string) (partitions []*DataPartition) {
+	dpMap.RLock()
+	defer dpMap.RUnlock()
+	partitions = make([]*DataPartition, 0)
+	for _, dp := range dpMap.dataPartitionMap {
+		if dp.containsBadDisk(diskPath, nodeAddr) {
+			partitions = append(partitions, dp)
+		}
+	}
+	return
+}
