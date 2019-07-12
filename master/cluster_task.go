@@ -458,9 +458,12 @@ func (c *Cluster) dealDeleteDataPartitionResponse(nodeAddr string, resp *proto.D
 
 func (c *Cluster) dealLoadDataPartitionResponse(nodeAddr string, resp *proto.LoadDataPartitionResponse) (err error) {
 	var dataNode *DataNode
-	dp, err := c.getDataPartitionByID(resp.PartitionId)
 	log.LogWarnf("dealLoadDataPartitionResponse,status[%v],pss[%v],err[%v]", resp.Status, resp.PartitionSnapshot, err)
-	if err != nil || resp.Status == proto.TaskFail || resp.PartitionSnapshot == nil {
+	if resp.Status == proto.TaskFail || resp.PartitionSnapshot == nil {
+		return
+	}
+	dp, err := c.getDataPartitionByIDAndVol(resp.PartitionId, resp.VolName)
+	if err != nil {
 		return
 	}
 	if dataNode, err = c.getDataNode(nodeAddr); err != nil {
@@ -518,7 +521,7 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 			continue
 		}
 		if dp, err := c.getDataPartitionByIDAndVol(vr.PartitionID, vr.VolName); err == nil {
-			dp.UpdateMetric(vr, dataNode,c)
+			dp.UpdateMetric(vr, dataNode, c)
 		}
 	}
 }

@@ -192,16 +192,27 @@ func (mds *MockDataServer) handleLoadDataPartition(conn net.Conn, pkg *proto.Pac
 	if err = json.Unmarshal(requestJson, req); err != nil {
 		return
 	}
+	partitionID := uint64(req.PartitionId)
 	response := &proto.LoadDataPartitionResponse{}
 	response.PartitionType = proto.ExtentPartition
-	response.PartitionId = uint64(req.PartitionId)
+	response.PartitionId = partitionID
 	response.Used = 10 * util.GB
 	response.PartitionSnapshot = buildSnapshot()
 	response.Status = proto.TaskSuccess
+	var partition *MockDataPartition
+	for _, partition = range mds.partitions {
+		if partition.PartitionID == partitionID {
+			break
+		}
+	}
+	if partition == nil {
+		return
+	}
+	response.VolName = partition.VolName
 	task.Response = response
 	data, err := json.Marshal(task)
 	if err != nil {
-		response.PartitionId = uint64(req.PartitionId)
+		response.PartitionId = partitionID
 		response.Status = proto.TaskFail
 		response.Result = err.Error()
 	}
