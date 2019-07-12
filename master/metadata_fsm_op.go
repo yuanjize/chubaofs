@@ -84,12 +84,18 @@ func newMetaPartitionValue(mp *MetaPartition) (mpv *MetaPartitionValue) {
 	return
 }
 
+type replicaValue struct {
+	Addr     string
+	DiskPath string
+}
+
 type DataPartitionValue struct {
 	PartitionID   uint64
 	ReplicaNum    uint8
 	Hosts         string
 	PartitionType string
 	IsManual      bool
+	Replicas    []*replicaValue
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -99,6 +105,11 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
 		IsManual:      dp.IsManual,
+		Replicas:    make([]*replicaValue, 0),
+	}
+	for _, replica := range dp.Replicas {
+		rv := &replicaValue{Addr: replica.Addr, DiskPath: replica.DiskPath}
+		dpv.Replicas = append(dpv.Replicas, rv)
 	}
 	return
 }
@@ -522,6 +533,9 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		dp.Lock()
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		dp.IsManual = dpv.IsManual
+		for _, rv := range dpv.Replicas {
+			dp.afterCreation(rv.Addr, rv.DiskPath, c)
+		}
 		dp.Unlock()
 		vol.dataPartitions.putDataPartition(dp)
 		encodedKey.Free()

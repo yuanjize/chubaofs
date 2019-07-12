@@ -20,8 +20,8 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
-	"github.com/juju/errors"
 	"encoding/json"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 )
 
 type Vol struct {

@@ -421,7 +421,9 @@ func (m *Master) dataPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	if dp, err = vol.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataPartitionOffline(offlineAddr, destAddr, volName, dp, HandleDataPartitionOfflineErr)
+	if err = m.cluster.dataPartitionOffline(offlineAddr, destAddr, volName, dp, HandleDataPartitionOfflineErr); err != nil {
+		goto errDeal
+	}
 	rstMsg = fmt.Sprintf(AdminDataPartitionOffline+" dataPartitionID :%v  on node:%v  has offline success", partitionID, offlineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -496,7 +498,7 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		goto errDeal
 	}
 
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity,mpCount); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, mpCount); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -613,7 +615,9 @@ func (m *Master) dataNodeOffline(w http.ResponseWriter, r *http.Request) {
 	if node, err = m.cluster.getDataNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataNodeOffLine(node, destAddr)
+	if err = m.cluster.dataNodeOffLine(node, destAddr); err != nil {
+		goto errDeal
+	}
 	rstMsg = fmt.Sprintf("dataNodeOffline node [%v] has offline SUCCESS", offLineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -631,6 +635,7 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 		destAddr              string
 		err                   error
 		badPartitionIds       []uint64
+		badPartitions         []*DataPartition
 	)
 
 	if offLineAddr, destAddr, diskPath, err = parseDiskOfflinePara(r); err != nil {
@@ -640,14 +645,19 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 	if node, err = m.cluster.getDataNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	badPartitionIds = node.getBadDiskPartitions(diskPath)
-	if len(badPartitionIds) == 0 {
+	badPartitions = node.badPartitions(diskPath, m.cluster)
+	if len(badPartitions) == 0 {
 		err = fmt.Errorf("node[%v] disk[%v] no any datapartition", node.Addr, diskPath)
 		goto errDeal
 	}
+	for _, bdp := range badPartitions {
+		badPartitionIds = append(badPartitionIds, bdp.PartitionID)
+	}
 	rstMsg = fmt.Sprintf("recive diskOffline node[%v] disk[%v],badPartitionIds[%v]  has offline  success",
 		node.Addr, diskPath, badPartitionIds)
-	m.cluster.diskOffLine(node, destAddr, diskPath, badPartitionIds)
+	if err = m.cluster.diskOffLine(node, destAddr, diskPath, badPartitions); err != nil {
+		goto errDeal
+	}
 	io.WriteString(w, rstMsg)
 	log.LogWarnf(rstMsg)
 	Warn(m.clusterName, rstMsg)

@@ -74,6 +74,7 @@ func (sender *AdminTaskSender) process() {
 	for {
 		select {
 		case <-sender.exitCh:
+			close(sender.exitCh)
 			return
 		case <-ticker.C:
 			sender.doDeleteTasks()
@@ -184,15 +185,15 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 	return nil
 }
 
-func (sender *AdminTaskSender) syncCreatePartition(task *proto.AdminTask) (err error) {
-	log.LogInfof(fmt.Sprintf("action[syncCreatePartition] sender task:%v begin", task.ToString()))
+func (sender *AdminTaskSender) syncSendAdminTask(task *proto.AdminTask) (body []byte, err error) {
+	log.LogInfof(fmt.Sprintf("action[syncSendAdminTask] sender task:%v begin", task.ToString()))
 	packet, err := sender.buildPacket(task)
 	if err != nil {
 		return
 	}
 	conn, err := sender.getConn()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		if err == nil {
@@ -204,22 +205,22 @@ func (sender *AdminTaskSender) syncCreatePartition(task *proto.AdminTask) (err e
 	}()
 
 	if err = packet.WriteToConn(conn); err != nil {
-		err = errors.Annotatef(err, "action[syncCreatePartition],WriteToConn failed,task:%v", task.ID)
+		err = errors.Annotatef(err, "action[syncSendAdminTask],WriteToConn failed,task:%v", task.ID)
 		return
 	}
 	if err = packet.ReadFromConn(conn, proto.CreateDataPartitionDeadlineTime); err != nil {
-		err = errors.Annotatef(err, "action[syncCreatePartition],ReadFromConn failed task:%v", task.ID)
+		err = errors.Annotatef(err, "action[syncSendAdminTask],ReadFromConn failed task:%v", task.ID)
 		return
 	}
 	data := packet.GetData()
 	if packet.ResultCode != proto.OpOk {
-		err = errors.Annotatef(fmt.Errorf(data), "action[syncCreatePartition],ReadFromConn failed task:%v", task.ID)
-		log.LogErrorf("action[syncCreatePartition] get task:%v response err[%v] ", task.ToString(), err)
+		err = errors.Annotatef(fmt.Errorf(data), "action[syncSendAdminTask],ReadFromConn failed task:%v", task.ID)
+		log.LogErrorf("action[syncSendAdminTask] get task:%v response err[%v] ", task.ToString(), err)
 		return
 	}
-	log.LogInfof(fmt.Sprintf("action[syncCreatePartition] sender task:%v success", task.ToString()))
+	log.LogInfof(fmt.Sprintf("action[syncSendAdminTask] sender task:%v success", task.ToString()))
 
-	return nil
+	return packet.Data, nil
 }
 
 func (sender *AdminTaskSender) DelTask(t *proto.AdminTask) {
