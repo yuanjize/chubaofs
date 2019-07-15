@@ -621,6 +621,41 @@ func (c *Cluster) ChooseTargetDataHosts(replicaNum int) (hosts []string, err err
 	return
 }
 
+func (c *Cluster) getAllDataPartitionIDByDatanode(addr string) (partitionIDs []uint64) {
+	partitionIDs = make([]uint64, 0)
+	safeVols := c.getAllNormalVols()
+	for _, vol := range safeVols {
+		for _, dp := range vol.dataPartitions.dataPartitions {
+			for _, host := range dp.PersistenceHosts {
+				if host == addr {
+					partitionIDs = append(partitionIDs, dp.PartitionID)
+					break
+				}
+			}
+		}
+	}
+
+	return
+}
+
+func (c *Cluster) getAllmetaPartitionIDByMetaNode(addr string) (partitionIDs []uint64) {
+	partitionIDs = make([]uint64, 0)
+	safeVols := c.getAllNormalVols()
+	for _, vol := range safeVols {
+		for _, mp := range vol.MetaPartitions {
+			for _, host := range mp.PersistenceHosts {
+				if host == addr {
+					partitionIDs = append(partitionIDs, mp.PartitionID)
+					break
+				}
+			}
+		}
+	}
+
+	return
+}
+
+
 func (c *Cluster) getDataNode(addr string) (dataNode *DataNode, err error) {
 	value, ok := c.dataNodes.Load(addr)
 	if !ok {

@@ -594,6 +594,7 @@ func (m *Master) getDataNode(w http.ResponseWriter, r *http.Request) {
 	if dataNode, err = m.cluster.getDataNode(nodeAddr); err != nil {
 		goto errDeal
 	}
+	dataNode.PersistenceDataPartitions=m.cluster.getAllDataPartitionIDByDatanode(nodeAddr)
 	if body, err = dataNode.toJson(); err != nil {
 		goto errDeal
 	}
@@ -745,6 +746,8 @@ func (m *Master) getMetaNode(w http.ResponseWriter, r *http.Request) {
 	if metaNode, err = m.cluster.getMetaNode(nodeAddr); err != nil {
 		goto errDeal
 	}
+
+	metaNode.PersistenceMetaPartitions =m.cluster.getAllmetaPartitionIDByMetaNode(nodeAddr)
 	if body, err = metaNode.toJson(); err != nil {
 		goto errDeal
 	}

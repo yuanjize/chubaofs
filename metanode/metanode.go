@@ -33,11 +33,13 @@ import (
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
+	"github.com/chubaofs/chubaofs/util"
 )
 
 var (
 	clusterInfo    *proto.ClusterInfo
 	configTotalMem int64
+	masterHelper = util.NewMasterHelper()
 )
 
 // The MetaNode manage Dentry and inode information in multiple metaPartition, and
@@ -99,21 +101,74 @@ func (m *MetaNode) onStart(cfg *config.Config) (err error) {
 	if err = m.register(); err != nil {
 		return
 	}
+	if err = m.startUMP(); err != nil {
+		return
+	}
 	if err = m.startRaftServer(); err != nil {
 		return
 	}
 	if err = m.startMetaManager(); err != nil {
 		return
 	}
-	if err = m.startUMP(); err != nil {
+	// check local partition compare with master ,if lack,then not start
+	if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
+		fmt.Println(err)
 		return
 	}
+
 	if err = m.registerHandler(); err != nil {
 		return
 	}
 	if err = m.startServer(); err != nil {
 		return
 	}
+	return
+}
+
+
+
+type MetaNodeInfo struct {
+	Addr                      string
+	PersistenceMetaPartitions []uint64
+}
+
+const (
+	GetMetaNode               = "/metaNode/get"
+)
+
+func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
+	params := make(map[string]string)
+	params["addr"] = fmt.Sprintf("%v:%v",m.localAddr,m.listen)
+	var data interface{}
+	for i := 0; i < 3; i++ {
+		data, err = masterHelper.Request(http.MethodGet, GetMetaNode, params, nil)
+		if err != nil {
+			log.LogErrorf("checkLocalPartitionMatchWithMaster error %v", err)
+			continue
+		}
+		break
+	}
+	minfo :=new(MetaNodeInfo)
+	if err = json.Unmarshal(data.([]byte), minfo);err!=nil {
+		err=fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v",err)
+		log.LogErrorf(err.Error())
+		return
+	}
+	if len(minfo.PersistenceMetaPartitions) == 0 {
+		return
+	}
+	lackPartitions := make([]uint64, 0)
+	for _, partitionID := range minfo.PersistenceMetaPartitions {
+		_,err = m.metaManager.GetPartition(partitionID)
+		if err!=nil {
+			lackPartitions = append(lackPartitions, partitionID)
+		}
+	}
+	if len(lackPartitions) == 0 {
+		return
+	}
+	err = fmt.Errorf("LackPartitions %v on metanode %v,metanode cannot start", lackPartitions, fmt.Sprintf("%v:%v",m.localAddr,m.listen))
+	log.LogErrorf(err.Error())
 	return
 }
 
@@ -154,6 +209,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	addrs := cfg.GetArray(cfgMasterAddrs)
 	for _, addr := range addrs {
 		masterAddrs = append(masterAddrs, addr.(string))
+		masterHelper.AddNode(addr.(string))
 	}
 	err = m.validConfig()
 	return
