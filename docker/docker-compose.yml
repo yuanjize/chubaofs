@@ -42,7 +42,7 @@ services:
             - "17020"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/master1.json:/cfs/conf/master.json
             - ./script/start_master.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -61,7 +61,7 @@ services:
             - "17020"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/master2.json:/cfs/conf/master.json
             - ./script/start_master.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -79,7 +79,7 @@ services:
             - "17020"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/master3.json:/cfs/conf/master.json
             - ./script/start_master.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -98,7 +98,7 @@ services:
             - "17240"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/metanode.json:/cfs/conf/metanode.json
             - ./script/start_meta.sh:/cfs/script/start.sh
         command: /bin/bash /cfs/script/start.sh
@@ -116,7 +116,7 @@ services:
             - "17240"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/metanode.json:/cfs/conf/metanode.json
             - ./script/start_meta.sh:/cfs/script/start.sh
         command: /bin/bash /cfs/script/start.sh
@@ -134,7 +134,7 @@ services:
             - "17240"
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/metanode.json:/cfs/conf/metanode.json
             - ./script/start_meta.sh:/cfs/script/start.sh
         command: /bin/bash /cfs/script/start.sh
@@ -153,7 +153,7 @@ services:
             - 9500
         volumes:
             - ${DiskPath:-./disk}/1:/cfs/disk
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/datanode.json:/cfs/conf/datanode.json
             - ./script/start_datanode.sh:/cfs/script/start.sh
         command: /bin/bash /cfs/script/start.sh
@@ -172,7 +172,7 @@ services:
             - 9500
         volumes:
             - ${DiskPath:-./disk}/2:/cfs/disk
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/datanode.json:/cfs/conf/datanode.json
             - ./script/start_datanode.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -191,7 +191,7 @@ services:
             - 9500
         volumes:
             - ${DiskPath:-./disk}/3:/cfs/disk
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/datanode.json:/cfs/conf/datanode.json
             - ./script/start_datanode.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -210,7 +210,7 @@ services:
             - 9500
         volumes:
             - ${DiskPath:-./disk}/4:/cfs/disk
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/datanode.json:/cfs/conf/datanode.json
             - ./script/start_datanode.sh:/cfs/script/start.sh
         command: /bin/sh /cfs/script/start.sh
@@ -224,7 +224,7 @@ services:
         ports:
             - 9500
         volumes:
-            - ../build/bin:/cfs/bin
+            - ./bin:/cfs/bin
             - ./conf/client.json:/cfs/conf/client.json
             - ./script/run_test.sh:/cfs/script/start.sh
             - ./script/start_client.sh:/cfs/script/start_client.sh
@@ -284,6 +284,10 @@ services:
             - "-c"
             - >-
               set -e;
-              cd /go/src/github.com/chubaofs/chubaofs && make build ;
+              mkdir -p /go/src/github.com/chubaofs/chubaofs/docker/bin &&
+              echo -n 'build server ' ;
+              cd /go/src/github.com/chubaofs/chubaofs/cmd && bash ./build.sh && mv cmd /go/src/github.com/chubaofs/chubaofs/docker/bin/cfs-server && echo "success" || echo "failed" ;
+              echo -n 'build client ' ;
+              cd /go/src/github.com/chubaofs/chubaofs/client && bash ./build.sh && mv client /go/src/github.com/chubaofs/chubaofs/docker/bin/cfs-client && echo 'success' || echo "failed" ;
         networks:
             extnetwork:
