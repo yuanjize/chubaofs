@@ -12,7 +12,7 @@ TryTimes=5
 getLeaderAddr() {
     echo -n "check Master "
     for i in $(seq 1 300) ; do
-        LeaderAddr=$(curl -s "http://$Master1Addr/admin/getCluster" | jq '.data.LeaderAddr' | tr -d '"' )
+        LeaderAddr=$(curl -s "http://$Master1Addr/admin/getCluster" | jq '.LeaderAddr' | tr -d '"' )
         if [ "x$LeaderAddr" != "x" ] ; then
             break
         fi
@@ -33,7 +33,7 @@ check_status() {
     for i in $(seq 1 300) ; do
         clusterInfo=$(curl -s "http://$LeaderAddr/admin/getCluster")
         #NodeUpCount=$( echo "$clusterInfo" | jq ".data.${node}s | .[].Status" | grep "true" | wc -l)
-        NodeTotoalGB=$( echo "$clusterInfo" | jq ".data.${node}StatInfo.TotalGB" )
+        NodeTotoalGB=$( echo "$clusterInfo" | jq ".${node}Stat.TotalGB" )
         if [[ $NodeTotoalGB -gt 0 ]]  ; then
             up=1
             break
@@ -51,14 +51,14 @@ check_status() {
 
 create_vol() {
     clusterInfo=$(curl -s "http://$LeaderAddr/admin/getCluster")
-    volname=$(echo "$clusterInfo" | jq ".data.VolStatInfo[0].Name" | tr -d \")
+    volname=$(echo "$clusterInfo" | jq ".VolStat[0].Name" | tr -d \")
     if [[ "-$volname" == "-$VolName" ]] ; then
         echo "vol ok"
         return
     fi
     echo -n "create vol "
-    res=$(curl -s "http://$LeaderAddr/admin/createVol?name=$VolName&capacity=30&owner=ltptest")
-    code=$(echo "$res" | jq .code)
+    res=$(curl -s "http://$LeaderAddr/admin/createVol?name=$VolName&capacity=30&owner=ltptest&replicas=3&type=extent")
+    code=$(echo "$res" | grep -q "success" ; echo $?)
     if [[ $code -ne 0 ]] ; then
         echo "failed, exit"
         curl -s "http://$LeaderAddr/admin/getCluster" | jq
@@ -96,13 +96,14 @@ start_client() {
     echo -n "start client "
     for((i=0; i<$TryTimes; i++)) ; do
         nohup /cfs/bin/cfs-client -c /cfs/conf/client.json >/cfs/log/cfs.out 2>&1 &
-        sleep 2
+        sleep 4
         sta=$(stat $MntPoint 2>/dev/null | tr ":：" " "  | awk '/Inode/{print $4}')
         if [[ "x$sta" == "x1" ]] ; then
             ok=1
 	        echo "ok"
             exit 0
         fi
+		ps -ef | grep cfs-client | grep -v "grep" | awk '{print $2}' | xargs -n1 kill 
     done
     echo "failed"
     exit 1
