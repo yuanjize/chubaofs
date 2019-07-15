@@ -6,7 +6,6 @@ export DiskPath="$RootPath/docker/disk"
 
 help() {
     cat <<EOF
-
 Usage: ./run_docker.sh [ -h | --help ] [ -d | --disk </disk/path> ] [ -l | --ltptest ]
     -h, --help              show help info
     -d, --disk </disk/path>     set datanode local disk path
@@ -57,7 +56,7 @@ run_ltptest() {
 
 run() {
     build
-    start_monitor
+    #start_monitor
     start_servers
     start_client
 }
