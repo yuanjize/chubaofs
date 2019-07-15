@@ -30,6 +30,7 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
+	"os"
 )
 
 var (
@@ -141,15 +142,19 @@ func (d *Disk) addWriteErr() {
 
 func (d *Disk) startScheduleTasks() {
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		updateSpaceInfoTicker := time.NewTicker(5 * time.Second)
+		checkStatusTickser :=time.NewTicker(time.Minute*2)
 		defer func() {
-			ticker.Stop()
+			updateSpaceInfoTicker.Stop()
+			checkStatusTickser.Stop()
 		}()
 		for {
 			select {
-			case <-ticker.C:
+			case <-updateSpaceInfoTicker.C:
 				d.computeUsage()
 				d.updateSpaceInfo()
+			case <-checkStatusTickser.C:
+				d.checkDiskStatus()
 			}
 		}
 	}()
@@ -234,6 +239,49 @@ func unmarshalPartitionName(name string) (partitionId uint32, partitionSize int,
 
 func (d *Disk) isPartitionDir(filename string) (is bool) {
 	is = RegexpDataPartitionDir.MatchString(filename)
+	return
+}
+
+const (
+	DiskStatusFile=".diskstatus"
+)
+
+func (d *Disk)checkDiskStatus(){
+	path:=path.Join(d.Path,DiskStatusFile)
+	fp,err:=os.OpenFile(path,os.O_CREATE|os.O_TRUNC|os.O_RDWR,0755)
+	if err!=nil {
+		d.triggerDiskError(err)
+		return
+	}
+	defer fp.Close()
+	data:=[]byte(DiskStatusFile)
+	_,err=fp.WriteAt(data,0)
+	if err!=nil {
+		d.triggerDiskError(err)
+		return
+	}
+	if err=fp.Sync();err!=nil {
+		d.triggerDiskError(err)
+		return
+	}
+	if _,err=fp.ReadAt(data,0);err!=nil {
+		d.triggerDiskError(err)
+		return
+	}
+}
+
+func (d *Disk)triggerDiskError(err error){
+	if err==nil {
+		return
+	}
+	if IsDiskErr(err.Error()){
+		d.Status=proto.Unavaliable
+		d.Lock()
+		defer d.Unlock()
+		for _,dp:=range d.partitionMap{
+			dp.partitionStatus=proto.Unavaliable
+		}
+	}
 	return
 }
 
