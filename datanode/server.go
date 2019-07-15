@@ -343,7 +343,7 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	if d == nil {
 		return
 	}
-	if !s.isDiskErr(err.Error()) {
+	if !IsDiskErr(err.Error()) {
 		return
 	}
 	if flag == WriteFlag {
@@ -360,7 +360,7 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 
 }
 
-func (s *DataNode) isDiskErr(errMsg string) bool {
+func IsDiskErr(errMsg string) bool {
 	if strings.Contains(errMsg,syscall.EIO.Error()){
 		return true
 	}
