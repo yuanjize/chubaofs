@@ -655,7 +655,6 @@ func (c *Cluster) getAllmetaPartitionIDByMetaNode(addr string) (partitionIDs []u
 	return
 }
 
-
 func (c *Cluster) getDataNode(addr string) (dataNode *DataNode, err error) {
 	value, ok := c.dataNodes.Load(addr)
 	if !ok {
@@ -882,7 +881,11 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		goto errDeal
 	}
 	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
+		if err = c.syncDeleteVol(vol); err != nil {
+			log.LogErrorf("action[createVol] failed,vol[%v] err[%v]", vol.Name, err)
+		}
 		c.deleteVol(name)
+		err = fmt.Errorf("action[createVol] initMetaPartitions failed")
 		goto errDeal
 	}
 	for retryCount := 0; readWriteDataPartitions < DefaultInitDataPartitions && retryCount < 3; retryCount++ {
