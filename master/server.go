@@ -86,7 +86,7 @@ func (m *Master) Start(cfg *config.Config) (err error) {
 		log.LogError(errors.ErrorStack(err))
 		return
 	}
-	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition)
+	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition,m.config)
 	m.cluster.retainLogs = m.retainLogs
 	//m.loadMetadata()
 	m.startHttpService()

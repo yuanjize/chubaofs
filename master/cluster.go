@@ -47,12 +47,12 @@ type Cluster struct {
 	BadDataPartitionIds *sync.Map
 }
 
-func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition) (c *Cluster) {
+func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *ClusterConfig) (c *Cluster) {
 	c = new(Cluster)
 	c.Name = name
 	c.leaderInfo = leaderInfo
 	c.vols = make(map[string]*Vol, 0)
-	c.cfg = NewClusterConfig()
+	c.cfg = cfg
 	c.fsm = fsm
 	c.partition = partition
 	c.idAlloc = newIDAllocator(c.fsm.store, c.partition)
