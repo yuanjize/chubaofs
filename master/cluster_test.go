@@ -7,7 +7,7 @@ import (
 )
 
 func buildPanicCluster() *Cluster {
-	c := newCluster(server.cluster.Name, server.cluster.leaderInfo, server.cluster.fsm, server.cluster.partition)
+	c := newCluster(server.cluster.Name, server.cluster.leaderInfo, server.cluster.fsm, server.cluster.partition,server.cluster.cfg)
 	v := buildPanicVol()
 	c.putVol(v)
 	return c
