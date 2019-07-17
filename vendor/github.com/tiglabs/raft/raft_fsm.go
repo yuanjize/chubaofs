@@ -219,7 +219,7 @@ func (r *raftFsm) loadState(state proto.HardState) error {
 }
 
 func (r *raftFsm) recoverCommit() error {
-	for r.raftLog.applied < r.raftLog.committed {
+	for r.raftLog.applied <= r.raftLog.committed {
 		committedEntries := r.raftLog.nextEnts(64 * MB)
 		for _, entry := range committedEntries {
 			r.raftLog.appliedTo(entry.Index)
@@ -241,6 +241,9 @@ func (r *raftFsm) recoverCommit() error {
 				}
 				r.applyConfChange(cc)
 			}
+		}
+		if r.raftLog.applied==r.raftLog.committed{
+			break
 		}
 	}
 	return nil
