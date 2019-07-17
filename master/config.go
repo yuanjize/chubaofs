@@ -44,7 +44,7 @@ const (
 	NoHeartBeatTimes                            = 3
 	DefaultNodeTimeOutSec                       = NoHeartBeatTimes * DefaultCheckHeartbeatIntervalSeconds
 	DefaultDataPartitionTimeOutSec              = 10 * DefaultCheckHeartbeatIntervalSeconds
-	DefaultDataPartitionMissSec                 = 24 * 3600
+	DefaultDataPartitionMissSec                 = 60 * 60
 	DefaultDataPartitionWarnInterval            = 60 * 60
 	LoadDataPartitionWaitTime                   = 120
 	DefaultLoadDataPartitionFrequencyTime       = 60 * 60 * 4

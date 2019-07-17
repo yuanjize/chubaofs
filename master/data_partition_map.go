@@ -52,7 +52,7 @@ func (dpMap *DataPartitionMap) getDataPartition(ID uint64) (*DataPartition, erro
 	if v, ok := dpMap.dataPartitionMap[ID]; ok {
 		return v, nil
 	}
-	return nil, errors.Annotatef(DataPartitionNotFound, "[%v] not found in [%v]", ID, dpMap.volName)
+	return nil, DataPartitionNotFound
 }
 
 func (dpMap *DataPartitionMap) putDataPartition(dp *DataPartition) {
@@ -242,4 +242,16 @@ func (dpMap *DataPartitionMap) setAllDataPartitionsToReadOnly() {
 	for _, dp := range dpMap.dataPartitions {
 		dp.Status = proto.ReadOnly
 	}
+}
+
+func (dpMap *DataPartitionMap) checkBadDiskDataPartitions(diskPath, nodeAddr string) (partitions []*DataPartition) {
+	dpMap.RLock()
+	defer dpMap.RUnlock()
+	partitions = make([]*DataPartition, 0)
+	for _, dp := range dpMap.dataPartitionMap {
+		if dp.containsBadDisk(diskPath, nodeAddr) {
+			partitions = append(partitions, dp)
+		}
+	}
+	return
 }

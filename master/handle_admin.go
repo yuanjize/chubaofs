@@ -107,7 +107,7 @@ func (m *Master) setCompactStatus(w http.ResponseWriter, r *http.Request) {
 	if status, err = parseCompactPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.syncPutCluster(); err != nil {
+	if err = m.cluster.syncCompactStatus(status); err != nil {
 		goto errDeal
 	}
 	io.WriteString(w, fmt.Sprintf("set compact status to %v success", status))
@@ -348,14 +348,20 @@ func (m *Master) getDataPartition(w http.ResponseWriter, r *http.Request) {
 		body        []byte
 		dp          *DataPartition
 		partitionID uint64
+		volName     string
 		err         error
 	)
-	if partitionID, err = parseDataPartitionID(r); err != nil {
+	if partitionID, volName, err = parseGetDataPartition(r); err != nil {
 		goto errDeal
 	}
-
-	if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
-		goto errDeal
+	if volName != "" {
+		if dp, err = m.cluster.getDataPartitionByIDAndVol(partitionID, volName); err != nil {
+			goto errDeal
+		}
+	} else {
+		if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
+			goto errDeal
+		}
 	}
 	if body, err = dp.toJson(); err != nil {
 		goto errDeal
@@ -421,7 +427,9 @@ func (m *Master) dataPartitionOffline(w http.ResponseWriter, r *http.Request) {
 	if dp, err = vol.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataPartitionOffline(offlineAddr, destAddr, volName, dp, HandleDataPartitionOfflineErr)
+	if err = m.cluster.dataPartitionOffline(offlineAddr, destAddr, volName, dp, HandleDataPartitionOfflineErr); err != nil {
+		goto errDeal
+	}
 	rstMsg = fmt.Sprintf(AdminDataPartitionOffline+" dataPartitionID :%v  on node:%v  has offline success", partitionID, offlineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -486,16 +494,17 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		err        error
 		msg        string
 		volType    string
+		mpCount    int
 		replicaNum int
 		capacity   int
 		vol        *Vol
 	)
 
-	if name, owner, volType, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
+	if name, owner, volType, mpCount, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
 
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, mpCount); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -585,6 +594,7 @@ func (m *Master) getDataNode(w http.ResponseWriter, r *http.Request) {
 	if dataNode, err = m.cluster.getDataNode(nodeAddr); err != nil {
 		goto errDeal
 	}
+	dataNode.PersistenceDataPartitions=m.cluster.getAllDataPartitionIDByDatanode(nodeAddr)
 	if body, err = dataNode.toJson(); err != nil {
 		goto errDeal
 	}
@@ -612,7 +622,9 @@ func (m *Master) dataNodeOffline(w http.ResponseWriter, r *http.Request) {
 	if node, err = m.cluster.getDataNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	m.cluster.dataNodeOffLine(node, destAddr)
+	if err = m.cluster.dataNodeOffLine(node, destAddr); err != nil {
+		goto errDeal
+	}
 	rstMsg = fmt.Sprintf("dataNodeOffline node [%v] has offline SUCCESS", offLineAddr)
 	io.WriteString(w, rstMsg)
 	return
@@ -630,6 +642,7 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 		destAddr              string
 		err                   error
 		badPartitionIds       []uint64
+		badPartitions         []*DataPartition
 	)
 
 	if offLineAddr, destAddr, diskPath, err = parseDiskOfflinePara(r); err != nil {
@@ -639,14 +652,19 @@ func (m *Master) diskOffline(w http.ResponseWriter, r *http.Request) {
 	if node, err = m.cluster.getDataNode(offLineAddr); err != nil {
 		goto errDeal
 	}
-	badPartitionIds = node.getBadDiskPartitions(diskPath)
-	if len(badPartitionIds) == 0 {
+	badPartitions = node.badPartitions(diskPath, m.cluster)
+	if len(badPartitions) == 0 {
 		err = fmt.Errorf("node[%v] disk[%v] no any datapartition", node.Addr, diskPath)
 		goto errDeal
 	}
+	for _, bdp := range badPartitions {
+		badPartitionIds = append(badPartitionIds, bdp.PartitionID)
+	}
 	rstMsg = fmt.Sprintf("recive diskOffline node[%v] disk[%v],badPartitionIds[%v]  has offline  success",
 		node.Addr, diskPath, badPartitionIds)
-	m.cluster.diskOffLine(node, destAddr, diskPath, badPartitionIds)
+	if err = m.cluster.diskOffLine(node, destAddr, diskPath, badPartitions); err != nil {
+		goto errDeal
+	}
 	io.WriteString(w, rstMsg)
 	log.LogWarnf(rstMsg)
 	Warn(m.clusterName, rstMsg)
@@ -728,6 +746,8 @@ func (m *Master) getMetaNode(w http.ResponseWriter, r *http.Request) {
 	if metaNode, err = m.cluster.getMetaNode(nodeAddr); err != nil {
 		goto errDeal
 	}
+
+	metaNode.PersistenceMetaPartitions =m.cluster.getAllmetaPartitionIDByMetaNode(nodeAddr)
 	if body, err = metaNode.toJson(); err != nil {
 		goto errDeal
 	}
@@ -970,7 +990,7 @@ func parseTaskResponse(r *http.Request) (tr *proto.AdminTask, err error) {
 		return
 	}
 	tr = &proto.AdminTask{}
-	decoder := json.NewDecoder(bytes.NewBuffer([]byte(body)))
+	decoder := json.NewDecoder(bytes.NewBuffer(body))
 	decoder.UseNumber()
 	err = decoder.Decode(tr)
 	return
@@ -1005,7 +1025,7 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, er
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, owner, volType string, replicaNum, capacity int, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity int, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1030,6 +1050,11 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, replicaNu
 	if owner = r.FormValue(ParaVolOwner); owner == "" {
 		err = paraNotFound(ParaVolOwner)
 		return
+	}
+	if mpCountStr := r.FormValue(metaPartitionCountKey); mpCountStr != "" {
+		if mpCount, err = strconv.Atoi(mpCountStr); err != nil {
+			mpCount = defaultInitMetaPartitionCount
+		}
 	}
 	return
 }
@@ -1068,6 +1093,15 @@ func parseDataPartitionType(r *http.Request) (partitionType string, err error) {
 func parseDataPartitionID(r *http.Request) (ID uint64, err error) {
 	r.ParseForm()
 	return checkDataPartitionID(r)
+}
+
+func parseGetDataPartition(r *http.Request) (ID uint64, name string, err error) {
+	r.ParseForm()
+	if ID, err = checkDataPartitionID(r); err != nil {
+		return
+	}
+	name = r.FormValue(ParaName)
+	return
 }
 
 func parseDataPartitionIDAndVol(r *http.Request) (ID uint64, name string, err error) {

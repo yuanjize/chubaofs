@@ -129,39 +129,47 @@ func (mp *MetaPartition) updateAllReplicasEnd() {
 	}
 }
 
-func (mp *MetaPartition) UpdateEnd(c *Cluster, end uint64) {
-	//to prevent overflow
-	if end > (DefaultMaxMetaPartitionInodeID - DefaultMetaPartitionInodeIDStep) {
-		log.LogWarnf("action[UpdateEnd] clusterID[%v] partitionID[%v] nextStart[%v] "+
-			"to prevent overflow ,not update end", c.Name, mp.PartitionID, end)
+//caller add vol lock?
+func (mp *MetaPartition) updateEnd(c *Cluster, end uint64) (err error) {
+	mp.Lock()
+	defer mp.Unlock()
+	if end < mp.MaxNodeID {
+		err = errors.Errorf("next meta partition start must be larger than %v", mp.MaxNodeID)
 		return
 	}
-	var err error
-	tasks := make([]*proto.AdminTask, 0)
+	//to prevent overflow
+	if end > (defaultMaxMetaPartitionInodeID - defaultMetaPartitionInodeIDStep) {
+		msg := fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] nextStart[%v] "+
+			"to prevent overflow ,not update end", c.Name, mp.PartitionID, end)
+		log.LogWarn(msg)
+		err = fmt.Errorf(msg)
+		return
+	}
+	if _, err = mp.getLeaderMetaReplica(); err != nil {
+		log.LogWarnf("action[updateEnd] vol[%v] id[%v] no leader", mp.volName, mp.PartitionID)
+		return
+	}
+
 	oldEnd := mp.End
 	mp.End = end
+
+	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+		mp.End = oldEnd
+		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
+		return
+	}
+	mp.updateAllReplicasEnd()
+	tasks := make([]*proto.AdminTask, 0)
 	t := mp.generateUpdateMetaReplicaTask(c.Name, mp.PartitionID, end)
 	//if no leader,don't update end
 	if t == nil {
 		mp.End = oldEnd
+		err = NoLeader
 		return
 	}
-	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
-		mp.End = oldEnd
-		goto errDeal
-	}
-	mp.updateAllReplicasEnd()
 	tasks = append(tasks, t)
 	c.putMetaNodeTasks(tasks)
-	if err = c.CreateMetaPartition(mp.volName, mp.End+1, DefaultMaxMetaPartitionInodeID); err != nil {
-		Warn(c.Name, fmt.Sprintf("action[UpdateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
-			c.Name, mp.PartitionID, err))
-		goto errDeal
-	}
-	log.LogWarnf("action[UpdateEnd] partitionID[%v] end[%v] success", mp.PartitionID, mp.End)
-	return
-errDeal:
-	log.LogErrorf("action[UpdateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
+	log.LogWarnf("action[updateEnd] partitionID[%v] end[%v] success", mp.PartitionID, mp.End)
 	return
 }
 
@@ -182,13 +190,23 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 		log.LogWarnf("action[checkEnd] partition[%v] not max partition[%v]", mp.PartitionID, curMaxPartitionID)
 		return
 	}
-	if mp.End != DefaultMaxMetaPartitionInodeID {
+	if mp.End != defaultMaxMetaPartitionInodeID {
 		oldEnd := mp.End
-		mp.End = DefaultMaxMetaPartitionInodeID
+		mp.End = defaultMaxMetaPartitionInodeID
 		if err := c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
 			mp.End = oldEnd
 			log.LogErrorf("action[checkEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
 		}
+		t := mp.generateUpdateMetaReplicaTask(c.Name, mp.PartitionID, mp.End)
+		//if no leader,don't update end
+		if t == nil {
+			mp.End = oldEnd
+			err = NoLeader
+			return
+		}
+		tasks := make([]*proto.AdminTask, 0)
+		tasks = append(tasks, t)
+		c.putMetaNodeTasks(tasks)
 	}
 	log.LogWarnf("action[checkEnd] partitionID[%v] end[%v]", mp.PartitionID, mp.End)
 }
@@ -389,7 +407,7 @@ func (mp *MetaPartition) needWarnMissReplica(addr string, warnInterval int64) (i
 	return false
 }
 
-func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, warnInterval int64) {
+func (mp *MetaPartition) checkReplicaMiss(clusterID, leaderAddr string, partitionMissSec, warnInterval int64) {
 	mp.Lock()
 	defer mp.Unlock()
 	//has report
@@ -408,6 +426,9 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, wa
 				"miss time > :%v  vlocLastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v",
 				clusterID, mp.volName, mp.PartitionID, replica.Addr, partitionMissSec, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, mp.volName, mp.PartitionID, replica.Addr)
+			log.LogRead(msg)
 		}
 	}
 	// never report
@@ -417,6 +438,9 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID string, partitionMissSec, wa
 				"miss time  > %v ",
 				clusterID, mp.volName, mp.PartitionID, addr, DefaultMetaPartitionTimeOutSec)
 			Warn(clusterID, msg)
+			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
+				leaderAddr, mp.volName, mp.PartitionID, addr)
+			log.LogRead(msg)
 		}
 	}
 }
@@ -522,14 +546,6 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.Status = (int8)(mgr.Status)
 	mr.IsLeader = mgr.IsLeader
 	mr.setLastReportTime()
-}
-
-func (mp *MetaPartition) updateMetricByRaft(mpv *MetaPartitionValue) {
-	mp.Start = mpv.Start
-	mp.End = mpv.End
-	mp.Peers = mpv.Peers
-	mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
-	mp.IsManual = mpv.IsManual
 }
 
 // the caller must add lock

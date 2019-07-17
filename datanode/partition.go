@@ -33,6 +33,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"math/rand"
 	"syscall"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 const (
@@ -287,6 +288,12 @@ func (dp *DataPartition) statusUpdateScheduler() {
 
 func (dp *DataPartition) statusUpdate() {
 	status := proto.ReadWrite
+	_,err:=os.Stat(dp.path)
+	if err!=nil{
+		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		ump.Alarm(umpKey,fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ",ClusterID,LocalIP,dp.path,err.Error()))
+		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ",ClusterID,LocalIP,dp.path,err.Error()))
+	}
 	dp.computeUsage()
 	if dp.used >= dp.partitionSize {
 		status = proto.ReadOnly
@@ -433,6 +440,7 @@ func (dp *DataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []stri
 	)
 	params := make(map[string]string)
 	params["id"] = strconv.Itoa(int(dp.partitionId))
+	params["name"]=dp.volumeId
 	if HostsBuf, err = MasterHelper.Request("GET", AdminGetDataPartition, params, nil); err != nil {
 		isLeader = false
 		return

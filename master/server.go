@@ -24,6 +24,7 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"sync"
+	"regexp"
 )
 
 //config keys
@@ -40,6 +41,8 @@ const (
 	CfgRetainLogs     = "retainLogs"
 	DefaultRetainLogs = 20000
 )
+
+var volNameRegexp *regexp.Regexp
 
 type Master struct {
 	id           uint64
@@ -72,12 +75,18 @@ func (m *Master) Start(cfg *config.Config) (err error) {
 		log.LogError(errors.ErrorStack(err))
 		return
 	}
+	pattern := "^[a-zA-Z0-9_-]{3,256}$"
+	volNameRegexp, err = regexp.Compile(pattern)
+	if err != nil {
+		log.LogError(err)
+		return
+	}
 	ump.InitUmp(fmt.Sprintf("%v_%v", m.clusterName, UmpModuleName))
 	if err = m.createRaftServer(); err != nil {
 		log.LogError(errors.ErrorStack(err))
 		return
 	}
-	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition)
+	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition,m.config)
 	m.cluster.retainLogs = m.retainLogs
 	//m.loadMetadata()
 	m.startHttpService()
@@ -167,10 +176,9 @@ func (m *Master) createRaftServer() (err error) {
 	if m.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
 		return errors.Annotatef(err, "NewRaftStore failed! id[%v] walPath[%v]", m.id, m.walDir)
 	}
-	fsm := newMetadataFsm(m.storeDir)
+	fsm := newMetadataFsm(m.storeDir, m.retainLogs, m.raftStore.RaftServer())
 	fsm.RegisterLeaderChangeHandler(m.handleLeaderChange)
 	fsm.RegisterPeerChangeHandler(m.handlePeerChange)
-	fsm.RegisterApplyHandler(m.handleApply)
 	fsm.RegisterApplySnapshotHandler(m.handleApplySnapshot)
 	fsm.restore()
 	m.fsm = fsm

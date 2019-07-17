@@ -29,7 +29,7 @@ import (
 
 const (
 	MinTaskLen         = 30
-	TaskWorkerInterval = time.Microsecond * time.Duration(200)
+	TaskWorkerInterval = time.Second * time.Duration(1)
 	ForceCloseConnect  = true
 	NoCloseConnect     = false
 )
@@ -47,8 +47,8 @@ type AdminTaskSender struct {
 	targetAddr string
 	TaskMap    map[string]*proto.AdminTask
 	sync.Mutex
-	exitCh   chan struct{}
-	connPool *pool.ConnectPool
+	exitCh     chan struct{}
+	connPool   *pool.ConnectPool
 }
 
 func NewAdminTaskSender(targetAddr, clusterID string) (sender *AdminTaskSender) {
@@ -57,7 +57,7 @@ func NewAdminTaskSender(targetAddr, clusterID string) (sender *AdminTaskSender) 
 		targetAddr: targetAddr,
 		clusterID:  clusterID,
 		TaskMap:    make(map[string]*proto.AdminTask),
-		exitCh:     make(chan struct{}),
+		exitCh:     make(chan struct{}, 1),
 		connPool:   pool.NewConnectPool(),
 	}
 	go sender.process()
@@ -74,6 +74,7 @@ func (sender *AdminTaskSender) process() {
 	for {
 		select {
 		case <-sender.exitCh:
+			close(sender.exitCh)
 			return
 		case <-ticker.C:
 			sender.doDeleteTasks()
@@ -112,29 +113,36 @@ func (sender *AdminTaskSender) getNeedDeleteTasks() (delTasks []*proto.AdminTask
 func (sender *AdminTaskSender) doSendTasks() {
 	tasks := sender.getNeedDealTask()
 	if len(tasks) == 0 {
-		time.Sleep(time.Second)
 		return
 	}
 	sender.sendTasks(tasks)
 }
 
+func (sender *AdminTaskSender) getConn() (conn *net.TCPConn, err error) {
+	return sender.connPool.Get(sender.targetAddr)
+}
+
+func (sender *AdminTaskSender) putConn(conn *net.TCPConn, forceCloseConnect bool) {
+	sender.connPool.Put(conn, forceCloseConnect)
+}
+
 func (sender *AdminTaskSender) sendTasks(tasks []*proto.AdminTask) {
 	for _, task := range tasks {
-		conn, err := sender.connPool.Get(sender.targetAddr)
+		conn, err := sender.getConn()
 		if err != nil {
 			msg := fmt.Sprintf("clusterID[%v] get connection to %v,err,%v", sender.clusterID, sender.targetAddr, errors.ErrorStack(err))
 			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_sendTask", sender.clusterID, UmpModuleName), msg)
-			sender.connPool.Put(conn, ForceCloseConnect)
+			sender.putConn(conn, true)
 			sender.updateTaskInfo(task, false)
 			break
 		}
 		if err = sender.sendAdminTask(task, conn); err != nil {
 			log.LogError(fmt.Sprintf("send task %v to %v,err,%v", task.ToString(), sender.targetAddr, errors.ErrorStack(err)))
-			sender.connPool.Put(conn, ForceCloseConnect)
+			sender.putConn(conn, true)
 			sender.updateTaskInfo(task, true)
 			continue
 		}
-		sender.connPool.Put(conn, NoCloseConnect)
+		sender.putConn(conn, false)
 	}
 }
 
@@ -177,35 +185,42 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 	return nil
 }
 
-func (sender *AdminTaskSender) syncCreatePartition(task *proto.AdminTask, conn net.Conn) (err error) {
-	log.LogInfof(fmt.Sprintf("action[syncCreatePartition] sender task:%v begin", task.ToString()))
+func (sender *AdminTaskSender) syncSendAdminTask(task *proto.AdminTask) (body []byte, err error) {
+	log.LogInfof(fmt.Sprintf("action[syncSendAdminTask] sender task:%v begin", task.ToString()))
 	packet, err := sender.buildPacket(task)
+	if err != nil {
+		return
+	}
+	conn, err := sender.getConn()
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
-		if err != nil {
+		if err == nil {
+			sender.putConn(conn, false)
+		} else {
+			sender.putConn(conn, true)
 			log.LogErrorf("request(%v) error(%v)", packet.GetUniqueLogId(), err)
 		}
 	}()
-	if err != nil {
-		err = errors.Annotatef(err, "action[syncCreatePartition build packet failed,task:%v]", task.ID)
-		return
-	}
+
 	if err = packet.WriteToConn(conn); err != nil {
-		err = errors.Annotatef(err, "action[syncCreatePartition],WriteToConn failed,task:%v", task.ID)
+		err = errors.Annotatef(err, "action[syncSendAdminTask],WriteToConn failed,task:%v", task.ID)
 		return
 	}
 	if err = packet.ReadFromConn(conn, proto.CreateDataPartitionDeadlineTime); err != nil {
-		err = errors.Annotatef(err, "action[syncCreatePartition],ReadFromConn failed task:%v", task.ID)
+		err = errors.Annotatef(err, "action[syncSendAdminTask],ReadFromConn failed task:%v", task.ID)
 		return
 	}
 	data := packet.GetData()
 	if packet.ResultCode != proto.OpOk {
-		err = errors.Annotatef(fmt.Errorf(data), "action[syncCreatePartition],ReadFromConn failed task:%v", task.ID)
-		log.LogErrorf("action[syncCreatePartition] get task:%v response err[%v] ", task.ToString(), err)
+		err = errors.Annotatef(fmt.Errorf(data), "action[syncSendAdminTask],ReadFromConn failed task:%v", task.ID)
+		log.LogErrorf("action[syncSendAdminTask] get task:%v response err[%v] ", task.ToString(), err)
 		return
 	}
-	log.LogInfof(fmt.Sprintf("action[syncCreatePartition] sender task:%v success", task.ToString()))
+	log.LogInfof(fmt.Sprintf("action[syncSendAdminTask] sender task:%v success", task.ToString()))
 
-	return nil
+	return packet.Data, nil
 }
 
 func (sender *AdminTaskSender) DelTask(t *proto.AdminTask) {
@@ -228,13 +243,6 @@ func (sender *AdminTaskSender) PutTask(t *proto.AdminTask) {
 	if !ok {
 		sender.TaskMap[t.ID] = t
 	}
-}
-
-func (sender *AdminTaskSender) IsExist(t *proto.AdminTask) bool {
-	sender.Lock()
-	defer sender.Unlock()
-	_, ok := sender.TaskMap[t.ID]
-	return ok
 }
 
 func (sender *AdminTaskSender) getNeedDealTask() (tasks []*proto.AdminTask) {

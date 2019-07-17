@@ -44,6 +44,7 @@ func (m *Master) handleLeaderChange(leader uint64) {
 		Warn(m.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
 			m.clusterName, m.leaderInfo.addr))
 		m.metaReady = false
+		m.clearMetadata()
 	}
 }
 
@@ -66,10 +67,6 @@ func (m *Master) handlePeerChange(confChange *proto.ConfChange) (err error) {
 	}
 	Warn(m.clusterName, msg)
 	return
-}
-
-func (m *Master) handleApply(cmd *Metadata) (err error) {
-	return m.cluster.handleApply(cmd)
 }
 
 func (m *Master) handleApplySnapshot() {
@@ -113,5 +110,8 @@ func (m *Master) loadMetadata() {
 }
 
 func (m *Master) clearMetadata() {
+	m.cluster.clearTopology()
+	m.cluster.clearDataNodes()
+	m.cluster.clearMetaNodes()
 	m.cluster.clearVols()
 }

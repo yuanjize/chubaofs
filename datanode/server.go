@@ -124,18 +124,74 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	if err = s.parseConfig(cfg); err != nil {
 		return
 	}
+	ump.InitUmp(UmpModuleName)
+	
+	s.registerToMaster()
 	debug.SetMaxThreads(20000)
 	if err = s.startSpaceManager(cfg); err != nil {
 		return
 	}
+
+	// check local partition compare with master ,if lack,then not start
+	if err = s.checkLocalPartitionMatchWithMaster(); err != nil {
+		fmt.Println(err)
+		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		ump.Alarm(umpKey,err.Error())
+		return
+	}
+
 	if err = s.startTcpService(); err != nil {
 		return
 	}
 	go s.registerProfHandler()
-	go s.registerToMaster()
-	ump.InitUmp(UmpModuleName)
 	return
 }
+
+type DataNodeInfo struct {
+	Addr                      string
+	PersistenceDataPartitions []uint64
+}
+
+const (
+	GetDataNode               = "/dataNode/get"
+)
+
+func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
+	params := make(map[string]string)
+	params["addr"] = s.localServeAddr
+	var data interface{}
+	for i := 0; i < 3; i++ {
+		data, err = MasterHelper.Request(http.MethodGet, GetDataNode, params, nil)
+		if err != nil {
+			log.LogErrorf("checkLocalPartitionMatchWithMaster error %v", err)
+			continue
+		}
+		break
+	}
+	dinfo:=new(DataNodeInfo)
+	if err = json.Unmarshal(data.([]byte),dinfo);err!=nil {
+		err=fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v",err)
+		log.LogErrorf(err.Error())
+		return
+	}
+	if len(dinfo.PersistenceDataPartitions) == 0 {
+		return
+	}
+	lackPartitions := make([]uint64, 0)
+	for _, partitionID := range dinfo.PersistenceDataPartitions {
+		dp := s.space.GetPartition(uint32(partitionID))
+		if dp == nil {
+			lackPartitions = append(lackPartitions, partitionID)
+		}
+	}
+	if len(lackPartitions) == 0 {
+		return
+	}
+	err = fmt.Errorf("LackPartitions %v on datanode %v,datanode cannot start", lackPartitions, s.localServeAddr)
+	log.LogErrorf(err.Error())
+	return
+}
+
 
 func (s *DataNode) onShutdown() {
 	close(s.stopC)
@@ -343,7 +399,7 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	if d == nil {
 		return
 	}
-	if !s.isDiskErr(err.Error()) {
+	if !IsDiskErr(err.Error()) {
 		return
 	}
 	if flag == WriteFlag {
@@ -360,7 +416,7 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 
 }
 
-func (s *DataNode) isDiskErr(errMsg string) bool {
+func IsDiskErr(errMsg string) bool {
 	if strings.Contains(errMsg,syscall.EIO.Error()){
 		return true
 	}

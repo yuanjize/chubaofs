@@ -84,12 +84,18 @@ func newMetaPartitionValue(mp *MetaPartition) (mpv *MetaPartitionValue) {
 	return
 }
 
+type replicaValue struct {
+	Addr     string
+	DiskPath string
+}
+
 type DataPartitionValue struct {
 	PartitionID   uint64
 	ReplicaNum    uint8
 	Hosts         string
 	PartitionType string
 	IsManual      bool
+	Replicas    []*replicaValue
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -99,6 +105,11 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
 		IsManual:      dp.IsManual,
+		Replicas:    make([]*replicaValue, 0),
+	}
+	for _, replica := range dp.Replicas {
+		rv := &replicaValue{Addr: replica.Addr, DiskPath: replica.DiskPath}
+		dpv.Replicas = append(dpv.Replicas, rv)
 	}
 	return
 }
@@ -323,288 +334,6 @@ func (c *Cluster) removeRaftNode(nodeID uint64, addr string) (err error) {
 	return nil
 }
 
-func (c *Cluster) handleApply(cmd *Metadata) (err error) {
-	log.LogInfof("action[handleApply] cmd:%v", cmd.K)
-	if cmd == nil {
-		return fmt.Errorf("metadata can't be null")
-	}
-	if c == nil || c.fsm == nil {
-		return fmt.Errorf("cluster has not init")
-	}
-	curIndex := c.fsm.applied
-	if curIndex > 0 && curIndex%c.retainLogs == 0 {
-		c.partition.Truncate(curIndex)
-	}
-	switch cmd.Op {
-	case OpSyncAddDataNode:
-		c.applyAddDataNode(cmd)
-	case OpSyncAddMetaNode:
-		err = c.applyAddMetaNode(cmd)
-	case OpSyncAddVol:
-		c.applyAddVol(cmd)
-	case OpSyncUpdateVol:
-		c.applyUpdateVol(cmd)
-	case OpSyncDeleteVol:
-		c.applyDeleteVol(cmd)
-	case OpSyncAddMetaPartition:
-		c.applyAddMetaPartition(cmd)
-	case OpSyncUpdateMetaPartition:
-		c.applyUpdateMetaPartition(cmd)
-	case OpSyncAddDataPartition:
-		c.applyAddDataPartition(cmd)
-	case OpSyncUpdateDataPartition:
-		c.applyUpdateDataPartition(cmd)
-	case OpSyncDeleteDataPartition:
-		c.applyDeleteDataPartition(cmd)
-	case OpSyncDeleteMetaNode:
-		c.applyDeleteMetaNode(cmd)
-	case OpSyncDeleteDataNode:
-		c.applyDeleteDataNode(cmd)
-	case OpSyncPutCluster:
-		c.applyPutCluster(cmd)
-	case OpSyncAllocMetaNodeID:
-		id, err1 := strconv.ParseUint(string(cmd.V), 10, 64)
-		if err1 != nil {
-			return err1
-		}
-		c.idAlloc.setMetaNodeID(id)
-	case OpSyncAllocDataPartitionID:
-		id, err1 := strconv.ParseUint(string(cmd.V), 10, 64)
-		if err1 != nil {
-			return err1
-		}
-		c.idAlloc.setDataPartitionID(id)
-	case OpSyncAllocMetaPartitionID:
-		id, err1 := strconv.ParseUint(string(cmd.V), 10, 64)
-		if err1 != nil {
-			return err1
-		}
-		c.idAlloc.setMetaPartitionID(id)
-	}
-	return
-}
-
-func (c *Cluster) applyPutCluster(cmd *Metadata) {
-	log.LogInfof("action[applyPutCluster] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] != ClusterAcronym {
-		return
-	}
-	status, err := strconv.ParseBool(keys[3])
-	if err != nil {
-		return
-	}
-	c.compactStatus = status
-}
-
-func (c *Cluster) applyDeleteDataNode(cmd *Metadata) {
-	log.LogInfof("action[applyDeleteDataNode] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] != DataNodeAcronym {
-		return
-	}
-	if value, ok := c.dataNodes.Load(keys[2]); ok {
-		dataNode := value.(*DataNode)
-		c.delDataNodeFromCache(dataNode)
-	}
-}
-
-func (c *Cluster) applyDeleteMetaNode(cmd *Metadata) {
-	log.LogInfof("action[applyDeleteMetaNode] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] != MetaNodeAcronym {
-		return
-	}
-	if value, ok := c.metaNodes.Load(keys[3]); ok {
-		metaNode := value.(*MetaNode)
-		c.delMetaNodeFromCache(metaNode)
-	}
-}
-
-func (c *Cluster) applyAddDataNode(cmd *Metadata) {
-	log.LogInfof("action[applyAddDataNode] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-
-	if keys[1] == DataNodeAcronym {
-		dataNode := NewDataNode(keys[2], c.Name)
-		c.dataNodes.Store(dataNode.Addr, dataNode)
-	}
-}
-
-func (c *Cluster) applyAddMetaNode(cmd *Metadata) (err error) {
-	log.LogInfof("action[applyAddMetaNode] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	var (
-		id uint64
-	)
-	if keys[1] == MetaNodeAcronym {
-		addr := keys[3]
-		if _, err = c.getMetaNode(addr); err != nil {
-			metaNode := NewMetaNode(addr, c.Name)
-			if id, err = strconv.ParseUint(keys[2], 10, 64); err != nil {
-				return
-			}
-			metaNode.ID = id
-			c.metaNodes.Store(metaNode.Addr, metaNode)
-		}
-	}
-	return nil
-}
-
-func (c *Cluster) applyAddVol(cmd *Metadata) {
-	log.LogInfof("action[applyAddVol] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == VolAcronym {
-
-		vv := &VolValue{}
-		if err := json.Unmarshal(cmd.V, vv); err != nil {
-			log.LogError(fmt.Sprintf("action[applyAddVol] failed,err:%v", err))
-			return
-		}
-		vol := NewVol(keys[2], vv.Owner, vv.VolType, vv.ReplicaNum, vv.Capacity)
-		c.putVol(vol)
-	}
-}
-
-func (c *Cluster) applyUpdateVol(cmd *Metadata) {
-	log.LogInfof("action[applyUpdateVol] cmd:%v", cmd.K)
-	var (
-		vol *Vol
-		err error
-	)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == VolAcronym {
-
-		vv := &VolValue{}
-		if err = json.Unmarshal(cmd.V, vv); err != nil {
-			log.LogError(fmt.Sprintf("action[applyUpdateVol] failed,err:%v", err))
-			return
-		}
-		if vol, err = c.getVol(keys[2]); err != nil {
-			log.LogError(fmt.Sprintf("action[applyUpdateVol] failed,err:%v", err))
-			return
-		}
-		vol.setStatus(vv.Status)
-		vol.setCapacity(vv.Capacity)
-	}
-}
-
-func (c *Cluster) applyDeleteVol(cmd *Metadata) {
-	log.LogInfof("action[applyDeleteVol] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == VolAcronym {
-		c.deleteVol(keys[2])
-	}
-}
-
-func (c *Cluster) applyAddMetaPartition(cmd *Metadata) {
-	log.LogInfof("action[applyAddMetaPartition] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == MetaPartitionAcronym {
-		mpv := &MetaPartitionValue{}
-		if err := json.Unmarshal(cmd.V, mpv); err != nil {
-			log.LogError(fmt.Sprintf("action[applyAddMetaPartition] failed,err:%v", err))
-			return
-		}
-		mp := NewMetaPartition(mpv.PartitionID, mpv.Start, mpv.End, mpv.ReplicaNum, keys[2])
-		mp.Lock()
-		mp.Peers = mpv.Peers
-		mp.PersistenceHosts = strings.Split(mpv.Hosts, UnderlineSeparator)
-		mp.Unlock()
-		vol, err := c.getVol(keys[2])
-		if err != nil {
-			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
-			return
-		}
-		vol.AddMetaPartitionByRaft(mp)
-	}
-}
-
-func (c *Cluster) applyUpdateMetaPartition(cmd *Metadata) {
-	log.LogInfof("action[applyUpdateMetaPartition] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == MetaPartitionAcronym {
-		mpv := &MetaPartitionValue{}
-		if err := json.Unmarshal(cmd.V, mpv); err != nil {
-			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
-			return
-		}
-		vol, err := c.getVol(keys[2])
-		if err != nil {
-			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
-			return
-		}
-		mp, err := vol.getMetaPartition(mpv.PartitionID)
-		if err != nil {
-			log.LogError(fmt.Sprintf("action[applyUpdateMetaPartition] failed,err:%v", err))
-			return
-		}
-		mp.updateMetricByRaft(mpv)
-	}
-}
-
-func (c *Cluster) applyAddDataPartition(cmd *Metadata) {
-	log.LogInfof("action[applyAddDataPartition] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == DataPartitionAcronym {
-		dpv := &DataPartitionValue{}
-		json.Unmarshal(cmd.V, dpv)
-		vol, err := c.getVol(keys[2])
-		if err != nil {
-			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
-			return
-		}
-		dp := newDataPartition(dpv.PartitionID, dpv.ReplicaNum, dpv.PartitionType, vol.Name)
-		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
-		vol.dataPartitions.putDataPartition(dp)
-	}
-}
-
-func (c *Cluster) applyUpdateDataPartition(cmd *Metadata) {
-	log.LogInfof("action[applyUpdateDataPartition] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == DataPartitionAcronym {
-		dpv := &DataPartitionValue{}
-		json.Unmarshal(cmd.V, dpv)
-		vol, err := c.getVol(keys[2])
-		if err != nil {
-			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
-			return
-		}
-		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
-		if err != nil {
-			log.LogError(fmt.Sprintf("action[applyUpdateDataPartition] failed,err:%v", err))
-			return
-		}
-		dp.ReplicaNum = dpv.ReplicaNum
-		dp.PartitionType = dpv.PartitionType
-		dp.VolName = vol.Name
-		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
-		dp.IsManual = dpv.IsManual
-		vol.dataPartitions.putDataPartition(dp)
-	}
-}
-
-func (c *Cluster) applyDeleteDataPartition(cmd *Metadata) {
-	log.LogInfof("action[applyDeleteDataPartition] cmd:%v", cmd.K)
-	keys := strings.Split(cmd.K, KeySeparator)
-	if keys[1] == DataPartitionAcronym {
-		dpv := &DataPartitionValue{}
-		json.Unmarshal(cmd.V, dpv)
-		vol, err := c.getVol(keys[2])
-		if err != nil {
-			log.LogErrorf("action[applyUpdateDataPartition] failed,err:%v", err)
-			return
-		}
-		dp, err := vol.getDataPartitionByID(dpv.PartitionID)
-		if err != nil {
-			log.LogError(fmt.Sprintf("action[applyDeleteDataPartition] failed,err:%v", err))
-			return
-		}
-		vol.dataPartitions.deleteDataPartition(dp)
-	}
-}
-
 func (c *Cluster) decodeDataPartitionKey(key string) (acronym, volName string) {
 	return c.decodeAcronymAndNsName(key)
 }
@@ -804,6 +533,9 @@ func (c *Cluster) loadDataPartitions() (err error) {
 		dp.Lock()
 		dp.PersistenceHosts = strings.Split(dpv.Hosts, UnderlineSeparator)
 		dp.IsManual = dpv.IsManual
+		for _, rv := range dpv.Replicas {
+			dp.afterCreation(rv.Addr, rv.DiskPath, c)
+		}
 		dp.Unlock()
 		vol.dataPartitions.putDataPartition(dp)
 		encodedKey.Free()

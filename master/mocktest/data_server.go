@@ -23,10 +23,12 @@ type MockDataServer struct {
 	CreatedPartitionCnt             uint64
 	MaxWeightsForCreatePartition    uint64
 	partitions                      []*MockDataPartition
+	rackName                        string
 }
 
-func NewMockDataServer(addr string) *MockDataServer {
-	mds := &MockDataServer{TcpAddr: addr, partitions: make([]*MockDataPartition, 0)}
+func NewMockDataServer(addr string, rackName string) *MockDataServer {
+	mds := &MockDataServer{TcpAddr: addr, rackName: rackName,
+		partitions: make([]*MockDataPartition, 0)}
 
 	return mds
 }
@@ -73,7 +75,7 @@ func (mds *MockDataServer) serveConn(rc net.Conn) {
 	conn.SetKeepAlive(true)
 	conn.SetNoDelay(true)
 	req := proto.NewPacket()
-	err := req.ReadFromConn(conn, proto.ReadDeadlineTime)
+	err := req.ReadFromConn(conn, proto.NoReadDeadlineTime)
 	if err != nil {
 		return
 	}
@@ -87,16 +89,16 @@ func (mds *MockDataServer) serveConn(rc net.Conn) {
 	switch req.Opcode {
 	case proto.OpCreateDataPartition:
 		err = mds.handleCreateDataPartition(conn, req, adminTask)
-		fmt.Printf("data node [%v] create data partition,err:%v\n", mds.TcpAddr, err)
+		fmt.Printf("data node [%v] create data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	case proto.OpDeleteDataPartition:
 		err = mds.handleDeleteDataPartition(conn, req)
-		fmt.Printf("data node [%v] delete data partition,err:%v\n", mds.TcpAddr, err)
+		fmt.Printf("data node [%v] delete data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	case proto.OpDataNodeHeartbeat:
 		err = mds.handleHeartbeats(conn, req)
 		fmt.Printf("data node [%v] report heartbeat to master,err:%v\n", mds.TcpAddr, err)
 	case proto.OpLoadDataPartition:
-		err = mds.handleLoadDataPartition(conn, req)
-		fmt.Printf("data node [%v] load data partition,err:%v\n", mds.TcpAddr, err)
+		err = mds.handleLoadDataPartition(conn, req, adminTask)
+		fmt.Printf("data node [%v] load data partition,id[%v],err:%v\n", mds.TcpAddr, adminTask.ID, err)
 	}
 }
 
@@ -145,7 +147,7 @@ func (mds *MockDataServer) handleHeartbeats(conn net.Conn, pkg *proto.Packet) (e
 	response.MaxWeightsForCreatePartition = 800 * util.GB
 	response.RemainWeightsForCreatePartition = 800 * util.GB
 
-	response.RackName = "default"
+	response.RackName = mds.rackName
 	response.PartitionInfo = make([]*proto.PartitionReport, 0)
 
 	for _, partition := range mds.partitions {
@@ -154,7 +156,7 @@ func (mds *MockDataServer) handleHeartbeats(conn net.Conn, pkg *proto.Packet) (e
 			PartitionStatus:      proto.ReadWrite,
 			Total:                120 * util.GB,
 			Used:                 20 * util.GB,
-			DiskPath:             "/export",
+			DiskPath:             "/cfs",
 			ExtentCount:          10,
 			NeedCompare:          true,
 			AvaliTinyExtentCnt:   5,
@@ -174,9 +176,77 @@ func (mds *MockDataServer) handleHeartbeats(conn net.Conn, pkg *proto.Packet) (e
 }
 
 func (mds *MockDataServer) handleDeleteDataPartition(conn net.Conn, pkg *proto.Packet) (err error) {
+	responseAckOKToMaster(conn, pkg)
 	return
 }
 
-func (mds *MockDataServer) handleLoadDataPartition(conn net.Conn, pkg *proto.Packet) (err error) {
+func (mds *MockDataServer) handleLoadDataPartition(conn net.Conn, pkg *proto.Packet, task *proto.AdminTask) (err error) {
+	responseAckOKToMaster(conn, pkg)
+	// Marshal request body.
+	requestJson, err := json.Marshal(task.Request)
+	if err != nil {
+		return
+	}
+	// Unmarshal request to entity
+	req := &proto.LoadDataPartitionRequest{}
+	if err = json.Unmarshal(requestJson, req); err != nil {
+		return
+	}
+	partitionID := uint64(req.PartitionId)
+	response := &proto.LoadDataPartitionResponse{}
+	response.PartitionType = proto.ExtentPartition
+	response.PartitionId = partitionID
+	response.Used = 10 * util.GB
+	response.PartitionSnapshot = buildSnapshot()
+	response.Status = proto.TaskSuccess
+	var partition *MockDataPartition
+	for _, partition = range mds.partitions {
+		if partition.PartitionID == partitionID {
+			break
+		}
+	}
+	if partition == nil {
+		return
+	}
+	response.VolName = partition.VolName
+	task.Response = response
+	data, err := json.Marshal(task)
+	if err != nil {
+		response.PartitionId = partitionID
+		response.Status = proto.TaskFail
+		response.Result = err.Error()
+	}
+	if err != nil {
+		return
+	}
+	_, err = PostToMaster(http.MethodPost, urlDataNodeResponse, data)
+	return
+}
+
+func buildSnapshot() (files []*proto.File) {
+	files = make([]*proto.File, 0)
+	f1 := &proto.File{
+		Name:     "1",
+		Crc:      4045512210,
+		Size:     2 * util.MB,
+		Modified: 1562507765,
+	}
+	files = append(files, f1)
+
+	f2 := &proto.File{
+		Name:     "2",
+		Crc:      4045512210,
+		Size:     2 * util.MB,
+		Modified: 1562507765,
+	}
+	files = append(files, f2)
+
+	f3 := &proto.File{
+		Name:     "50000010",
+		Crc:      4045512210,
+		Size:     2 * util.MB,
+		Modified: 1562507765,
+	}
+	files = append(files, f3)
 	return
 }

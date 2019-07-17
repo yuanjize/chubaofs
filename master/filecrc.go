@@ -70,12 +70,12 @@ func (fc *FileInCore) isDelayCheck() bool {
 	return time.Now().Unix()-fc.LastModify > DefaultFileDelayCheckLackSec
 }
 
-func (fc *FileInCore) needCrcRepair(liveVols []*DataReplica, volType string) (fms []*FileMetaOnNode, needRepair bool) {
+func (fc *FileInCore) needCrcRepair(liveReplicas []*DataReplica, volType string) (fms []*FileMetaOnNode, needRepair bool) {
 	var baseCrc uint32
 	fms = make([]*FileMetaOnNode, 0)
 
-	for i := 0; i < len(liveVols); i++ {
-		vol := liveVols[i]
+	for i := 0; i < len(liveReplicas); i++ {
+		vol := liveReplicas[i]
 		if fm, ok := fc.getFileMetaByAddr(vol); ok {
 			fms = append(fms, fm)
 		}
