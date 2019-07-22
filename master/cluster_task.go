@@ -457,12 +457,19 @@ func (c *Cluster) dealDeleteDataPartitionResponse(nodeAddr string, resp *proto.D
 }
 
 func (c *Cluster) dealLoadDataPartitionResponse(nodeAddr string, resp *proto.LoadDataPartitionResponse) (err error) {
-	var dataNode *DataNode
+	var (
+		dataNode *DataNode
+		dp       *DataPartition
+	)
 	log.LogWarnf("dealLoadDataPartitionResponse,status[%v],pss[%v],err[%v]", resp.Status, resp.PartitionSnapshot, err)
 	if resp.Status == proto.TaskFail || resp.PartitionSnapshot == nil {
 		return
 	}
-	dp, err := c.getDataPartitionByIDAndVol(resp.PartitionId, resp.VolName)
+	if resp.VolName != "" {
+		dp, err = c.getDataPartitionByIDAndVol(resp.PartitionId, resp.VolName)
+	} else {
+		dp, err = c.getDataPartitionByID(resp.PartitionId)
+	}
 	if err != nil {
 		return
 	}
@@ -520,28 +527,49 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 		if vr == nil {
 			continue
 		}
-		if dp, err := c.getDataPartitionByIDAndVol(vr.PartitionID, vr.VolName); err == nil {
-			dp.UpdateMetric(vr, dataNode, c)
+		if vr.VolName != "" {
+			if dp, err := c.getDataPartitionByIDAndVol(vr.PartitionID, vr.VolName); err == nil {
+				dp.UpdateMetric(vr, dataNode, c)
+			}
+		} else {
+			if dp, err := c.getDataPartitionByID(vr.PartitionID); err == nil {
+				dp.UpdateMetric(vr, dataNode, c)
+			}
 		}
 	}
 }
 
 func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.MetaPartitionReport, hasArriveThreshold bool) {
+	var (
+		err error
+		vol *Vol
+	)
 	for _, mr := range metaPartitions {
 		if mr == nil {
 			continue
 		}
-		vol, err := c.getVol(mr.VolName)
-		if err != nil {
-			log.LogErrorf("action[UpdateMetaNode] get vol[%v] err[%v]", mr.VolName, err)
-			continue
+		var mp *MetaPartition
+		if mr.VolName != "" {
+			vol, err = c.getVol(mr.VolName)
+			if err != nil {
+				log.LogErrorf("action[UpdateMetaNode] get vol[%v] err[%v]", mr.VolName, err)
+				continue
+			}
+			mp, err = vol.getMetaPartition(mr.PartitionID)
+			if err != nil {
+				log.LogError(fmt.Sprintf("action[UpdateMetaNode],err:%v", err))
+				err = nil
+				continue
+			}
+		} else {
+			mp, err = c.getMetaPartitionByID(mr.PartitionID)
+			if err != nil {
+				log.LogError(fmt.Sprintf("action[UpdateMetaNode],err:%v", err))
+				err = nil
+				continue
+			}
 		}
-		mp, err := vol.getMetaPartition(mr.PartitionID)
-		if err != nil {
-			log.LogError(fmt.Sprintf("action[UpdateMetaNode],err:%v", err))
-			err = nil
-			continue
-		}
+
 		//send latest end to replica
 		if mr.End != mp.End {
 			tasks := make([]*proto.AdminTask, 0)
