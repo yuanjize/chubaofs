@@ -290,7 +290,7 @@ func (dp *DataPartition) statusUpdate() {
 	status := proto.ReadWrite
 	_, err := os.Stat(dp.path)
 	if err != nil {
-		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		umpKey := fmt.Sprintf("%s_datanode", ClusterID)
 		ump.Alarm(umpKey, fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ", ClusterID, LocalIP, dp.path, err.Error()))
 		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ", ClusterID, LocalIP, dp.path, err.Error()))
 	}
