@@ -15,19 +15,19 @@
 package master
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
-	"net/http"
-	"testing"
-	_ "net/http/pprof"
 	"github.com/chubaofs/chubaofs/master/mocktest"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
-	"strings"
-	"time"
 	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
-	"crypto/md5"
-	"encoding/hex"
+	"strings"
+	"testing"
+	"time"
 )
 
 const (

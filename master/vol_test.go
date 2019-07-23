@@ -1,10 +1,10 @@
 package master
 
 import (
-	"testing"
-	"github.com/chubaofs/chubaofs/util"
 	"fmt"
+	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"testing"
 	"time"
 )
 

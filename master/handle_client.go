@@ -19,9 +19,9 @@ import (
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"io"
 	"net/http"
 	"strconv"
-	"io"
 )
 
 type VolStatInfo struct {

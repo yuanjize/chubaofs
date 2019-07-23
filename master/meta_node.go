@@ -17,28 +17,28 @@ package master
 import (
 	"encoding/json"
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
 	"math/rand"
 	"sync"
 	"time"
-	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type MetaNode struct {
 	ID                 uint64
-	Addr                      string
-	IsActive                  bool
-	Sender                    *AdminTaskSender
-	RackName                  string `json:"Rack"`
-	MaxMemAvailWeight         uint64 `json:"MaxMemAvailWeight"`
-	Total                     uint64 `json:"TotalWeight"`
-	Used                      uint64 `json:"UsedWeight"`
-	Ratio                     float64
-	SelectCount               uint64
-	Carry                     float64
-	Threshold                 float32
-	ReportTime                time.Time
-	metaPartitionInfos        []*proto.MetaPartitionReport
-	MetaPartitionCount        int
+	Addr               string
+	IsActive           bool
+	Sender             *AdminTaskSender
+	RackName           string `json:"Rack"`
+	MaxMemAvailWeight  uint64 `json:"MaxMemAvailWeight"`
+	Total              uint64 `json:"TotalWeight"`
+	Used               uint64 `json:"UsedWeight"`
+	Ratio              float64
+	SelectCount        uint64
+	Carry              float64
+	Threshold          float32
+	ReportTime         time.Time
+	metaPartitionInfos []*proto.MetaPartitionReport
+	MetaPartitionCount int
 	sync.RWMutex
 	PersistenceMetaPartitions []uint64
 }

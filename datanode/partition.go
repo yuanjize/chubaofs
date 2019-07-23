@@ -31,9 +31,9 @@ import (
 	"github.com/chubaofs/chubaofs/storage"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 	"math/rand"
 	"syscall"
-	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 const (
@@ -288,11 +288,11 @@ func (dp *DataPartition) statusUpdateScheduler() {
 
 func (dp *DataPartition) statusUpdate() {
 	status := proto.ReadWrite
-	_,err:=os.Stat(dp.path)
-	if err!=nil{
+	_, err := os.Stat(dp.path)
+	if err != nil {
 		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
-		ump.Alarm(umpKey,fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ",ClusterID,LocalIP,dp.path,err.Error()))
-		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ",ClusterID,LocalIP,dp.path,err.Error()))
+		ump.Alarm(umpKey, fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ", ClusterID, LocalIP, dp.path, err.Error()))
+		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) diskPath(%v) error(%v) ", ClusterID, LocalIP, dp.path, err.Error()))
 	}
 	dp.computeUsage()
 	if dp.used >= dp.partitionSize {
@@ -301,8 +301,8 @@ func (dp *DataPartition) statusUpdate() {
 	if dp.extentStore.GetExtentCount() >= MaxActiveExtents {
 		status = proto.ReadOnly
 	}
-	if dp.Status()==proto.Unavaliable{
-		status=proto.Unavaliable
+	if dp.Status() == proto.Unavaliable {
+		status = proto.Unavaliable
 	}
 	dp.partitionStatus = int(math.Min(float64(status), float64(dp.disk.Status)))
 }
@@ -440,7 +440,7 @@ func (dp *DataPartition) fetchReplicaHosts() (isLeader bool, replicaHosts []stri
 	)
 	params := make(map[string]string)
 	params["id"] = strconv.Itoa(int(dp.partitionId))
-	params["name"]=dp.volumeId
+	params["name"] = dp.volumeId
 	if HostsBuf, err = MasterHelper.Request("GET", AdminGetDataPartition, params, nil); err != nil {
 		isLeader = false
 		return

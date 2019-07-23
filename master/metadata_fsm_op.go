@@ -95,7 +95,7 @@ type DataPartitionValue struct {
 	Hosts         string
 	PartitionType string
 	IsManual      bool
-	Replicas    []*replicaValue
+	Replicas      []*replicaValue
 }
 
 func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
@@ -105,7 +105,7 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 		Hosts:         dp.HostsToString(),
 		PartitionType: dp.PartitionType,
 		IsManual:      dp.IsManual,
-		Replicas:    make([]*replicaValue, 0),
+		Replicas:      make([]*replicaValue, 0),
 	}
 	for _, replica := range dp.Replicas {
 		rv := &replicaValue{Addr: replica.Addr, DiskPath: replica.DiskPath}

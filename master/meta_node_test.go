@@ -1,9 +1,9 @@
 package master
 
 import (
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 )
 
 func TestMetaNode(t *testing.T) {

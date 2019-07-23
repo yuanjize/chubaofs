@@ -1,9 +1,9 @@
 package master
 
 import (
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 )
 
 func TestMetaPartition(t *testing.T) {

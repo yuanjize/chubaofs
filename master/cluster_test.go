@@ -1,13 +1,13 @@
 package master
 
 import (
-	"testing"
-	"sync"
 	"fmt"
+	"sync"
+	"testing"
 )
 
 func buildPanicCluster() *Cluster {
-	c := newCluster(server.cluster.Name, server.cluster.leaderInfo, server.cluster.fsm, server.cluster.partition,server.cluster.cfg)
+	c := newCluster(server.cluster.Name, server.cluster.leaderInfo, server.cluster.fsm, server.cluster.partition, server.cluster.cfg)
 	v := buildPanicVol()
 	c.putVol(v)
 	return c

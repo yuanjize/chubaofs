@@ -37,12 +37,12 @@ type DataNode struct {
 	ReportTime                time.Time
 	isActive                  bool
 	sync.RWMutex
-	Ratio                     float64
-	SelectCount               uint64
-	Carry                     float64
-	Sender                    *AdminTaskSender
-	dataPartitionInfos        []*proto.PartitionReport
-	DataPartitionCount        uint32
+	Ratio              float64
+	SelectCount        uint64
+	Carry              float64
+	Sender             *AdminTaskSender
+	dataPartitionInfos []*proto.PartitionReport
+	DataPartitionCount uint32
 
 	PersistenceDataPartitions []uint64
 }

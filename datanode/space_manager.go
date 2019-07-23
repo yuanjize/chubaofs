@@ -241,7 +241,7 @@ func (space *SpaceManager) CreatePartition(volId string, partitionId uint32, sto
 	)
 	for i := 0; i < len(space.disks); i++ {
 		disk = space.getMinPartitionCntDisk()
-		if disk.Available < uint64(storeSize) || disk.Status!=proto.ReadWrite {
+		if disk.Available < uint64(storeSize) || disk.Status != proto.ReadWrite {
 			disk = nil
 			continue
 		}
