@@ -1,16 +1,16 @@
 package mocktest
 
 import (
-	"net"
-	"io/ioutil"
-	"github.com/chubaofs/chubaofs/proto"
-	"fmt"
-	"net/http"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
+	"io/ioutil"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
-	"bytes"
 	"sync"
 )
 
@@ -266,8 +266,7 @@ func (mms *MockMetaServer) handleLoadMetaPartition(conn net.Conn, p *proto.Packe
 		responseAckErrToMaster(conn, p, err)
 		return
 	}
-	resp := &proto.LoadMetaPartitionMetricResponse{
-	}
+	resp := &proto.LoadMetaPartitionMetricResponse{}
 	return mms.postResponseToMaster(adminTask, resp)
 }
 
@@ -285,7 +284,6 @@ func (mms *MockMetaServer) handleOfflineMetaPartition(conn net.Conn, p *proto.Pa
 		responseAckErrToMaster(conn, p, err)
 		return
 	}
-	resp := &proto.MetaPartitionOfflineResponse{
-	}
+	resp := &proto.MetaPartitionOfflineResponse{}
 	return mms.postResponseToMaster(adminTask, resp)
 }

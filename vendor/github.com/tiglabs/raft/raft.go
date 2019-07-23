@@ -19,13 +19,13 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 	"time"
+	"unsafe"
 
+	"github.com/chubaofs/chubaofs/util/ump"
 	"github.com/tiglabs/raft/logger"
 	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/util"
-	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 const UmpModuleName = "raft"
@@ -168,7 +168,6 @@ func newRaft(config *Config, raftConfig *RaftConfig) (*raft, error) {
 	raft.curApplied.Set(r.raftLog.applied)
 	raft.peerState.replace(raftConfig.Peers)
 
-	ump.InitUmp(UmpModuleName)
 	util.RunWorker(raft.runApply, raft.handlePanic)
 	util.RunWorker(raft.run, raft.handlePanic)
 	util.RunWorker(raft.monitor, raft.handlePanic)

@@ -80,7 +80,7 @@ func (lw *LogWrite) initLogFp(sufixx string) (err error) {
 	lw.sigCh = make(chan bool, 1)
 	lw.logSufixx = sufixx
 	lw.logName = fmt.Sprintf("%s%s%s", LogDir, "ump_", lw.logSufixx)
-	if lw.logFp, err = os.OpenFile(lw.logName, LogFileOpt, 0666); err != nil {
+	if lw.logFp, err = os.OpenFile(lw.logName, LogFileOpt, 0777); err != nil {
 		return
 	}
 	if fi, err = lw.logFp.Stat(); err != nil {
@@ -107,7 +107,7 @@ func (lw *LogWrite) backGroundCheckFile() (err error) {
 	}
 	os.Rename(lw.logName, name)
 
-	if lw.logFp, err = os.OpenFile(lw.logName, LogFileOpt, 0666); err != nil {
+	if lw.logFp, err = os.OpenFile(lw.logName, LogFileOpt, 0777); err != nil {
 		lw.seq--
 		return
 	}
@@ -151,9 +151,11 @@ func (lw *LogWrite) backGroundWrite(umpType string) {
 }
 
 func initLogName(module string) (err error) {
-	if err = os.MkdirAll(LogDir, 0666); err != nil {
+	if err = os.MkdirAll(LogDir, 0777); err != nil {
 		return
 	}
+
+	os.Chmod(LogDir, 0777)
 
 	if HostName, err = GetLocalIpAddr(); err != nil {
 		return

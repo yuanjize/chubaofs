@@ -2,25 +2,25 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"github.com/chubaofs/chubaofs/util"
 	"io/ioutil"
 	"net/http"
 	"runtime"
 	"strings"
 	"time"
-	"github.com/chubaofs/chubaofs/util"
-	"flag"
 	//"strconv"
 )
 
 var (
 	maxPartitionId  = 189451
 	verifyPartition chan int
-	isOnlyCheckSize=flag.Bool("checkSize",true,"isonly check dataPartitionSize")
+	isOnlyCheckSize = flag.Bool("checkSize", true, "isonly check dataPartitionSize")
 )
 
 var (
-	aa="65527 56255 54649 59941 62755 166216 161510 92617 97293 146300 135822 75307 113628 143986 36893 163773 100776 151056 155729 66851 112517 167387 137016 93854 142857 116008 125301 124141 79215 156825 47782 160315 41468 110095 57147 35144 94920 87119 134653 101941 43862 82104 70602 133477 162665 89221 123033 149886 126521 77254 80184 85950 132340 44301 117185 104290 46475 154496 59238 127585 84027 99634 73036 118401 111287 107775 128810 98420 90425 152166 52587 121837 145183 69160 147529 114853 159157 131193 165007 83067 96168 76270 91452 81149 85015 105457 53502 74180 39728 41036 140484 108957 71636 129971 120705 64141 33620 157963 138153 32530 141693 60642 153342 67684 148644 139355 106634 38201 119515 78236 103130"
+	aa = "65527 56255 54649 59941 62755 166216 161510 92617 97293 146300 135822 75307 113628 143986 36893 163773 100776 151056 155729 66851 112517 167387 137016 93854 142857 116008 125301 124141 79215 156825 47782 160315 41468 110095 57147 35144 94920 87119 134653 101941 43862 82104 70602 133477 162665 89221 123033 149886 126521 77254 80184 85950 132340 44301 117185 104290 46475 154496 59238 127585 84027 99634 73036 118401 111287 107775 128810 98420 90425 152166 52587 121837 145183 69160 147529 114853 159157 131193 165007 83067 96168 76270 91452 81149 85015 105457 53502 74180 39728 41036 140484 108957 71636 129971 120705 64141 33620 157963 138153 32530 141693 60642 153342 67684 148644 139355 106634 38201 119515 78236 103130"
 )
 
 func main() {
@@ -31,8 +31,8 @@ func main() {
 		go verifyWorker()
 	}
 	// arr:=strings.Split(aa," ")
-	for i:=1;i<maxPartitionId;i++ {
-		partitionId:=i
+	for i := 1; i < maxPartitionId; i++ {
+		partitionId := i
 		verifyPartition <- partitionId
 	}
 	for {
@@ -44,7 +44,7 @@ func verifyWorker() {
 	for {
 		select {
 		case partitionId := <-verifyPartition:
-			err := verifyDataPartition(partitionId,*isOnlyCheckSize)
+			err := verifyDataPartition(partitionId, *isOnlyCheckSize)
 			if err != nil {
 				fmt.Println(fmt.Sprintf("verify partitionId %v FAILED %v", partitionId, err.Error()))
 			} else {
@@ -64,25 +64,24 @@ type FileIncore struct {
 }
 
 type DataPartition struct {
-	Replica []*Replica
-	ReplicaNum int
+	Replica          []*Replica
+	ReplicaNum       int
 	PersistenceHosts []string
-	VolName string
-	FileInCoreMap map[int]*FileMeta
-	PartitionID int
-
+	VolName          string
+	FileInCoreMap    map[int]*FileMeta
+	PartitionID      int
 }
 
 type Replica struct {
-	Addr string
-	ReportTime int64
-	FileCount int
-	Status int
+	Addr                    string
+	ReportTime              int64
+	FileCount               int
+	Status                  int
 	LoadPartitionIsResponse bool
-	TotalSize int
-	UsedSize int
-	NeedCompare bool
-	DiskPath string
+	TotalSize               int
+	UsedSize                int
+	NeedCompare             bool
+	DiskPath                string
 }
 
 type FileMeta struct {
@@ -96,8 +95,8 @@ type FileCrc struct {
 	Size    int
 }
 
-func verifyDataPartition(partitionId int,isOnlyVerifySize bool) (err error) {
-	if isOnlyVerifySize{
+func verifyDataPartition(partitionId int, isOnlyVerifySize bool) (err error) {
+	if isOnlyVerifySize {
 		return checkDataPartitionSize(partitionId)
 	}
 	vname, err := getVolName(partitionId)
@@ -118,7 +117,7 @@ func getDataPartitionResult(partitionId int) (err error) {
 	loadUrl := fmt.Sprintf("http://dbbak.jd.local/dataPartition/get?id=%v", partitionId)
 	resp, err := http.Get(loadUrl)
 	if err != nil {
-		err = fmt.Errorf("cannot get partitonId %v result %v", partitionId,err)
+		err = fmt.Errorf("cannot get partitonId %v result %v", partitionId, err)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -133,35 +132,35 @@ func getDataPartitionResult(partitionId int) (err error) {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v json unmash %v", partitionId, resp.StatusCode, err.Error())
 		return
 	}
-	maxUsed:=0
+	maxUsed := 0
 	var maxReportTime int64
-	for i:=0;i<len(dp.Replica);i++{
-		if maxUsed<dp.Replica[i].UsedSize{
-			maxUsed=dp.Replica[i].UsedSize
+	for i := 0; i < len(dp.Replica); i++ {
+		if maxUsed < dp.Replica[i].UsedSize {
+			maxUsed = dp.Replica[i].UsedSize
 		}
-		if maxReportTime<dp.Replica[i].ReportTime{
-			maxReportTime=dp.Replica[i].ReportTime
+		if maxReportTime < dp.Replica[i].ReportTime {
+			maxReportTime = dp.Replica[i].ReportTime
 		}
 	}
-	for i:=0;i<len(dp.Replica);i++{
+	for i := 0; i < len(dp.Replica); i++ {
 		var (
-			err1,err2 error
+			err1, err2 error
 		)
-		if maxUsed-dp.Replica[i].UsedSize>util.MB{
-			err1=fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
-				dp.PartitionID,dp.Replica[i].Addr,maxUsed,dp.Replica[i].UsedSize))
+		if maxUsed-dp.Replica[i].UsedSize > util.MB {
+			err1 = fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
+				dp.PartitionID, dp.Replica[i].Addr, maxUsed, dp.Replica[i].UsedSize))
 		}
-		if maxReportTime-dp.Replica[i].ReportTime>3600{
-			err2=fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
-				dp.PartitionID,dp.Replica[i].Addr,maxReportTime,dp.Replica[i].ReportTime))
+		if maxReportTime-dp.Replica[i].ReportTime > 3600 {
+			err2 = fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
+				dp.PartitionID, dp.Replica[i].Addr, maxReportTime, dp.Replica[i].ReportTime))
 		}
-		if err1!=nil && err2!=nil {
-			return fmt.Errorf("error1 %v error2 %v",err1.Error(),err2.Error())
+		if err1 != nil && err2 != nil {
+			return fmt.Errorf("error1 %v error2 %v", err1.Error(), err2.Error())
 		}
-		if err1!=nil {
+		if err1 != nil {
 			return err1
 		}
-		if err2!=nil {
+		if err2 != nil {
 			return err2
 		}
 
@@ -184,18 +183,16 @@ func getDataPartitionResult(partitionId int) (err error) {
 			}
 		}
 
-	
 		fmt.Println(fmt.Sprintf("file %v_%v success verify", partitionId, file.Name))
 	}
 	return nil
 }
 
-
 func checkDataPartitionSize(partitionId int) (err error) {
 	getPartitionUrl := fmt.Sprintf("http://dbbak.jd.local/dataPartition/get?id=%v", partitionId)
 	resp, err := http.Get(getPartitionUrl)
 	if err != nil {
-		err = fmt.Errorf("cannot get partitonId %v result error %v", partitionId,err.Error())
+		err = fmt.Errorf("cannot get partitonId %v result error %v", partitionId, err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -210,30 +207,29 @@ func checkDataPartitionSize(partitionId int) (err error) {
 		err = fmt.Errorf("cannot get partitonId %v result status code %v json unmash %v", partitionId, resp.StatusCode, err.Error())
 		return
 	}
-	maxUsed:=0
+	maxUsed := 0
 	var maxReportTime int64
-	for i:=0;i<len(dp.Replica);i++{
-		if maxUsed<dp.Replica[i].UsedSize{
-			maxUsed=dp.Replica[i].UsedSize
+	for i := 0; i < len(dp.Replica); i++ {
+		if maxUsed < dp.Replica[i].UsedSize {
+			maxUsed = dp.Replica[i].UsedSize
 		}
-		if maxReportTime<dp.Replica[i].ReportTime{
-			maxReportTime=dp.Replica[i].ReportTime
+		if maxReportTime < dp.Replica[i].ReportTime {
+			maxReportTime = dp.Replica[i].ReportTime
 		}
 	}
-	for i:=0;i<len(dp.Replica);i++{
-		if maxUsed-dp.Replica[i].UsedSize>util.MB{
+	for i := 0; i < len(dp.Replica); i++ {
+		if maxUsed-dp.Replica[i].UsedSize > util.MB {
 			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxUsedSize %v currentUsedSize %v",
-				dp.PartitionID,dp.Replica[i].Addr,maxUsed,dp.Replica[i].UsedSize))
+				dp.PartitionID, dp.Replica[i].Addr, maxUsed, dp.Replica[i].UsedSize))
 		}
-		if maxReportTime-dp.Replica[i].ReportTime>3600{
+		if maxReportTime-dp.Replica[i].ReportTime > 3600 {
 			return fmt.Errorf(fmt.Sprintf("checkPartition %v failed on %v maxReportTime %v currenReportTime %v",
-				dp.PartitionID,dp.Replica[i].Addr,maxReportTime,dp.Replica[i].ReportTime))
+				dp.PartitionID, dp.Replica[i].Addr, maxReportTime, dp.Replica[i].ReportTime))
 		}
 	}
 
 	return nil
 }
-
 
 func loadDataParititon(partitionId int, vname string) (err error) {
 	loadUrl := fmt.Sprintf("http://dbbak.jd.local/dataPartition/load?id=%v&name=%v", partitionId, vname)

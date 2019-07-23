@@ -1,8 +1,8 @@
 package master
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestGetAllVols(t *testing.T) {

@@ -20,11 +20,10 @@ import (
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
-	"github.com/chubaofs/chubaofs/util/ump"
 	"net/http/httputil"
+	"regexp"
 	"strconv"
 	"sync"
-	"regexp"
 )
 
 //config keys
@@ -81,12 +80,11 @@ func (m *Master) Start(cfg *config.Config) (err error) {
 		log.LogError(err)
 		return
 	}
-	ump.InitUmp(fmt.Sprintf("%v_%v", m.clusterName, UmpModuleName))
 	if err = m.createRaftServer(); err != nil {
 		log.LogError(errors.ErrorStack(err))
 		return
 	}
-	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition,m.config)
+	m.cluster = newCluster(m.clusterName, m.leaderInfo, m.fsm, m.partition, m.config)
 	m.cluster.retainLogs = m.retainLogs
 	//m.loadMetadata()
 	m.startHttpService()

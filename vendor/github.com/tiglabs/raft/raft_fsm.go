@@ -242,7 +242,7 @@ func (r *raftFsm) recoverCommit() error {
 				r.applyConfChange(cc)
 			}
 		}
-		if r.raftLog.applied==r.raftLog.committed{
+		if r.raftLog.applied == r.raftLog.committed {
 			break
 		}
 	}

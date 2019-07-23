@@ -143,7 +143,7 @@ func (d *Disk) addWriteErr() {
 func (d *Disk) startScheduleTasks() {
 	go func() {
 		updateSpaceInfoTicker := time.NewTicker(5 * time.Second)
-		checkStatusTickser :=time.NewTicker(time.Minute*2)
+		checkStatusTickser := time.NewTicker(time.Minute * 2)
 		defer func() {
 			updateSpaceInfoTicker.Stop()
 			checkStatusTickser.Stop()
@@ -165,10 +165,10 @@ func (d *Disk) updateSpaceInfo() (err error) {
 	if err = syscall.Statfs(d.Path, &statsInfo); err != nil {
 		d.addReadErr()
 	}
-	if d.Status==proto.Unavaliable{
+	if d.Status == proto.Unavaliable {
 		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
-		ump.Alarm(umpKey,fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ",ClusterID,LocalIP,d.Path))
-		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ",ClusterID,LocalIP,d.Path))
+		ump.Alarm(umpKey, fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
+		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
 	} else if d.Available <= 0 {
 		d.Status = proto.ReadOnly
 	} else {
@@ -244,43 +244,43 @@ func (d *Disk) isPartitionDir(filename string) (is bool) {
 }
 
 const (
-	DiskStatusFile=".diskstatus"
+	DiskStatusFile = ".diskstatus"
 )
 
-func (d *Disk)checkDiskStatus(){
-	path:=path.Join(d.Path,DiskStatusFile)
-	fp,err:=os.OpenFile(path,os.O_CREATE|os.O_TRUNC|os.O_RDWR,0755)
-	if err!=nil {
+func (d *Disk) checkDiskStatus() {
+	path := path.Join(d.Path, DiskStatusFile)
+	fp, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+	if err != nil {
 		d.triggerDiskError(err)
 		return
 	}
 	defer fp.Close()
-	data:=[]byte(DiskStatusFile)
-	_,err=fp.WriteAt(data,0)
-	if err!=nil {
+	data := []byte(DiskStatusFile)
+	_, err = fp.WriteAt(data, 0)
+	if err != nil {
 		d.triggerDiskError(err)
 		return
 	}
-	if err=fp.Sync();err!=nil {
+	if err = fp.Sync(); err != nil {
 		d.triggerDiskError(err)
 		return
 	}
-	if _,err=fp.ReadAt(data,0);err!=nil {
+	if _, err = fp.ReadAt(data, 0); err != nil {
 		d.triggerDiskError(err)
 		return
 	}
 }
 
-func (d *Disk)triggerDiskError(err error){
-	if err==nil {
+func (d *Disk) triggerDiskError(err error) {
+	if err == nil {
 		return
 	}
-	if IsDiskErr(err.Error()){
-		d.Status=proto.Unavaliable
+	if IsDiskErr(err.Error()) {
+		d.Status = proto.Unavaliable
 		d.Lock()
 		defer d.Unlock()
-		for _,dp:=range d.partitionMap{
-			dp.partitionStatus=proto.Unavaliable
+		for _, dp := range d.partitionMap {
+			dp.partitionStatus = proto.Unavaliable
 		}
 	}
 	return

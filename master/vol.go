@@ -15,13 +15,13 @@
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
-	"encoding/json"
-	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 )
 
 type Vol struct {

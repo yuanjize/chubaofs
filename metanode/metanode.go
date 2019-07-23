@@ -30,16 +30,15 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
-	"github.com/chubaofs/chubaofs/util/ump"
-	"github.com/chubaofs/chubaofs/util"
 )
 
 var (
 	clusterInfo    *proto.ClusterInfo
 	configTotalMem int64
-	masterHelper = util.NewMasterHelper()
+	masterHelper   = util.NewMasterHelper()
 )
 
 // The MetaNode manage Dentry and inode information in multiple metaPartition, and
@@ -125,20 +124,18 @@ func (m *MetaNode) onStart(cfg *config.Config) (err error) {
 	return
 }
 
-
-
 type MetaNodeInfo struct {
 	Addr                      string
 	PersistenceMetaPartitions []uint64
 }
 
 const (
-	GetMetaNode               = "/metaNode/get"
+	GetMetaNode = "/metaNode/get"
 )
 
 func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
 	params := make(map[string]string)
-	params["addr"] = fmt.Sprintf("%v:%v",m.localAddr,m.listen)
+	params["addr"] = fmt.Sprintf("%v:%v", m.localAddr, m.listen)
 	var data interface{}
 	for i := 0; i < 3; i++ {
 		data, err = masterHelper.Request(http.MethodGet, GetMetaNode, params, nil)
@@ -148,9 +145,9 @@ func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
 		}
 		break
 	}
-	minfo :=new(MetaNodeInfo)
-	if err = json.Unmarshal(data.([]byte), minfo);err!=nil {
-		err=fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v",err)
+	minfo := new(MetaNodeInfo)
+	if err = json.Unmarshal(data.([]byte), minfo); err != nil {
+		err = fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v", err)
 		log.LogErrorf(err.Error())
 		return
 	}
@@ -159,15 +156,15 @@ func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
 	}
 	lackPartitions := make([]uint64, 0)
 	for _, partitionID := range minfo.PersistenceMetaPartitions {
-		_,err = m.metaManager.GetPartition(partitionID)
-		if err!=nil {
+		_, err = m.metaManager.GetPartition(partitionID)
+		if err != nil {
 			lackPartitions = append(lackPartitions, partitionID)
 		}
 	}
 	if len(lackPartitions) == 0 {
 		return
 	}
-	err = fmt.Errorf("LackPartitions %v on metanode %v,metanode cannot start", lackPartitions, fmt.Sprintf("%v:%v",m.localAddr,m.listen))
+	err = fmt.Errorf("LackPartitions %v on metanode %v,metanode cannot start", lackPartitions, fmt.Sprintf("%v:%v", m.localAddr, m.listen))
 	log.LogErrorf(err.Error())
 	return
 }
@@ -345,7 +342,6 @@ func postToMaster(method string, reqPath string, body []byte) (msg []byte,
 
 func (m *MetaNode) startUMP() (err error) {
 	UMPKey = clusterInfo.Cluster + "_metaNode"
-	ump.InitUmp(UMPKey)
 	return
 }
 

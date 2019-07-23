@@ -108,9 +108,9 @@ func (w *Wrapper) update() {
 	for {
 		select {
 		case <-ticker.C:
-			err:=w.updateDataPartition()
-			if err!=nil{
-				log.LogWarnf("vol %v update DataPartition error (%v)",w.volName,err.Error())
+			err := w.updateDataPartition()
+			if err != nil {
+				log.LogWarnf("vol %v update DataPartition error (%v)", w.volName, err.Error())
 			}
 		}
 	}
@@ -161,7 +161,7 @@ func (w *Wrapper) updateDataPartition() error {
 			}
 		}
 	}
-	log.LogInfof(fmt.Sprintf("vol %v update readWriteDataPartiton to %v",w.volName,len(rwPartitionGroups)))
+	log.LogInfof(fmt.Sprintf("vol %v update readWriteDataPartiton to %v", w.volName, len(rwPartitionGroups)))
 	w.rwPartition = rwPartitionGroups
 	w.localLeaderPartitions = localLeaderPartitionGroups
 

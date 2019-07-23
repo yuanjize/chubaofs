@@ -152,7 +152,7 @@ func (s *DataNode) handleCreateFile(pkg *Packet) {
 func (s *DataNode) handleCreateDataPartition(pkg *Packet) {
 	var (
 		err error
-		dp *DataPartition
+		dp  *DataPartition
 	)
 	defer func() {
 		if err != nil {
@@ -277,7 +277,7 @@ func (s *DataNode) asyncLoadDataPartition(task *proto.AdminTask) {
 			log.LogErrorf("from master Task[%v] failed,error[%v]", task.ToString(), response.Result)
 		} else {
 			response = dp.Load()
-			response.VolName=dp.volumeId
+			response.VolName = dp.volumeId
 			response.PartitionId = uint64(request.PartitionId)
 			response.Status = proto.TaskSuccess
 		}

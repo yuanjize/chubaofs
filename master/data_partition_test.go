@@ -1,10 +1,10 @@
 package master
 
 import (
-	"time"
-	"testing"
 	"fmt"
 	"github.com/chubaofs/chubaofs/util"
+	"testing"
+	"time"
 )
 
 func TestDataPartition(t *testing.T) {

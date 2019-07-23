@@ -3,8 +3,8 @@ package master
 import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/util"
-	"strconv"
 	"github.com/chubaofs/chubaofs/util/log"
+	"strconv"
 )
 
 type DataNodeSpaceStat struct {

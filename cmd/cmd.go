@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/chubaofs/chubaofs/util/config"
+	"github.com/chubaofs/chubaofs/util/ump"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -130,7 +131,7 @@ func main() {
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	ump.InitUmp(role)
 	// Init server instance with specified role configuration.
 	var (
 		server Server

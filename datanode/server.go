@@ -49,7 +49,7 @@ var (
 
 	LocalIP      string
 	gConnPool    = pool.NewConnectPool()
-	ClusterID 	 string
+	ClusterID    string
 	MasterHelper = util.NewMasterHelper()
 )
 
@@ -124,8 +124,7 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	if err = s.parseConfig(cfg); err != nil {
 		return
 	}
-	ump.InitUmp(UmpModuleName)
-	
+
 	s.registerToMaster()
 	debug.SetMaxThreads(20000)
 	if err = s.startSpaceManager(cfg); err != nil {
@@ -136,7 +135,7 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	if err = s.checkLocalPartitionMatchWithMaster(); err != nil {
 		fmt.Println(err)
 		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
-		ump.Alarm(umpKey,err.Error())
+		ump.Alarm(umpKey, err.Error())
 		return
 	}
 
@@ -153,7 +152,7 @@ type DataNodeInfo struct {
 }
 
 const (
-	GetDataNode               = "/dataNode/get"
+	GetDataNode = "/dataNode/get"
 )
 
 func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
@@ -168,9 +167,9 @@ func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
 		}
 		break
 	}
-	dinfo:=new(DataNodeInfo)
-	if err = json.Unmarshal(data.([]byte),dinfo);err!=nil {
-		err=fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v",err)
+	dinfo := new(DataNodeInfo)
+	if err = json.Unmarshal(data.([]byte), dinfo); err != nil {
+		err = fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v", err)
 		log.LogErrorf(err.Error())
 		return
 	}
@@ -191,7 +190,6 @@ func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
 	log.LogErrorf(err.Error())
 	return
 }
-
 
 func (s *DataNode) onShutdown() {
 	close(s.stopC)
@@ -286,7 +284,7 @@ func (s *DataNode) registerToMaster() {
 			json.Unmarshal(data, cInfo)
 			LocalIP = string(cInfo.Ip)
 			s.clusterId = cInfo.Cluster
-			ClusterID=s.clusterId
+			ClusterID = s.clusterId
 			s.localServeAddr = fmt.Sprintf("%s:%v", LocalIP, s.port)
 			if !util.IP(LocalIP) {
 				log.LogErrorf("action[registerToMaster] got an invalid local ip[%v] from master[%v].",
@@ -407,17 +405,17 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	} else if flag == ReadFlag {
 		d.addReadErr()
 	}
-	d.Status=proto.Unavaliable
+	d.Status = proto.Unavaliable
 	d.Lock()
 	defer d.Unlock()
-	for _,dp:=range d.partitionMap{
-		dp.partitionStatus=proto.Unavaliable
+	for _, dp := range d.partitionMap {
+		dp.partitionStatus = proto.Unavaliable
 	}
 
 }
 
 func IsDiskErr(errMsg string) bool {
-	if strings.Contains(errMsg,syscall.EIO.Error()){
+	if strings.Contains(errMsg, syscall.EIO.Error()) {
 		return true
 	}
 	return false
