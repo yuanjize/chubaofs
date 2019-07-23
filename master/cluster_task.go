@@ -461,7 +461,6 @@ func (c *Cluster) dealLoadDataPartitionResponse(nodeAddr string, resp *proto.Loa
 		dataNode *DataNode
 		dp       *DataPartition
 	)
-	log.LogWarnf("dealLoadDataPartitionResponse,status[%v],pss[%v],err[%v]", resp.Status, resp.PartitionSnapshot, err)
 	if resp.Status == proto.TaskFail || resp.PartitionSnapshot == nil {
 		return
 	}
