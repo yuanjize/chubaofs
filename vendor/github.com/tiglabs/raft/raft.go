@@ -420,7 +420,7 @@ func (s *raft) monitor() {
 				s.mStatus.conErrCount = 0
 			}
 			if s.mStatus.conErrCount > 5 {
-				umpKey := fmt.Sprintf("%s_warning", s.config.ClusterID)
+				umpKey := fmt.Sprintf("%s", s.config.ClusterID)
 				errMsg := fmt.Sprintf("raft status not health partitionID[%d]_nodeID[%d]_leader[%v]_state[%v]_replicas[%v]",
 					s.raftFsm.id, s.raftFsm.config.NodeID, s.raftFsm.leader, s.raftFsm.state, s.raftFsm.peers())
 				ump.Alarm(umpKey, errMsg)
@@ -440,7 +440,7 @@ func (s *raft) monitor() {
 						s.mStatus.replicasErrCnt[id] = 0
 					}
 					if s.mStatus.replicasErrCnt[id] > 5 {
-						umpKey := fmt.Sprintf("%s_warning", s.config.ClusterID)
+						umpKey := fmt.Sprintf("%s", s.config.ClusterID)
 						errMsg := fmt.Sprintf("raft partitionID[%d] replicaID[%v] not active peer[%v]",
 							s.raftFsm.id, id, p.peer)
 						ump.Alarm(umpKey, errMsg)

@@ -134,7 +134,7 @@ func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	// check local partition compare with master ,if lack,then not start
 	if err = s.checkLocalPartitionMatchWithMaster(); err != nil {
 		fmt.Println(err)
-		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		umpKey := fmt.Sprintf("%s_datanode", ClusterID)
 		ump.Alarm(umpKey, err.Error())
 		return
 	}

@@ -166,7 +166,7 @@ func (d *Disk) updateSpaceInfo() (err error) {
 		d.addReadErr()
 	}
 	if d.Status == proto.Unavaliable {
-		umpKey := fmt.Sprintf("%s_datanode_warning", ClusterID)
+		umpKey := fmt.Sprintf("%s_datanode", ClusterID)
 		ump.Alarm(umpKey, fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
 		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
 	} else if d.Available <= 0 {
