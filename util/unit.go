@@ -44,6 +44,7 @@ const (
 	ExtentSize             = BlockCount * BlockSize
 	ExtentFileSizeLimit    = BlockHeaderSize + ExtentSize
 	PacketHeaderSize       = 45
+	TinyBlockSize          = 1 * MB
 )
 
 func Min(a, b int) int {
