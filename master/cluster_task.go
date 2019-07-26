@@ -584,14 +584,11 @@ func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.Met
 	}
 }
 
-func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, hasArriveThreshold bool, metaNode *MetaNode) {
+func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, hasArriveThreshold bool, metaNode *MetaNode) (err error){
 	if !hasArriveThreshold {
 		return
 	}
-	var (
-		vol *Vol
-		err error
-	)
+	var vol *Vol
 	if vol, err = c.getVol(mp.volName); err != nil {
 		log.LogWarnf("action[updateEnd] vol[%v] not found", mp.volName)
 		return
@@ -603,5 +600,5 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, ha
 		end = mr.MaxInodeID + defaultMetaPartitionInodeIDStep
 	}
 	log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
-	vol.splitMetaPartition(c, mp, end)
+	return vol.splitMetaPartition(c, mp, end)
 }
