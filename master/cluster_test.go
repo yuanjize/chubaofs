@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"github.com/chubaofs/chubaofs/proto"
+	"time"
 )
 
 func buildPanicCluster() *Cluster {
@@ -165,4 +167,42 @@ func TestCheckBadDiskRecovery(t *testing.T) {
 		t.Errorf("expect bad partition num[0],real num[%v]", count)
 		return
 	}
+}
+
+func TestUpdateEnd(t *testing.T) {
+	vol, err := server.cluster.getVol(commonVolName)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	maxPartitionID := vol.getMaxPartitionID()
+	vol.RLock()
+	mp := vol.MetaPartitions[maxPartitionID]
+	mpLen := len(vol.MetaPartitions)
+	vol.RUnlock()
+	mr := &proto.MetaPartitionReport{
+		PartitionID: mp.PartitionID,
+		Start:       mp.Start,
+		End:         mp.End,
+		Status:      int(mp.Status),
+		MaxInodeID:  mp.Start + 1,
+		IsLeader:    false,
+		VolName:     mp.volName,
+	}
+	metaNode, err := server.cluster.getMetaNode(mp.PersistenceHosts[0])
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	server.cluster.checkMetaNodeHeartbeat()
+	time.Sleep(5 * time.Second)
+	if err = server.cluster.updateEnd(mp, mr, true, metaNode); err != nil {
+		t.Error(err)
+		return
+	}
+	curMpLen := len(vol.MetaPartitions)
+	if curMpLen == mpLen {
+		t.Errorf("split failed,oldMpLen[%v],curMpLen[%v]", mpLen, curMpLen)
+	}
+
 }
