@@ -208,6 +208,8 @@ func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
 	opt.IcacheTimeout = parseConfigString(cfg, "icacheTimeout")
 	opt.LookupValid = parseConfigString(cfg, "lookupValid")
 	opt.AttrValid = parseConfigString(cfg, "attrValid")
+	opt.ReadRate = parseConfigString(cfg, "readRate")
+	opt.WriteRate = parseConfigString(cfg, "writeRate")
 	opt.AutoInvalData = parseConfigString(cfg, "autoInvalData")
 
 	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {

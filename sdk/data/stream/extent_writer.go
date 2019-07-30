@@ -17,6 +17,7 @@ package stream
 import (
 	"container/list"
 	"fmt"
+	"golang.org/x/net/context"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -160,6 +161,10 @@ func (writer *ExtentWriter) sendCurrPacket() (err error) {
 	if writer.currentPacket.getPacketLength() == 0 {
 		return
 	}
+
+	ctx := context.Background()
+	globalWriteLimiter.Wait(ctx)
+
 	writer.updateSizeLock.Lock()
 	writer.requestQueue.PushBack(writer.currentPacket)
 	writer.updateSizeLock.Unlock()

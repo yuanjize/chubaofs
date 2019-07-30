@@ -40,6 +40,8 @@ type MountOption struct {
 	IcacheTimeout int64
 	LookupValid   int64
 	AttrValid     int64
+	ReadRate      int64
+	WriteRate     int64
 	EnSyncWrite   int64
 	AutoInvalData int64
 	UmpDatadir    string
@@ -72,7 +74,7 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 		return nil, err
 	}
 
-	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, s.mw.AppendExtentKey, s.mw.GetExtents)
+	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, opt.ReadRate, opt.WriteRate, s.mw.AppendExtentKey, s.mw.GetExtents)
 	if err != nil {
 		log.LogErrorf("NewExtentClient failed! %v", err.Error())
 		return nil, err

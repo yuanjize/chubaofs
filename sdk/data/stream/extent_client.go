@@ -16,6 +16,7 @@ package stream
 
 import (
 	"fmt"
+	"golang.org/x/time/rate"
 	"sync"
 	"sync/atomic"
 
@@ -33,6 +34,12 @@ import (
 const (
 	MaxRetryLimit = 5
 	RetryInterval = time.Second * 5
+
+	defaultReadLimitRate  = rate.Inf
+	defaultReadLimitBurst = 128
+
+	defaultWriteLimitRate  = rate.Inf
+	defaultWriteLimitBurst = 128
 )
 
 type AppendExtentKeyFunc func(inode uint64, key proto.ExtentKey) error
@@ -45,6 +52,9 @@ var (
 	flushRequestPool   *sync.Pool
 	releaseRequestPool *sync.Pool
 	evictRequestPool   *sync.Pool
+
+	globalReadLimiter  *rate.Limiter
+	globalWriteLimiter *rate.Limiter
 )
 
 type ExtentClient struct {
@@ -54,7 +64,7 @@ type ExtentClient struct {
 	getExtents      GetExtentsFunc
 }
 
-func NewExtentClient(volname, master string, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
+func NewExtentClient(volname, master string, readRate, writeRate int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	client = new(ExtentClient)
 
@@ -89,6 +99,17 @@ retry:
 	evictRequestPool = &sync.Pool{New: func() interface{} {
 		return &EvictRequest{}
 	}}
+
+	if readRate <= 0 {
+		globalReadLimiter = rate.NewLimiter(defaultReadLimitRate, defaultReadLimitBurst)
+	} else {
+		globalReadLimiter = rate.NewLimiter(rate.Limit(readRate), defaultReadLimitBurst)
+	}
+	if writeRate <= 0 {
+		globalWriteLimiter = rate.NewLimiter(defaultWriteLimitRate, defaultWriteLimitBurst)
+	} else {
+		globalWriteLimiter = rate.NewLimiter(rate.Limit(writeRate), defaultWriteLimitBurst)
+	}
 
 	return
 }
