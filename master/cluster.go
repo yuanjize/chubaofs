@@ -1096,6 +1096,16 @@ func (c *Cluster) syncCompactStatus(status bool) (err error) {
 	return
 }
 
+func (c *Cluster) hasEnoughWritableMetaHosts(replicaNum int) bool {
+	maxTotal := c.GetMetaNodeMaxTotal()
+	excludeHosts := make([]string, 0)
+	nodeTabs, _ := c.GetAvailCarryMetaNodeTab(maxTotal, excludeHosts)
+	if nodeTabs != nil && len(nodeTabs) >= replicaNum {
+		return true
+	}
+	return false
+}
+
 func (c *Cluster) clearVols() {
 	c.volsLock.Lock()
 	defer c.volsLock.Unlock()
