@@ -57,6 +57,9 @@ const (
 	LoggerOutput = "output.log"
 
 	UmpModuleName = "fuseclient"
+
+	ControlCommandSetRate = "/rate/set"
+	ControlCommandGetRate = "/rate/get"
 )
 
 var (
@@ -225,6 +228,8 @@ func mount(opt *cfs.MountOption) (fsConn *fuse.Conn, super *cfs.Super, err error
 		return
 	}
 
+	http.HandleFunc(ControlCommandSetRate, super.SetRate)
+	http.HandleFunc(ControlCommandGetRate, super.GetRate)
 	go func() {
 		fmt.Println(http.ListenAndServe(":"+opt.Profport, nil))
 	}()

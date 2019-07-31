@@ -16,6 +16,8 @@ package fs
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -118,6 +120,37 @@ func (s *Super) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.
 	resp.Namelen = DefaultMaxNameLen
 	resp.Frsize = DefaultBlksize
 	return nil
+}
+
+func (s *Super) GetRate(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(s.ec.GetRate()))
+}
+
+func (s *Super) SetRate(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	if rate := r.FormValue("read"); rate != "" {
+		val, err := strconv.Atoi(rate)
+		if err != nil {
+			w.Write([]byte("Set read rate failed\n"))
+		} else {
+			msg := s.ec.SetReadRate(val)
+			w.Write([]byte(fmt.Sprintf("Set read rate to %v successfully\n", msg)))
+		}
+	}
+
+	if rate := r.FormValue("write"); rate != "" {
+		val, err := strconv.Atoi(rate)
+		if err != nil {
+			w.Write([]byte("Set write rate failed\n"))
+		} else {
+			msg := s.ec.SetWriteRate(val)
+			w.Write([]byte(fmt.Sprintf("Set write rate to %v successfully\n", msg)))
+		}
+	}
 }
 
 func (s *Super) umpKey(act string) string {

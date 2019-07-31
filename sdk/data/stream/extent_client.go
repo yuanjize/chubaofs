@@ -114,6 +114,35 @@ retry:
 	return
 }
 
+func (client *ExtentClient) GetRate() string {
+	return fmt.Sprintf("read: %v\nwrite: %v\n", getRate(globalReadLimiter), getRate(globalWriteLimiter))
+}
+
+func getRate(lim *rate.Limiter) string {
+	val := int(lim.Limit())
+	if val > 0 {
+		return fmt.Sprintf("%v", val)
+	}
+	return "unlimited"
+}
+
+func (client *ExtentClient) SetReadRate(val int) string {
+	return setRate(globalReadLimiter, val)
+}
+
+func (client *ExtentClient) SetWriteRate(val int) string {
+	return setRate(globalWriteLimiter, val)
+}
+
+func setRate(lim *rate.Limiter, val int) string {
+	if val > 0 {
+		lim.SetLimit(rate.Limit(val))
+		return fmt.Sprintf("%v", val)
+	}
+	lim.SetLimit(rate.Inf)
+	return "unlimited"
+}
+
 func (client *ExtentClient) getStreamWriter(inode uint64) (stream *StreamWriter) {
 	client.writerLock.RLock()
 	stream = client.writers[inode]
