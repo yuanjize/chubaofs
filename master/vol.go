@@ -425,6 +425,22 @@ func (vol *Vol) getDeleteDataTasks() (tasks []*proto.AdminTask) {
 	return
 }
 
+func (vol *Vol) doSplitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (nextMp *MetaPartition, err error) {
+	mp.Lock()
+	defer mp.Unlock()
+	log.LogWarnf("action[splitMetaPartition],partition[%v],start[%v],end[%v]", mp.PartitionID, mp.Start, mp.End)
+	if err = mp.updateEnd(c, end); err != nil {
+		return
+	}
+	if nextMp, err = vol.doCreateMetaPartition(c, mp.End+1, defaultMaxMetaPartitionInodeID); err != nil {
+		Warn(c.Name, fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
+			c.Name, mp.PartitionID, err))
+		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
+		return
+	}
+	return
+}
+
 func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (err error) {
 	vol.createMpLock.Lock()
 	defer vol.createMpLock.Unlock()
@@ -437,19 +453,7 @@ func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (e
 		err = fmt.Errorf("mp[%v] is not the last meta partition[%v]", mp.PartitionID, maxPartitionID)
 		return
 	}
-	mp.Lock()
-	defer mp.Unlock()
-	log.LogWarnf("action[splitMetaPartition],partition[%v],start[%v],end[%v]", mp.PartitionID, mp.Start, mp.End)
-	if err = mp.updateEnd(c, end); err != nil {
-		return
-	}
-	var nextMp *MetaPartition
-	if nextMp, err = vol.doCreateMetaPartition(c, mp.End+1, defaultMaxMetaPartitionInodeID); err != nil {
-		Warn(c.Name, fmt.Sprintf("action[updateEnd] clusterID[%v] partitionID[%v] create meta partition err[%v]",
-			c.Name, mp.PartitionID, err))
-		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
-		return
-	}
+	nextMp, err := vol.doSplitMetaPartition(c, mp, end)
 	vol.AddMetaPartition(nextMp)
 	log.LogWarnf("action[splitMetaPartition],next partition[%v],start[%v],end[%v]", nextMp.PartitionID, nextMp.Start, nextMp.End)
 	return
