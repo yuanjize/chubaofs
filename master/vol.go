@@ -454,6 +454,9 @@ func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (e
 		return
 	}
 	nextMp, err := vol.doSplitMetaPartition(c, mp, end)
+	if err != nil {
+		return
+	}
 	vol.AddMetaPartition(nextMp)
 	log.LogWarnf("action[splitMetaPartition],next partition[%v],start[%v],end[%v]", nextMp.PartitionID, nextMp.Start, nextMp.End)
 	return
