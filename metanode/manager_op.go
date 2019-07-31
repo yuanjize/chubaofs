@@ -27,6 +27,11 @@ import (
 	raftProto "github.com/tiglabs/raft/proto"
 )
 
+const(
+	MaxUsedMemFactor=1.1
+)
+
+
 func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 	// For ack to master
 	m.responseAckOKToMaster(conn, p)
@@ -92,6 +97,10 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 		if mConf.Cursor >= mConf.End {
 			mpr.Status = proto.ReadOnly
 		}
+		if resp.Used>uint64(float64(resp.Total)*MaxUsedMemFactor){
+			mpr.Status=proto.ReadOnly
+		}
+
 		resp.MetaPartitionInfo = append(resp.MetaPartitionInfo, mpr)
 		return true
 	})
@@ -100,8 +109,9 @@ end:
 	adminTask.Request = nil
 	adminTask.Response = resp
 	m.respondToMaster(adminTask)
+	data,_:=json.Marshal(resp)
 	log.LogDebugf("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
-		req, adminTask, adminTask.Response)
+		req, adminTask, string(data))
 	return
 }
 
