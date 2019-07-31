@@ -198,11 +198,11 @@ func (m *metaManager) loadPartitions() (err error) {
 		if fileInfo.IsDir() && strings.HasPrefix(fileInfo.Name(), partitionPrefix) {
 			wg.Add(1)
 			go func(fileName string) {
-				var err error
+				var errLoad error
 				defer func() {
-					if r := recover(); r != nil || err != nil {
+					if r := recover(); r != nil || errLoad != nil {
 						log.LogErrorf("loadPartitions partition: %s, "+
-							"error: %v, failed: %v", fileName, err, r)
+							"error: %v, failed: %v", fileName, errLoad, r)
 						log.LogFlush()
 						panic(r)
 					}
@@ -214,11 +214,11 @@ func (m *metaManager) loadPartitions() (err error) {
 				}
 				var id uint64
 				partitionId := fileName[len(partitionPrefix):]
-				id, err = strconv.ParseUint(partitionId, 10, 64)
-				if err != nil {
+				id, errLoad = strconv.ParseUint(partitionId, 10, 64)
+				if errLoad != nil {
 					log.LogWarnf("loadPartition ignore path: %s,not partition",
 						fileName)
-					err = nil
+					errLoad = nil
 					return
 				}
 				partitionConfig := &MetaPartitionConfig{
@@ -231,7 +231,7 @@ func (m *metaManager) loadPartitions() (err error) {
 					m.detachPartition(id)
 				}
 				partition := NewMetaPartition(partitionConfig)
-				err = m.attachPartition(id, partition)
+				errLoad = m.attachPartition(id, partition)
 			}(fileInfo.Name())
 		}
 	}
