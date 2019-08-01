@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"github.com/chubaofs/chubaofs/util"
 )
 
 type DataPartition struct {
@@ -494,6 +495,8 @@ func (partition *DataPartition) afterCreation(nodeAddr, diskPath string, c *Clus
 	replica := NewDataReplica(dataNode)
 	replica.Status = proto.ReadWrite
 	replica.DiskPath = diskPath
+	replica.ReportTime = time.Now().Unix()
+	replica.Total = util.DefaultDataPartitionSize
 	partition.AddMember(replica)
 	partition.checkAndRemoveMissReplica(replica.Addr)
 	return

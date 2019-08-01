@@ -22,6 +22,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
 	"time"
+	"github.com/chubaofs/chubaofs/util"
 )
 
 type Cluster struct {
@@ -530,6 +531,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 			}(host)
 		}
 	default:
+		dp.total = util.DefaultDataPartitionSize
 		dp.Status = proto.ReadWrite
 	}
 	if err = c.syncAddDataPartition(volName, dp); err != nil {
@@ -782,7 +784,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	tasks = append(tasks, task)
 	c.putDataNodeTasks(tasks)
 errDeal:
-	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
@@ -1094,6 +1096,16 @@ func (c *Cluster) syncCompactStatus(status bool) (err error) {
 		return
 	}
 	return
+}
+
+func (c *Cluster) hasEnoughWritableMetaHosts(replicaNum int) bool {
+	maxTotal := c.GetMetaNodeMaxTotal()
+	excludeHosts := make([]string, 0)
+	nodeTabs, _ := c.GetAvailCarryMetaNodeTab(maxTotal, excludeHosts)
+	if nodeTabs != nil && len(nodeTabs) >= replicaNum {
+		return true
+	}
+	return false
 }
 
 func (c *Cluster) clearVols() {

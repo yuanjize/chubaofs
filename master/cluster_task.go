@@ -584,18 +584,23 @@ func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.Met
 	}
 }
 
-func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, hasArriveThreshold bool, metaNode *MetaNode) {
+func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, hasArriveThreshold bool, metaNode *MetaNode) (err error) {
 	if !hasArriveThreshold {
 		return
 	}
-	var (
-		vol *Vol
-		err error
-	)
+	var vol *Vol
 	if vol, err = c.getVol(mp.volName); err != nil {
 		log.LogWarnf("action[updateEnd] vol[%v] not found", mp.volName)
 		return
 	}
+
+	hasEnough := c.hasEnoughWritableMetaHosts(int(vol.mpReplicaNum))
+	if !hasEnough {
+		err = NoAnyMetaNodeForCreateMetaPartition
+		Warn(c.Name, fmt.Sprintf("no enough writable meta hosts to split meta partition[%v],vol[%v]", mp.PartitionID, mp.volName))
+		return
+	}
+
 	var end uint64
 	if mr.MaxInodeID <= 0 {
 		end = mr.Start + defaultMetaPartitionInodeIDStep
@@ -603,5 +608,5 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, ha
 		end = mr.MaxInodeID + defaultMetaPartitionInodeIDStep
 	}
 	log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
-	vol.splitMetaPartition(c, mp, end)
+	return vol.splitMetaPartition(c, mp, end)
 }

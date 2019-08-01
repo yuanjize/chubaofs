@@ -27,6 +27,11 @@ import (
 	raftProto "github.com/tiglabs/raft/proto"
 )
 
+const(
+	MaxUsedMemFactor=1.1
+)
+
+
 func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 	// For ack to master
 	m.responseAckOKToMaster(conn, p)
@@ -100,8 +105,9 @@ end:
 	adminTask.Request = nil
 	adminTask.Response = resp
 	m.respondToMaster(adminTask)
-	log.LogDebugf("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
-		req, adminTask, adminTask.Response)
+	data,_:=json.Marshal(resp)
+	log.LogInfof("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
+		req, adminTask, string(data))
 	return
 }
 

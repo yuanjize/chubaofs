@@ -6,6 +6,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"testing"
 	"time"
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 func TestAutoCreateDataPartitions(t *testing.T) {
@@ -65,6 +66,27 @@ func createVol(name string, t *testing.T) {
 	reqUrl := fmt.Sprintf("%v%v?name=%v&replicas=3&type=extent&capacity=100&owner=cfs&mpCount=2", hostAddr, AdminCreateVol, name)
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
+	vol, err := server.cluster.getVol(name)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if len(vol.dataPartitions.dataPartitions) == 0 {
+		return
+	}
+	partition := vol.dataPartitions.dataPartitions[0]
+	if partition.Status != proto.ReadWrite {
+		t.Errorf("expect partition status[%v],real status[%v]\n", proto.ReadWrite, partition.Status)
+		return
+	}
+
+	//after check data partitions ,the status must be writable
+	vol.checkDataPartitions(server.cluster)
+	partition = vol.dataPartitions.dataPartitions[0]
+	if partition.Status != proto.ReadWrite {
+		t.Errorf("expect partition status[%v],real status[%v]\n", proto.ReadWrite, partition.Status)
+		return
+	}
 }
 
 func getVol(name string, t *testing.T) {

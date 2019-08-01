@@ -22,6 +22,7 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/sdk/data/wrapper"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"net"
 	"strings"
@@ -396,7 +397,7 @@ func (s *StreamWriter) write(data []byte, offset, size int) (total int, err erro
 	)
 	for total < size {
 		var useExtent = true
-		if offset+size <= MaxTinyExtentSize {
+		if offset+size <= util.TinyBlockSize {
 			useExtent = false
 		}
 		err = s.init(useExtent, size)

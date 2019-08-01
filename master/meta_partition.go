@@ -129,11 +129,9 @@ func (mp *MetaPartition) updateAllReplicasEnd() {
 	}
 }
 
-//caller add vol lock?
+//caller add vol lock
 func (mp *MetaPartition) updateEnd(c *Cluster, end uint64) (err error) {
-	mp.Lock()
-	defer mp.Unlock()
-	if end < mp.MaxNodeID {
+	if end <= mp.MaxNodeID {
 		err = errors.Errorf("next meta partition start must be larger than %v", mp.MaxNodeID)
 		return
 	}
@@ -196,6 +194,7 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 		if err := c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
 			mp.End = oldEnd
 			log.LogErrorf("action[checkEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
+			return
 		}
 		t := mp.generateUpdateMetaReplicaTask(c.Name, mp.PartitionID, mp.End)
 		//if no leader,don't update end
