@@ -174,6 +174,7 @@ func TestSetDisableAutoAlloc(t *testing.T) {
 		t.Errorf("set disableAutoAlloc to %v failed", enable)
 		return
 	}
+	server.cluster.DisableAutoAlloc = false
 }
 
 func TestGetCompactStatus(t *testing.T) {

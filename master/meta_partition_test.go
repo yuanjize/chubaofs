@@ -35,6 +35,7 @@ func createMetaPartition(vol *Vol, t *testing.T) {
 		t.Error(err)
 		return
 	}
+	server.cluster.DisableAutoAlloc = false
 	var start uint64
 	start = mp.Start + defaultMetaPartitionInodeIDStep
 	reqUrl := fmt.Sprintf("%v%v?name=%v&start=%v",
@@ -46,10 +47,15 @@ func createMetaPartition(vol *Vol, t *testing.T) {
 		t.Error(err)
 		return
 	}
-	maxPartitionID = vol.getMaxPartitionID()
-	mp, err = vol.getMetaPartition(maxPartitionID)
+	curMaxPartitionID := vol.getMaxPartitionID()
+	mp, err = vol.getMetaPartition(curMaxPartitionID)
 	if err != nil {
 		t.Errorf("createMetaPartition,err [%v]", err)
+		return
+	}
+	if maxPartitionID == curMaxPartitionID {
+		t.Errorf("createMetaPartition failed,maxPartitionID[%v],curMaxPartitionID[%v]",
+			maxPartitionID, curMaxPartitionID)
 		return
 	}
 	start = start + 1
