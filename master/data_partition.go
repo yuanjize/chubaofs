@@ -38,14 +38,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total           uint64
-	used            uint64
-	VolName         string
-	modifyTime      int64
-	createTime      int64
-	FileInCoreMap   map[string]*FileInCore
-	MissNodes       map[string]int64
-	FileMissReplica map[string]int64
+	total            uint64
+	used             uint64
+	VolName          string
+	modifyTime       int64
+	createTime       int64
+	FileInCoreMap    map[string]*FileInCore
+	MissNodes        map[string]int64
+	FileMissReplica  map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {
@@ -432,32 +432,32 @@ func (partition *DataPartition) UpdateMetric(vr *proto.PartitionReport, dataNode
 		partition.AddMember(replica)
 	}
 	partition.total = vr.Total
+	replica.Status = int8(vr.PartitionStatus)
+	replica.Total = vr.Total
+	replica.Used = vr.Used
+	partition.setMaxUsed()
+	replica.FileCount = uint32(vr.ExtentCount)
+	replica.NeedCompare = vr.NeedCompare
+	if vr.DiskPath != replica.DiskPath {
+		oldDiskPath := replica.DiskPath
+		replica.DiskPath = vr.DiskPath
+		err = c.syncUpdateDataPartition(partition.VolName, partition)
+		if err != nil {
+			replica.DiskPath = oldDiskPath
+		}
+	}
+	replica.SetAlive()
+	partition.checkAndRemoveMissReplica(dataNode.Addr)
+}
+
+func (partition *DataPartition) setMaxUsed() {
 	var maxUsed uint64
 	for _, r := range partition.Replicas {
 		if r.Used > maxUsed {
 			maxUsed = r.Used
 		}
 	}
-	if vr.Used > maxUsed {
-		partition.used = vr.Used
-	}
-	replica.Status = int8(vr.PartitionStatus)
-	replica.Total = vr.Total
-	replica.Used = vr.Used
-	replica.FileCount = uint32(vr.ExtentCount)
-	replica.NeedCompare = vr.NeedCompare
-
-	if vr.DiskPath != replica.DiskPath {
-		oldDiskPath := replica.DiskPath
-		replica.DiskPath = oldDiskPath
-		err = c.syncUpdateDataPartition(partition.VolName, partition)
-		if err != nil {
-			replica.DiskPath = oldDiskPath
-		}
-	}
-	replica.DiskPath = vr.DiskPath
-	replica.SetAlive()
-	partition.checkAndRemoveMissReplica(dataNode.Addr)
+	partition.used = maxUsed
 }
 
 func (partition *DataPartition) toJson() (body []byte, err error) {
