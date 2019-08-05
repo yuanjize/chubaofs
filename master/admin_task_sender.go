@@ -176,7 +176,7 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 	if err = packet.WriteToConn(conn); err != nil {
 		return errors.Annotatef(err, "action[sendAdminTask],WriteToConn failed,task:%v", task.ID)
 	}
-	if err = packet.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
+	if err = packet.ReadFromConn(conn, 60); err != nil {
 		return errors.Annotatef(err, "action[sendAdminTask],ReadFromConn failed task:%v", task.ID)
 	}
 	log.LogDebugf(fmt.Sprintf("action[sendAdminTask] sender task:%v success", task.ToString()))
