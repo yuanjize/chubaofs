@@ -32,7 +32,6 @@ func (m *Master) handleLeaderChange(leader uint64) {
 	}
 	oldLeaderAddr := m.leaderInfo.addr
 	m.leaderInfo.addr = AddrDatabase[leader]
-	m.leaderInfo.addr = AddrDatabase[leader]
 	m.reverseProxy = m.newReverseProxy()
 	//Once switched to the master, the checkHeartbeat is executed
 	if m.id == leader {

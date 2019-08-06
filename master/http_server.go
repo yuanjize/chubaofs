@@ -52,8 +52,9 @@ const (
 	GetALLVols           = "/admin/listVols"
 
 	//raft node APIs
-	RaftNodeAdd    = "/raftNode/add"
-	RaftNodeRemove = "/raftNode/remove"
+	RaftNodeAdd        = "/raftNode/add"
+	RaftNodeRemove     = "/raftNode/remove"
+	RaftTransferLeader = "/raft/transferLeader"
 
 	// Node APIs
 	AddDataNode               = "/dataNode/add"
@@ -115,6 +116,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(ClientVolStat, m.handlerWithInterceptor())
 	http.Handle(RaftNodeAdd, m.handlerWithInterceptor())
 	http.Handle(RaftNodeRemove, m.handlerWithInterceptor())
+	http.Handle(RaftTransferLeader, m.handlerWithInterceptor())
 	http.Handle(AdminSetCompactStatus, m.handlerWithInterceptor())
 	http.Handle(AdminGetCompactStatus, m.handlerWithInterceptor())
 	http.Handle(AdminSetMetaNodeThreshold, m.handlerWithInterceptor())
@@ -226,6 +228,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.handleAddRaftNode(w, r)
 	case RaftNodeRemove:
 		m.handleRemoveRaftNode(w, r)
+	case RaftTransferLeader:
+		m.handleRaftTransferLeader(w, r)
 	case AdminSetCompactStatus:
 		m.setCompactStatus(w, r)
 	case AdminGetCompactStatus:

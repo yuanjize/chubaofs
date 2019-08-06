@@ -26,6 +26,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"io/ioutil"
 	"strings"
+	"github.com/tiglabs/raft"
 )
 
 type ClusterView struct {
@@ -927,6 +928,32 @@ func (m *Master) handleRemoveRaftNode(w http.ResponseWriter, r *http.Request) {
 	return
 errDeal:
 	logMsg := getReturnMessage("remove raft node", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
+func (m *Master) handleRaftTransferLeader(w http.ResponseWriter, r *http.Request) {
+	var (
+		msg        string
+		raftServer *raft.RaftServer
+	)
+	id, addr, err := parseRaftNodePara(r)
+	if err != nil {
+		goto errDeal
+	}
+	if _, ok := AddrDatabase[id]; !ok {
+		err = fmt.Errorf("unvalid id[%v],addr[%v]", id, addr)
+		goto errDeal
+	}
+	raftServer = m.raftStore.RaftServer()
+	if _, err := raftServer.TryToLeader(GroupId).Response(); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("try to transfer leader to [%v] has been submit to raft group", id)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("handleRaftTransferLeader", r.RemoteAddr, err.Error(), http.StatusBadRequest)
 	HandleError(logMsg, err, http.StatusBadRequest, w)
 	return
 }

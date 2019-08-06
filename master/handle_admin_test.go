@@ -215,7 +215,7 @@ func process(reqUrl string, t *testing.T) {
 	return
 }
 
-func processWithStatus(reqUrl string,statusCode int, t *testing.T) {
+func processWithStatus(reqUrl string, statusCode int, t *testing.T) {
 	resp, err := http.Get(reqUrl)
 	if err != nil {
 		t.Errorf("err is %v", err)
@@ -354,4 +354,11 @@ func TestDataPartitionOffline(t *testing.T) {
 		t.Errorf("offlineAddr[%v],hosts[%v]", offlineAddr, partition.PersistenceHosts)
 		return
 	}
+}
+
+func TestTransferLeader(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v?id=%v&addr=%v",
+		hostAddr, RaftTransferLeader, server.id, fmt.Sprintf("%v:%v", server.ip, server.port))
+	fmt.Println(reqUrl)
+	process(reqUrl, t)
 }
