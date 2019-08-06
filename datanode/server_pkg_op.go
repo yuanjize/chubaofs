@@ -192,11 +192,14 @@ func (s *DataNode) handleCreateDataPartition(pkg *Packet) {
 
 // Handle OpHeartbeat packet.
 func (s *DataNode) handleHeartbeats(pkg *Packet) {
-	var err error
 	task := &proto.AdminTask{}
 	json.Unmarshal(pkg.Data, task)
 	pkg.PackOkReply()
+	go s.asyncResponseHeartBeat(pkg,task)
+}
 
+
+func (s *DataNode)asyncResponseHeartBeat(pkg *Packet,task *proto.AdminTask){
 	request := &proto.HeartBeatRequest{}
 	response := &proto.DataNodeHeartBeatResponse{}
 
@@ -224,7 +227,7 @@ func (s *DataNode) handleHeartbeats(pkg *Packet) {
 		log.LogErrorf(errors.ErrorStack(err))
 		return
 	}
-	log.LogDebugf("action[handleHeartbeats] report data len[%v] to master success.", len(data))
+	log.LogDebugf("action[handleHeartbeats] Async Rsponse report data len[%v] to master success.", len(data))
 }
 
 // Handle OpDeleteDataPartition packet.
