@@ -30,14 +30,18 @@ func (m *Master) handleLeaderChange(leader uint64) {
 		log.LogWarnf("action[handleLeaderChange] but no leader")
 		return
 	}
+	oldLeaderAddr := m.leaderInfo.addr
+	m.leaderInfo.addr = AddrDatabase[leader]
 	m.leaderInfo.addr = AddrDatabase[leader]
 	m.reverseProxy = m.newReverseProxy()
 	//Once switched to the master, the checkHeartbeat is executed
 	if m.id == leader {
 		Warn(m.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
 			m.clusterName, m.leaderInfo.addr))
-		m.loadMetadata()
-		m.metaReady = true
+		if oldLeaderAddr != m.leaderInfo.addr {
+			m.loadMetadata()
+			m.metaReady = true
+		}
 		m.cluster.checkDataNodeHeartbeat()
 		m.cluster.checkMetaNodeHeartbeat()
 	} else {
