@@ -215,6 +215,27 @@ func process(reqUrl string, t *testing.T) {
 	return
 }
 
+func processWithStatus(reqUrl string,statusCode int, t *testing.T) {
+	resp, err := http.Get(reqUrl)
+	if err != nil {
+		t.Errorf("err is %v", err)
+		return
+	}
+	fmt.Println(resp.StatusCode)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("err is %v", err)
+		return
+	}
+	fmt.Println(string(body))
+	if resp.StatusCode != statusCode {
+		t.Errorf("status code[%v]", resp.StatusCode)
+		return
+	}
+	return
+}
+
 func TestDisk(t *testing.T) {
 	addr := mds5Addr
 	disk := "/cfs"

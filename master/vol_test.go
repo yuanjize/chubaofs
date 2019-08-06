@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 	"github.com/chubaofs/chubaofs/proto"
+	"encoding/json"
+	"net/http"
 )
 
 func TestAutoCreateDataPartitions(t *testing.T) {
@@ -138,4 +140,42 @@ func markDeleteVol(name string, t *testing.T) {
 		t.Errorf("markDeleteVol failed,expect[%v],real[%v]", VolMarkDelete, vol.Status)
 		return
 	}
+}
+
+// if the node change to leader,after reload the metadata,the meta partition's status is readonly,
+// and the status is not the actual status,don't put to vol view cache and feedback to client
+func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
+	name := "afterLeaderChange"
+	vol := NewVol(name, name, "extent", 2, 100)
+	//unavaliable mp
+	mp1 := NewMetaPartition(1, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	vol.AddMetaPartition(mp1)
+	//readonly mp
+	mp2 := NewMetaPartition(2, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	mp2.Status = proto.ReadOnly
+	vol.AddMetaPartition(mp2)
+	vol.updateViewCache(server.cluster)
+	volView := &VolView{}
+	if err := json.Unmarshal(vol.getViewCache(), volView); err != nil {
+		t.Error(err)
+		return
+	}
+	if len(volView.MetaPartitions) != 0 {
+		t.Error("expect len(mp) is 0")
+		return
+	}
+	server.cluster.vols[name] = vol
+	reqUrl := fmt.Sprintf("%v%v?name=%v", hostAddr, ClientVol, name)
+	fmt.Println(reqUrl)
+	processWithStatus(reqUrl, http.StatusInternalServerError, t)
+	mp2.Status = proto.ReadWrite
+	vol.updateViewCache(server.cluster)
+	if vol.isAllMetaPartitionReadonly {
+		t.Errorf("isAllMetaPartitionReadonly[%v] should be false,vol.MetaPartitions[%v]\n", vol.isAllMetaPartitionReadonly,vol.MetaPartitions)
+		return
+	}
+
+	reqUrl = fmt.Sprintf("%v%v?name=%v", hostAddr, ClientVol, name)
+	fmt.Println(reqUrl)
+	processWithStatus(reqUrl, http.StatusOK, t)
 }

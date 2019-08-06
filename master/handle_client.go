@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"fmt"
 )
 
 type VolStatInfo struct {
@@ -169,6 +170,11 @@ func (m *Master) getVol(w http.ResponseWriter, r *http.Request) {
 	if vol, err = m.cluster.getVol(name); err != nil {
 		err = errors.Annotatef(VolNotFound, "%v not found", name)
 		code = http.StatusNotFound
+		goto errDeal
+	}
+	if vol.isAllMetaPartitionReadonly {
+		err = fmt.Errorf("vol[%v] meta parititions are readonly", vol.Name)
+		code = http.StatusInternalServerError
 		goto errDeal
 	}
 	w.Write(vol.getViewCache())

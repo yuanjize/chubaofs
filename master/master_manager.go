@@ -88,6 +88,7 @@ func (m *Master) loadMetadata() {
 	m.clearMetadata()
 	m.restoreIDAlloc()
 	var err error
+	m.cluster.setReloadMetadataTime()
 	if err = m.cluster.loadCompactStatus(); err != nil {
 		panic(err)
 	}

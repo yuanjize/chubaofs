@@ -22,26 +22,28 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
+	"time"
 )
 
 type Vol struct {
-	Name                string
-	Owner               string
-	VolType             string
-	dpReplicaNum        uint8
-	mpReplicaNum        uint8
-	threshold           float32
-	Status              uint8
-	Capacity            uint64 //GB
-	AvailSpaceAllocated uint64 //GB
-	UsedSpace           uint64 //GB
-	MetaPartitions      map[uint64]*MetaPartition
-	mpsLock             sync.RWMutex
-	dataPartitions      *DataPartitionMap
-	mpsCache            []byte
-	viewCache           []byte
-	createMpLock        sync.Mutex
-	createDpLock        sync.Mutex
+	Name                       string
+	Owner                      string
+	VolType                    string
+	dpReplicaNum               uint8
+	mpReplicaNum               uint8
+	threshold                  float32
+	Status                     uint8
+	Capacity                   uint64 //GB
+	AvailSpaceAllocated        uint64 //GB
+	UsedSpace                  uint64 //GB
+	MetaPartitions             map[uint64]*MetaPartition
+	mpsLock                    sync.RWMutex
+	dataPartitions             *DataPartitionMap
+	mpsCache                   []byte
+	viewCache                  []byte
+	isAllMetaPartitionReadonly bool
+	createMpLock               sync.Mutex
+	createDpLock               sync.Mutex
 	sync.RWMutex
 }
 
@@ -288,7 +290,7 @@ func (vol *Vol) updateViewCache(c *Cluster) {
 		return
 	}
 	view := NewVolView(vol.Name, vol.VolType, vol.Status)
-	mpViews := vol.getMetaPartitionsView()
+	mpViews := vol.getMetaPartitionsView(c.reloadMetadataTime)
 	view.MetaPartitions = mpViews
 	mpsBody, err := json.Marshal(mpViews)
 	if err != nil {
@@ -306,12 +308,22 @@ func (vol *Vol) updateViewCache(c *Cluster) {
 	vol.setViewCache(body)
 }
 
-func (vol *Vol) getMetaPartitionsView() (mpViews []*MetaPartitionView) {
+func (vol *Vol) getMetaPartitionsView(reloadMetadataTime int64) (mpViews []*MetaPartitionView) {
 	vol.mpsLock.RLock()
 	defer vol.mpsLock.RUnlock()
 	mpViews = make([]*MetaPartitionView, 0)
+	readonlyCount := 0
 	for _, mp := range vol.MetaPartitions {
+		if mp.Status != proto.ReadWrite {
+			readonlyCount++
+		}
 		mpViews = append(mpViews, getMetaPartitionView(mp))
+	}
+	if time.Now().Unix()-reloadMetadataTime < 120 && readonlyCount == len(vol.MetaPartitions) {
+		mpViews = make([]*MetaPartitionView, 0)
+		vol.isAllMetaPartitionReadonly = true
+	} else {
+		vol.isAllMetaPartitionReadonly = false
 	}
 	return
 }

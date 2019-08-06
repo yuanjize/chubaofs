@@ -46,6 +46,7 @@ type Cluster struct {
 	metaNodeSpace       *MetaNodeSpaceStat
 	volSpaceStat        sync.Map
 	BadDataPartitionIds *sync.Map
+	reloadMetadataTime  int64
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *ClusterConfig) (c *Cluster) {
@@ -71,6 +72,10 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckVolStatus()
 	c.startCheckBadDiskRecovery()
 	return
+}
+
+func (c *Cluster) setReloadMetadataTime() {
+	c.reloadMetadataTime = time.Now().Unix()
 }
 
 func (c *Cluster) getMasterAddr() (addr string) {
