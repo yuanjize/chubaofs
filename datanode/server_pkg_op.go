@@ -93,7 +93,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	case proto.OpTinyExtentRepairRead:
 		s.handleTinyExtentRepairRead(pkg, c)
 	case proto.OpMarkDelete:
-		s.handleMarkDelete(pkg)
+		s.handleMarkDelete(pkg,c)
 	case proto.OpNotifyExtentRepair:
 		s.handleNotifyExtentRepair(pkg)
 	case proto.OpGetWatermark:
@@ -315,7 +315,7 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 
 // Handle OpMarkDelete packet.
 // Handle OpMarkDelete packet.
-func (s *DataNode) handleMarkDelete(pkg *Packet) {
+func (s *DataNode) handleMarkDelete(pkg *Packet,c net.Conn) {
 	var (
 		err error
 	)
@@ -324,14 +324,14 @@ func (s *DataNode) handleMarkDelete(pkg *Packet) {
 		err = json.Unmarshal(pkg.Data, ext)
 		if err == nil {
 			err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, int64(ext.ExtentOffset), int64(ext.Size))
-			log.LogInfof("action[MarkDeleteTiny] id[%v_%v_%v_%v_%v] err %v",
-				pkg.ReqID, pkg.PartitionID, pkg.FileID, ext.ExtentOffset, ext.Size, err)
+			log.LogInfof("action[MarkDeleteTiny]  id(%v_%v_%v_%v_%v) from (%v) err %v",
+				pkg.ReqID, pkg.PartitionID, pkg.FileID, ext.ExtentOffset, ext.Size,c.RemoteAddr().String(), err)
 			pkg.Offset = int64(ext.ExtentOffset)
 		}
 	} else {
 		err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, 0, 0)
-		log.LogInfof("action[MarkDeleteNormal] id[%v_%v_%v] err %v",
-			pkg.ReqID, pkg.PartitionID, pkg.FileID, err)
+		log.LogInfof("action[MarkDeleteNormal] id(%v_%v_%v) from (%v) err %v",
+			pkg.ReqID, pkg.PartitionID, pkg.FileID,c.RemoteAddr().String(), err)
 	}
 	if err != nil {
 		err = errors.Annotatef(err, "Request(%v) MarkDelete Error", pkg.GetUniqueLogId())
