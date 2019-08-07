@@ -155,7 +155,7 @@ func (m *metaManager) opCreateMetaPartition(conn net.Conn, p *Packet) (err error
 			err.Error(), adminTask.Request)
 		return
 	}
-	log.LogDebugf("[opCreateMetaPartition] req:%v; resp: %v", req, adminTask)
+	log.LogInfof("[opCreateMetaPartition] req:%v; resp: %v", req, adminTask)
 	return
 }
 
@@ -179,7 +179,7 @@ func (m *metaManager) opCreateInode(conn net.Conn, p *Packet) (err error) {
 	err = mp.CreateInode(req, p)
 	// Reply operation result to client though TCP connection.
 	m.respondToClient(conn, p)
-	log.LogDebugf("[opCreateInode] req:%v; resp: %v, body: %s", req, p.GetResultMesg(), p.Data)
+	log.LogDebugf("[opCreateInode] req:%v; resp: %v, body: %s remote:%v", req, p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
 	return
 }
 
@@ -249,7 +249,7 @@ func (m *metaManager) opDeleteDentry(conn net.Conn, p *Packet) (err error) {
 	err = mp.DeleteDentry(req, p)
 	// Reply operation result to client though TCP connection.
 	m.respondToClient(conn, p)
-	log.LogDebugf("[opDeleteDentry] req:%v; resp: %v, body: %s", req,
+	log.LogInfof("[opDeleteDentry] req:%v; resp: %v, body: %s", req,
 		p.GetResultMesg(), p.Data)
 	return
 }
@@ -272,8 +272,8 @@ func (m *metaManager) opUpdateDentry(conn net.Conn, p *Packet) (err error) {
 	}
 	err = mp.UpdateDentry(req, p)
 	m.respondToClient(conn, p)
-	log.LogDebugf("[opUpdateDentry] req: %v; resp: %v, body: %s",
-		req, p.GetResultMesg(), p.Data)
+	log.LogInfof("[opUpdateDentry] req: %v; resp: %v, body: %s,remote :%v",
+		req, p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
 	return
 }
 
@@ -295,8 +295,8 @@ func (m *metaManager) opDeleteInode(conn net.Conn, p *Packet) (err error) {
 	}
 	err = mp.DeleteInode(req, p)
 	m.respondToClient(conn, p)
-	log.LogDebugf("[opDeleteInode] req:%v; resp: %v, body: %s", req,
-		p.GetResultMesg(), p.Data)
+	log.LogInfof("[opDeleteInode] req:%v; resp: %v, body: %s,remote :%v", req,
+		p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
 	return
 }
 
@@ -555,7 +555,7 @@ func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error
 	adminTask.Response = resp
 	adminTask.Request = nil
 	err = m.respondToMaster(adminTask)
-	log.LogDebugf("[opDeleteMetaPartition] req: %v, resp: %v", req, adminTask)
+	log.LogWarnf("[opDeleteMetaPartition] req: %v, resp: %v", req, adminTask)
 	return
 }
 
@@ -716,7 +716,7 @@ end:
 	adminTask.Request = nil
 	adminTask.Response = resp
 	m.respondToMaster(adminTask)
-	log.LogDebugf("[opOfflineMetaPartition]: the end %v", adminTask)
+	log.LogWarnf("[opOfflineMetaPartition]: the end %v", adminTask)
 	return
 }
 
