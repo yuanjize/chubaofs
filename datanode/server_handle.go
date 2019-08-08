@@ -182,6 +182,7 @@ func (s *DataNode) apiGetExtent(w http.ResponseWriter, r *http.Request) {
 		Size:        extentInfo.Size,
 		PartitionID: uint32(partitionId),
 		RealSize:    realSize,
+		ModTime:	 extentInfo.ModTime,
 	}
 	s.buildApiSuccessResp(w, result)
 	return

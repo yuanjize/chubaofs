@@ -199,7 +199,6 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 				p.GetUniqueLogId(), string(p.Data[:p.Size]))
 			return
 		}
-		log.LogDebugf("[deleteExtent] %v", p.GetUniqueLogId())
 		return
 	}
 
@@ -217,6 +216,7 @@ func (mp *metaPartition) deleteExtent(inoSlice []*Inode) {
 					log.LogWarnf("[deleteExtent] extentKey: %s, "+
 						"err: %v", v.String(), err)
 				}
+				log.LogInfof("deleteExtent ino(%v) extent(%v_%v_%v_%v)",ino,v.PartitionId,v.ExtentId,v.ExtentOffset,v.Size)
 				return true
 			})
 			if len(reExt) == 0 {
