@@ -38,6 +38,8 @@ const (
 	GroupId           = 1
 	UmpModuleName     = "master"
 	CfgRetainLogs     = "retainLogs"
+	cfgTickInterval   = "tickInterval"
+	cfgElectionTick   = "electionTick"
 	DefaultRetainLogs = 20000
 )
 
@@ -51,6 +53,8 @@ type Master struct {
 	walDir       string
 	storeDir     string
 	retainLogs   uint64
+	tickInterval int
+	electionTick int
 	leaderInfo   *LeaderInfo
 	config       *ClusterConfig
 	cluster      *Cluster
@@ -111,12 +115,20 @@ func (m *Master) checkConfig(cfg *config.Config) (err error) {
 	replicaNum := cfg.GetString(ReplicaNum)
 	m.walDir = cfg.GetString(WalDir)
 	m.storeDir = cfg.GetString(StoreDir)
+	m.tickInterval = int(cfg.GetFloat(cfgTickInterval))
+	m.electionTick = int(cfg.GetFloat(cfgElectionTick))
 	peerAddrs := cfg.GetString(CfgPeers)
 	if m.retainLogs, err = strconv.ParseUint(cfg.GetString(CfgRetainLogs), 10, 64); err != nil {
 		return fmt.Errorf("%v,err:%v", ErrBadConfFile, err.Error())
 	}
 	if m.retainLogs <= 0 {
 		m.retainLogs = DefaultRetainLogs
+	}
+	if m.tickInterval <= 300 {
+		m.tickInterval = 500
+	}
+	if m.electionTick <= 3 {
+		m.electionTick = 5
 	}
 	fmt.Println("retainLogs=", m.retainLogs)
 	if err = m.config.parsePeers(peerAddrs); err != nil {
@@ -170,7 +182,14 @@ func (m *Master) checkConfig(cfg *config.Config) (err error) {
 }
 
 func (m *Master) createRaftServer() (err error) {
-	raftCfg := &raftstore.Config{ClusterID: m.clusterName + "_master", NodeID: m.id, WalPath: m.walDir, RetainLogs: m.retainLogs}
+	raftCfg := &raftstore.Config{
+		ClusterID:    m.clusterName + "_master",
+		NodeID:       m.id,
+		WalPath:      m.walDir,
+		RetainLogs:   m.retainLogs,
+		TickInterval: m.tickInterval,
+		ElectionTick: m.electionTick,
+	}
 	if m.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
 		return errors.Annotatef(err, "NewRaftStore failed! id[%v] walPath[%v]", m.id, m.walDir)
 	}
@@ -180,7 +199,7 @@ func (m *Master) createRaftServer() (err error) {
 	fsm.RegisterApplySnapshotHandler(m.handleApplySnapshot)
 	fsm.restore()
 	m.fsm = fsm
-	fmt.Println(m.config.peers)
+	fmt.Println(m.config.peers, m.tickInterval, m.electionTick)
 	partitionCfg := &raftstore.PartitionConfig{
 		ID:      GroupId,
 		Peers:   m.config.peers,

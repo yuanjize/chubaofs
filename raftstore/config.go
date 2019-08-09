@@ -23,6 +23,8 @@ const (
 	DefaultHeartbeatPort = 5901
 	DefaultReplicatePort = 5902
 	DefaultRetainLogs    = 20000
+	DefaultTickInterval  = 300
+	DefaultElectionTick  = 3
 )
 
 // Config defined necessary configuration properties for raft store.
@@ -34,6 +36,17 @@ type Config struct {
 	HeartbeatPort int
 	ReplicatePort int
 	RetainLogs    uint64 // // RetainLogs controls how many logs we leave after truncate. The default value is 20000.
+
+	// TickInterval is the interval of timer which check heartbeat and election timeout.
+	// The default value is 300,unit is millisecond.
+	TickInterval int
+
+	// ElectionTick is the election timeout. If a follower does not receive any message
+	// from the leader of current term during ElectionTick, it will become candidate and start an election.
+	// ElectionTick must be greater than HeartbeatTick.
+	// We suggest to use ElectionTick = 10 * HeartbeatTick to avoid unnecessary leader switching.
+	// The default value is 1s.
+	ElectionTick int
 }
 
 type PeerAddress struct {
