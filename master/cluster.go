@@ -1136,7 +1136,7 @@ func (c *Cluster) clearMetaNodes() {
 	c.metaNodes.Range(func(key, value interface{}) bool {
 		metaNode := value.(*MetaNode)
 		metaNode.clean()
-		c.dataNodes.Delete(key)
+		c.metaNodes.Delete(key)
 		return true
 	})
 }
