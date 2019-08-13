@@ -181,6 +181,7 @@ func (sender *AdminTaskSender) sendAdminTask(task *proto.AdminTask, conn net.Con
 	}
 	log.LogDebugf(fmt.Sprintf("action[sendAdminTask] sender task:%v success", task.ToString()))
 	sender.updateTaskInfo(task, true)
+	sender.DelTask(task)
 
 	return nil
 }
