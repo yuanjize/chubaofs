@@ -217,7 +217,7 @@ func (mw *MetaWrapper) Rename_ll(srcParentID uint64, srcName string, dstParentID
 
 	// delete dentry from src parent
 	status, _, err = mw.ddelete(srcParentMP, srcParentID, srcName)
-	if err != nil || status != statusOK {
+	if err != nil || (status != statusOK && status != statusNoent) {
 		if oldInode == 0 {
 			mw.ddelete(dstParentMP, dstParentID, dstName)
 		} else {
