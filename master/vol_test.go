@@ -179,3 +179,30 @@ func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 	fmt.Println(reqUrl)
 	processWithStatus(reqUrl, http.StatusOK, t)
 }
+
+
+func TestConcurrentReadWriteDataPartitionMap(t *testing.T) {
+	name := "TestConcurrentReadWriteDataPartitionMap"
+	vol := NewVol(name, name, "extent", 2, 100)
+	//unavaliable mp
+	mp1 := NewMetaPartition(1, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	vol.AddMetaPartition(mp1)
+	//readonly mp
+	mp2 := NewMetaPartition(2, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	mp2.Status = proto.ReadOnly
+	vol.AddMetaPartition(mp2)
+	vol.updateViewCache(server.cluster)
+	go func() {
+		var id uint64
+		for {
+			id++
+			dp := newDataPartition(id,3,proto.ExtentPartition,name)
+			vol.dataPartitions.putDataPartition(dp)
+			time.Sleep(time.Second)
+		}
+	}()
+	for i :=0;i< 10;i++{
+		time.Sleep(time.Second)
+		vol.updateViewCache(server.cluster)
+	}
+}
