@@ -169,20 +169,20 @@ func main() {
 	default:
 		level = log.ErrorLevel
 	}
+	if _, err = log.InitLog(logDir, module, level); err != nil {
+		fmt.Println("Fatal: failed to start the baud storage daemon - ", err)
+		os.Exit(1)
+		return
+	}
 
 	if profPort != "" {
 		go func() {
+			http.HandleFunc(log.SetLogLevelPath,log.SetLogLevel)
 			err = http.ListenAndServe(fmt.Sprintf(":%v", profPort), nil)
 			if err != nil {
 				panic(fmt.Sprintf("cannot listen pprof %v err %v", profPort, err.Error()))
 			}
 		}()
-	}
-
-	if _, err = log.InitLog(logDir, module, level); err != nil {
-		fmt.Println("Fatal: failed to start the baud storage daemon - ", err)
-		os.Exit(1)
-		return
 	}
 	interceptSignal(server)
 	err = server.Start(cfg)
