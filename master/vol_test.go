@@ -73,6 +73,10 @@ func createVol(name string, t *testing.T) {
 		t.Error(err)
 		return
 	}
+	checkDataPartitionsWritableTest(vol, t)
+	checkMetaPartitionsWritableTest(vol, t)
+}
+func checkDataPartitionsWritableTest(vol *Vol, t *testing.T) {
 	if len(vol.dataPartitions.dataPartitions) == 0 {
 		return
 	}
@@ -87,6 +91,27 @@ func createVol(name string, t *testing.T) {
 	partition = vol.dataPartitions.dataPartitions[0]
 	if partition.Status != proto.ReadWrite {
 		t.Errorf("expect partition status[%v],real status[%v]\n", proto.ReadWrite, partition.Status)
+		return
+	}
+}
+func checkMetaPartitionsWritableTest(vol *Vol, t *testing.T) {
+	if len(vol.MetaPartitions) == 0 {
+		t.Error("no meta partition")
+		return
+	}
+
+	for _, mp := range vol.MetaPartitions {
+		if mp.Status != proto.ReadWrite {
+			t.Errorf("expect partition status[%v],real status[%v]\n", proto.ReadWrite, mp.Status)
+			return
+		}
+	}
+	maxPartitionID := vol.getMaxPartitionID()
+	maxMp := vol.MetaPartitions[maxPartitionID]
+	//after check meta partitions ,the status must be writable
+	maxMp.checkStatus(false, int(vol.mpReplicaNum))
+	if maxMp.Status != proto.ReadWrite {
+		t.Errorf("expect partition status[%v],real status[%v]\n", proto.ReadWrite, maxMp.Status)
 		return
 	}
 }
@@ -178,4 +203,31 @@ func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 	reqUrl = fmt.Sprintf("%v%v?name=%v", hostAddr, ClientVol, name)
 	fmt.Println(reqUrl)
 	processWithStatus(reqUrl, http.StatusOK, t)
+}
+
+
+func TestConcurrentReadWriteDataPartitionMap(t *testing.T) {
+	name := "TestConcurrentReadWriteDataPartitionMap"
+	vol := NewVol(name, name, "extent", 2, 100)
+	//unavaliable mp
+	mp1 := NewMetaPartition(1, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	vol.AddMetaPartition(mp1)
+	//readonly mp
+	mp2 := NewMetaPartition(2, 1, defaultMaxMetaPartitionInodeID, 3, name)
+	mp2.Status = proto.ReadOnly
+	vol.AddMetaPartition(mp2)
+	vol.updateViewCache(server.cluster)
+	go func() {
+		var id uint64
+		for {
+			id++
+			dp := newDataPartition(id,3,proto.ExtentPartition,name)
+			vol.dataPartitions.putDataPartition(dp)
+			time.Sleep(time.Second)
+		}
+	}()
+	for i :=0;i< 10;i++{
+		time.Sleep(time.Second)
+		vol.updateViewCache(server.cluster)
+	}
 }

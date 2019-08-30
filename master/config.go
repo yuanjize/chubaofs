@@ -53,7 +53,7 @@ const (
 	//DefaultMetaPartitionMissSec                         = 3600
 	DefaultMetaPartitionWarnInterval            = 10 * 60
 	DefaultMetaPartitionThreshold       float32 = 0.75
-	DefaultMetaPartitionCountOnEachNode         = 100
+	DefaultMetaPartitionCountOnEachNode         = 2000
 )
 
 //AddrDatabase ...

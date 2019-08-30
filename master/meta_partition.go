@@ -555,6 +555,7 @@ func (mp *MetaPartition) createPartitionSuccessTriggerOperator(nodeAddr string, 
 	}
 	mr := NewMetaReplica(mp.Start, mp.End, metaNode)
 	mr.Status = proto.ReadWrite
+	mr.ReportTime = time.Now().Unix()
 	mp.addReplica(mr)
 	mp.checkAndRemoveMissMetaReplica(mr.Addr)
 	return

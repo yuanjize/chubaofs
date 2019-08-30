@@ -71,16 +71,17 @@ type BadPartitionView struct {
 
 // SimpleVolView defines the simple view of a volume
 type SimpleVolView struct {
-	ID           uint64
-	Name         string
-	Owner        string
-	DpReplicaNum uint8
-	MpReplicaNum uint8
-	Status       uint8
-	Capacity     uint64 // GB
-	RwDpCnt      int
-	MpCnt        int
-	DpCnt        int
+	ID                  uint64
+	Name                string
+	Owner               string
+	DpReplicaNum        uint8
+	MpReplicaNum        uint8
+	Status              uint8
+	Capacity            uint64 // GB
+	RwDpCnt             int
+	MpCnt               int
+	DpCnt               int
+	AvailSpaceAllocated uint64 //GB
 }
 
 func (m *Master) setMetaNodeThreshold(w http.ResponseWriter, r *http.Request) {
@@ -549,15 +550,16 @@ errDeal:
 
 func newSimpleView(vol *Vol) *SimpleVolView {
 	return &SimpleVolView{
-		Name:         vol.Name,
-		Owner:        vol.Owner,
-		DpReplicaNum: vol.dpReplicaNum,
-		MpReplicaNum: vol.mpReplicaNum,
-		Status:       vol.Status,
-		Capacity:     vol.Capacity,
-		RwDpCnt:      vol.dataPartitions.readWriteDataPartitions,
-		MpCnt:        len(vol.MetaPartitions),
-		DpCnt:        len(vol.dataPartitions.dataPartitionMap),
+		Name:                vol.Name,
+		Owner:               vol.Owner,
+		DpReplicaNum:        vol.dpReplicaNum,
+		MpReplicaNum:        vol.mpReplicaNum,
+		Status:              vol.Status,
+		Capacity:            vol.Capacity,
+		RwDpCnt:             vol.dataPartitions.readWriteDataPartitions,
+		MpCnt:               len(vol.MetaPartitions),
+		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
+		AvailSpaceAllocated: vol.AvailSpaceAllocated,
 	}
 }
 

@@ -246,6 +246,9 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 		count := vol.calculateExpandNum()
 		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],usedRatio[%v],availRatio[%v]", vol.Name, count, usedRatio, availRatio)
 		for i := 0; i < count; i++ {
+			if c.DisableAutoAlloc {
+				return
+			}
 			c.createDataPartition(vol.Name, vol.VolType)
 		}
 	}
@@ -454,6 +457,9 @@ func (vol *Vol) doSplitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) 
 }
 
 func (vol *Vol) splitMetaPartition(c *Cluster, mp *MetaPartition, end uint64) (err error) {
+	if c.DisableAutoAlloc {
+		return
+	}
 	vol.createMpLock.Lock()
 	defer vol.createMpLock.Unlock()
 	if end < mp.Start {

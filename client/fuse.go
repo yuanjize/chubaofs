@@ -22,21 +22,28 @@ package main
 //
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	syslog "log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/chubaofs/chubaofs/third_party/fuse"
 	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
 
-	bdfs "github.com/chubaofs/chubaofs/client/fs"
+	cfs "github.com/chubaofs/chubaofs/client/fs"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
+	"github.com/jacobsa/daemonize"
 	"strconv"
 )
 
@@ -47,8 +54,12 @@ const (
 const (
 	LoggerDir    = "client"
 	LoggerPrefix = "client"
+	LoggerOutput = "output.log"
 
 	UmpModuleName = "fuseclient"
+
+	ControlCommandSetRate = "/rate/set"
+	ControlCommandGetRate = "/rate/get"
 )
 
 var (
@@ -58,8 +69,9 @@ var (
 )
 
 var (
-	configFile    = flag.String("c", "", "FUSE client config file")
-	configVersion = flag.Bool("v", false, "show version")
+	configFile       = flag.String("c", "", "FUSE client config file")
+	configVersion    = flag.Bool("v", false, "show version")
+	configForeground = flag.Bool("f", false, "run foreground")
 )
 
 func main() {
@@ -75,72 +87,173 @@ func main() {
 		os.Exit(0)
 	}
 
-	ump.InitUmp(UmpModuleName)
+	if !*configForeground {
+		if err := startDaemon(); err != nil {
+			fmt.Printf("Mount failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	/*
+	 * We are in daemon from here.
+	 * Must notify the parent process through SignalOutcome anyway.
+	 */
 
 	cfg := config.LoadConfigFile(*configFile)
-	if err := Mount(cfg); err != nil {
-		fmt.Println("Mount failed: ", err)
+	opt, err := parseMountOption(cfg)
+	if err != nil {
+		daemonize.SignalOutcome(err)
 		os.Exit(1)
 	}
-	// Wait for the log to be flushed
-	fmt.Println("Done!")
-}
 
-func Mount(cfg *config.Config) error {
-	mnt := cfg.GetString("mountpoint")
-	volname := cfg.GetString("volname")
-	master := cfg.GetString("master")
-	logpath := cfg.GetString("logpath")
-	loglvl := cfg.GetString("loglvl")
-	profport := cfg.GetString("profport")
-	rdonly := cfg.GetBool("rdonly")
-	icacheTimeout := ParseConfigString(cfg, "icacheTimeout")
-	lookupValid := ParseConfigString(cfg, "lookupValid")
-	attrValid := ParseConfigString(cfg, "attrValid")
-	autoInvalData := ParseConfigString(cfg, "autoInvalData")
-	level := ParseLogLevel(loglvl)
-	_, err := log.InitLog(logpath, LoggerPrefix, level)
+	level := parseLogLevel(opt.Loglvl)
+	_, err = log.InitLog(opt.Logpath, LoggerPrefix, level)
 	if err != nil {
-		return err
+		daemonize.SignalOutcome(err)
+		os.Exit(1)
 	}
 	defer log.LogFlush()
 
-	super, err := bdfs.NewSuper(volname, master, icacheTimeout, lookupValid, attrValid)
+	outputFilePath := path.Join(opt.Logpath, LoggerPrefix, LoggerOutput)
+	outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		return err
+		daemonize.SignalOutcome(err)
+		os.Exit(1)
 	}
+	defer func() {
+		outputFile.Sync()
+		outputFile.Close()
+	}()
+	syslog.SetOutput(outputFile)
+
+	if err = syscall.Dup2(int(outputFile.Fd()), int(os.Stderr.Fd())); err != nil {
+		daemonize.SignalOutcome(err)
+		os.Exit(1)
+	}
+
+	registerInterceptedSignal(opt.MountPoint)
+
+	fsConn, super, err := mount(opt)
+	if err != nil {
+		daemonize.SignalOutcome(err)
+		os.Exit(1)
+	} else {
+		daemonize.SignalOutcome(nil)
+	}
+	defer fsConn.Close()
+
+	if err = fs.Serve(fsConn, super); err != nil {
+		syslog.Printf("fs Serve returns err(%v)", err)
+		os.Exit(1)
+	}
+
+	<-fsConn.Ready
+	if fsConn.MountError != nil {
+		syslog.Printf("fs Serve returns err(%v)\n", err)
+		os.Exit(1)
+	}
+}
+
+func startDaemon() error {
+	cmdPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("startDaemon failed: cannot get absolute command path, err(%v)", err)
+	}
+
+	configPath, err := filepath.Abs(*configFile)
+	if err != nil {
+		return fmt.Errorf("startDaemon failed: cannot get absolute command path of config file(%v) , err(%v)", *configFile, err)
+	}
+
+	args := []string{"-f"}
+	args = append(args, "-c")
+	args = append(args, configPath)
+
+	env := []string{
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
+	}
+
+	err = daemonize.Run(cmdPath, args, env, os.Stdout)
+	if err != nil {
+		return fmt.Errorf("startDaemon failed: daemon start failed, cmd(%v) args(%v) env(%v) err(%v)\n", cmdPath, args, env, err)
+	}
+
+	return nil
+}
+
+func registerInterceptedSignal(mnt string) {
+	sigC := make(chan os.Signal, 1)
+	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigC
+		syslog.Printf("Killed due to a received signal (%v)\n", sig)
+	}()
+}
+
+func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
+	var err error
+	opt := new(cfs.MountOption)
+
+	rawmnt := cfg.GetString("mountpoint")
+	opt.MountPoint, err = filepath.Abs(rawmnt)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("invalide mount point (%v) ", rawmnt))
+	}
+
+	opt.Volname = cfg.GetString("volname")
+	opt.Master = cfg.GetString("master")
+	opt.Logpath = cfg.GetString("logpath")
+	opt.Loglvl = cfg.GetString("loglvl")
+	opt.Profport = cfg.GetString("profport")
+	opt.Rdonly = cfg.GetBool("rdonly")
+	opt.IcacheTimeout = parseConfigString(cfg, "icacheTimeout")
+	opt.LookupValid = parseConfigString(cfg, "lookupValid")
+	opt.AttrValid = parseConfigString(cfg, "attrValid")
+	opt.ReadRate = parseConfigString(cfg, "readRate")
+	opt.WriteRate = parseConfigString(cfg, "writeRate")
+	opt.AutoInvalData = parseConfigString(cfg, "autoInvalData")
+
+	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {
+		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v)", opt.MountPoint, opt.Volname, opt.Master))
+	}
+
+	return opt, nil
+}
+
+func mount(opt *cfs.MountOption) (fsConn *fuse.Conn, super *cfs.Super, err error) {
+	super, err = cfs.NewSuper(opt)
+	if err != nil {
+		return
+	}
+
+	http.HandleFunc(ControlCommandSetRate, super.SetRate)
+	http.HandleFunc(ControlCommandGetRate, super.GetRate)
+	http.HandleFunc(log.SetLogLevelPath,log.SetLogLevel)
+	go func() {
+		fmt.Println(http.ListenAndServe(":"+opt.Profport, nil))
+	}()
+
+	ump.InitUmp(UmpModuleName)
 
 	options := []fuse.MountOption{
 		fuse.AllowOther(),
 		fuse.MaxReadahead(MaxReadAhead),
 		fuse.AsyncRead(),
-		fuse.AutoInvalData(autoInvalData),
-		fuse.FSName("cfs-" + volname),
+		fuse.AutoInvalData(opt.AutoInvalData),
+		fuse.FSName("cfs-" + opt.Volname),
 		fuse.LocalVolume(),
-		fuse.VolumeName("cfs-" + volname)}
+		fuse.VolumeName("cfs-" + opt.Volname)}
 
-	if rdonly {
+	if opt.Rdonly {
 		options = append(options, fuse.ReadOnly())
 	}
 
-	c, err := fuse.Mount(mnt, options...)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-	go func() {
-		fmt.Println(http.ListenAndServe(":"+profport, nil))
-	}()
-
-	if err = fs.Serve(c, super); err != nil {
-		return err
-	}
-
-	<-c.Ready
-	return c.MountError
+	fsConn, err = fuse.Mount(opt.MountPoint, options...)
+	return
 }
 
-func ParseConfigString(cfg *config.Config, keyword string) int64 {
+func parseConfigString(cfg *config.Config, keyword string) int64 {
 	var ret int64 = -1
 	rawstr := cfg.GetString(keyword)
 	if rawstr != "" {
@@ -153,7 +266,7 @@ func ParseConfigString(cfg *config.Config, keyword string) int64 {
 	return ret
 }
 
-func ParseLogLevel(loglvl string) log.Level {
+func parseLogLevel(loglvl string) log.Level {
 	var level log.Level
 	switch strings.ToLower(loglvl) {
 	case "debug":

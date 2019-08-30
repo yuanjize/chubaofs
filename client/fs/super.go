@@ -16,6 +16,8 @@ package fs
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -27,6 +29,25 @@ import (
 	"github.com/chubaofs/chubaofs/sdk/meta"
 	"github.com/chubaofs/chubaofs/util/log"
 )
+
+type MountOption struct {
+	MountPoint    string
+	Volname       string
+	Owner         string
+	Master        string
+	Logpath       string
+	Loglvl        string
+	Profport      string
+	Rdonly        bool
+	IcacheTimeout int64
+	LookupValid   int64
+	AttrValid     int64
+	ReadRate      int64
+	WriteRate     int64
+	EnSyncWrite   int64
+	AutoInvalData int64
+	UmpDatadir    string
+}
 
 type Super struct {
 	cluster string
@@ -47,32 +68,32 @@ var (
 	_ fs.FSStatfser = (*Super)(nil)
 )
 
-func NewSuper(volname, master string, icacheTimeout, lookupValid, attrValid int64) (s *Super, err error) {
+func NewSuper(opt *MountOption) (s *Super, err error) {
 	s = new(Super)
-	s.mw, err = meta.NewMetaWrapper(volname, master)
+	s.mw, err = meta.NewMetaWrapper(opt.Volname, opt.Master)
 	if err != nil {
 		log.LogErrorf("NewMetaWrapper failed! %v", err.Error())
 		return nil, err
 	}
 
-	s.ec, err = stream.NewExtentClient(volname, master, s.mw.AppendExtentKey, s.mw.GetExtents)
+	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, opt.ReadRate, opt.WriteRate, s.mw.AppendExtentKey, s.mw.GetExtents)
 	if err != nil {
 		log.LogErrorf("NewExtentClient failed! %v", err.Error())
 		return nil, err
 	}
 
-	s.volname = volname
+	s.volname = opt.Volname
 	s.cluster = s.mw.Cluster()
 	s.localIP = s.mw.LocalIP()
 	inodeExpiration := DefaultInodeExpiration
-	if icacheTimeout >= 0 {
-		inodeExpiration = time.Duration(icacheTimeout) * time.Second
+	if opt.IcacheTimeout >= 0 {
+		inodeExpiration = time.Duration(opt.IcacheTimeout) * time.Second
 	}
-	if lookupValid >= 0 {
-		LookupValidDuration = time.Duration(lookupValid) * time.Second
+	if opt.LookupValid >= 0 {
+		LookupValidDuration = time.Duration(opt.LookupValid) * time.Second
 	}
-	if attrValid >= 0 {
-		AttrValidDuration = time.Duration(attrValid) * time.Second
+	if opt.AttrValid >= 0 {
+		AttrValidDuration = time.Duration(opt.AttrValid) * time.Second
 	}
 	s.ic = NewInodeCache(inodeExpiration, MaxInodeCache)
 	s.orphan = NewOrphanInodeList()
@@ -99,6 +120,37 @@ func (s *Super) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.
 	resp.Namelen = DefaultMaxNameLen
 	resp.Frsize = DefaultBlksize
 	return nil
+}
+
+func (s *Super) GetRate(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(s.ec.GetRate()))
+}
+
+func (s *Super) SetRate(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	if rate := r.FormValue("read"); rate != "" {
+		val, err := strconv.Atoi(rate)
+		if err != nil {
+			w.Write([]byte("Set read rate failed\n"))
+		} else {
+			msg := s.ec.SetReadRate(val)
+			w.Write([]byte(fmt.Sprintf("Set read rate to %v successfully\n", msg)))
+		}
+	}
+
+	if rate := r.FormValue("write"); rate != "" {
+		val, err := strconv.Atoi(rate)
+		if err != nil {
+			w.Write([]byte("Set write rate failed\n"))
+		} else {
+			msg := s.ec.SetWriteRate(val)
+			w.Write([]byte(fmt.Sprintf("Set write rate to %v successfully\n", msg)))
+		}
+	}
 }
 
 func (s *Super) umpKey(act string) string {

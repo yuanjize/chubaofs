@@ -104,7 +104,7 @@ func (partition *DataPartition) checkExtentFile(fc *FileInCore, liveReplicas []*
 	if len(fms) < len(liveReplicas) && (time.Now().Unix()-fc.LastModify) > CheckMissFileReplicaTime {
 		fileMissReplicaTime, ok := partition.FileMissReplica[fc.Name]
 		if len(partition.FileMissReplica) > 400 {
-			Warn(clusterID, fmt.Sprintf("partitionid[%v] has [%v] miss replica", partition.PartitionID, len(partition.FileMissReplica)))
+			Warn(clusterID, fmt.Sprintf("partitionid[%v] has [%v] file missed replica", partition.PartitionID, len(partition.FileMissReplica)))
 			return
 		}
 		if !ok {

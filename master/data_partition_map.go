@@ -42,6 +42,7 @@ func NewDataPartitionMap(volName string) (dpMap *DataPartitionMap) {
 	dpMap.dataPartitionMap = make(map[uint64]*DataPartition, 0)
 	dpMap.dataPartitionCount = 1
 	dpMap.dataPartitions = make([]*DataPartition, 0)
+	dpMap.cacheDataPartitionResponse = make([]byte, 0)
 	dpMap.volName = volName
 	return
 }
@@ -99,11 +100,23 @@ func (dpMap *DataPartitionMap) setReadWriteDataPartitions(readWrites int, cluste
 	dpMap.readWriteDataPartitions = readWrites
 }
 
-func (dpMap *DataPartitionMap) updateDataPartitionResponseCache(needUpdate bool, minPartitionID uint64) (body []byte, err error) {
+func (dpMap *DataPartitionMap) getDataPartitionResponseCache() []byte {
+	dpMap.RLock()
+	defer dpMap.RUnlock()
+	return dpMap.cacheDataPartitionResponse
+}
+
+func (dpMap *DataPartitionMap) setDataPartitionResponseCache(cacheDataPartitionResponse []byte) {
 	dpMap.Lock()
 	defer dpMap.Unlock()
-	if dpMap.cacheDataPartitionResponse == nil || needUpdate || len(dpMap.cacheDataPartitionResponse) == 0 {
-		dpMap.cacheDataPartitionResponse = make([]byte, 0)
+	if cacheDataPartitionResponse != nil {
+		dpMap.cacheDataPartitionResponse = cacheDataPartitionResponse
+	}
+}
+
+func (dpMap *DataPartitionMap) updateDataPartitionResponseCache(needUpdate bool, minPartitionID uint64) (body []byte, err error) {
+	cacheDataPartitionResponse := dpMap.getDataPartitionResponseCache()
+	if cacheDataPartitionResponse == nil || needUpdate || len(cacheDataPartitionResponse) == 0 {
 		dpResps := dpMap.GetDataPartitionsView(minPartitionID)
 		if len(dpResps) == 0 {
 			log.LogError(fmt.Sprintf("action[updateDpResponseCache],volName[%v] minPartitionID:%v,err:%v",
@@ -117,11 +130,11 @@ func (dpMap *DataPartitionMap) updateDataPartitionResponseCache(needUpdate bool,
 				minPartitionID, err.Error()))
 			return nil, errors.Annotatef(err, "volName[%v],marshal err", dpMap.volName)
 		}
-		dpMap.cacheDataPartitionResponse = body
+		dpMap.setDataPartitionResponseCache(body)
 		return
 	}
-	body = make([]byte, len(dpMap.cacheDataPartitionResponse))
-	copy(body, dpMap.cacheDataPartitionResponse)
+	body = make([]byte, len(cacheDataPartitionResponse))
+	copy(body, cacheDataPartitionResponse)
 
 	return
 }
@@ -130,6 +143,8 @@ func (dpMap *DataPartitionMap) GetDataPartitionsView(minPartitionID uint64) (dpR
 	dpResps = make([]*DataPartitionResponse, 0)
 	log.LogDebugf("volName[%v] DataPartitionMapLen[%v],DataPartitionsLen[%v],minPartitionID[%v]",
 		dpMap.volName, len(dpMap.dataPartitionMap), len(dpMap.dataPartitions), minPartitionID)
+	dpMap.RLock()
+	defer dpMap.RUnlock()
 	for _, dp := range dpMap.dataPartitionMap {
 		if dp.PartitionID <= minPartitionID {
 			continue

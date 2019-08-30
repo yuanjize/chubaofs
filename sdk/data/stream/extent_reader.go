@@ -22,6 +22,7 @@ import (
 	"github.com/chubaofs/chubaofs/third_party/pool"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"golang.org/x/net/context"
 	"hash/crc32"
 	"math/rand"
 	"net"
@@ -128,6 +129,10 @@ func (reader *ExtentReader) streamReadDataFromHost(offset, expectReadSize int, d
 		index = 0
 		atomic.StoreUint32(&reader.readerIndex, 0)
 	}
+
+	ctx := context.Background()
+	globalReadLimiter.Wait(ctx)
+
 	host = reader.dp.Hosts[index]
 	connect, err = ReadConnectPool.Get(host)
 	if err != nil {
