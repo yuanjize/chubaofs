@@ -249,7 +249,7 @@ func (m *metaManager) opDeleteDentry(conn net.Conn, p *Packet) (err error) {
 	err = mp.DeleteDentry(req, p)
 	// Reply operation result to client though TCP connection.
 	m.respondToClient(conn, p)
-	log.LogInfof("[opDeleteDentry] req:%v; resp: %v, body: %s,remote :%v", req,
+	log.LogDebugf("[opDeleteDentry] req:%v; resp: %v, body: %s,remote :%v", req,
 		p.GetResultMesg(), p.Data,p.Data,conn.RemoteAddr().String())
 	return
 }
@@ -295,7 +295,7 @@ func (m *metaManager) opDeleteInode(conn net.Conn, p *Packet) (err error) {
 	}
 	err = mp.DeleteInode(req, p)
 	m.respondToClient(conn, p)
-	log.LogInfof("[opDeleteInode] req:%v; resp: %v, body: %s,remote :%v", req,
+	log.LogDebugf("[opDeleteInode] req:%v; resp: %v, body: %s,remote :%v", req,
 		p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
 	return
 }
