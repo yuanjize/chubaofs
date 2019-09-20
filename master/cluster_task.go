@@ -527,7 +527,14 @@ func (c *Cluster) UpdateDataNode(dataNode *DataNode, dps []*proto.PartitionRepor
 			continue
 		}
 		if vr.VolName != "" {
-			if dp, err := c.getDataPartitionByIDAndVol(vr.PartitionID, vr.VolName); err == nil {
+			vol, err := c.getVol(vr.VolName)
+			if err != nil {
+				continue
+			}
+			if vol.Status == VolMarkDelete {
+				continue
+			}
+			if dp, err := vol.getDataPartitionByID(vr.PartitionID); err == nil {
 				dp.UpdateMetric(vr, dataNode, c)
 			}
 		} else {
@@ -552,6 +559,9 @@ func (c *Cluster) UpdateMetaNode(metaNode *MetaNode, metaPartitions []*proto.Met
 			vol, err = c.getVol(mr.VolName)
 			if err != nil {
 				log.LogErrorf("action[UpdateMetaNode] get vol[%v] err[%v]", mr.VolName, err)
+				continue
+			}
+			if vol.Status == VolMarkDelete {
 				continue
 			}
 			mp, err = vol.getMetaPartition(mr.PartitionID)

@@ -284,9 +284,6 @@ func (vol *Vol) getTotalSpace() uint64 {
 }
 
 func (vol *Vol) updateViewCache(c *Cluster) {
-	if vol.Status == VolMarkDelete {
-		return
-	}
 	liveMetaNodesRate := c.getLiveMetaNodesRate()
 	liveDataNodesRate := c.getLiveDataNodesRate()
 	if liveMetaNodesRate < NodesAliveRate || liveDataNodesRate < NodesAliveRate {
