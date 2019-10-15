@@ -132,7 +132,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerInterceptedSignal(opt.MountPoint)
+	syslog.Print(opt)
+
+	registerInterceptedSignal()
 
 	fsConn, super, err := mount(opt)
 	if err != nil {
@@ -182,7 +184,7 @@ func startDaemon() error {
 	return nil
 }
 
-func registerInterceptedSignal(mnt string) {
+func registerInterceptedSignal() {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -229,7 +231,7 @@ func mount(opt *cfs.MountOption) (fsConn *fuse.Conn, super *cfs.Super, err error
 
 	http.HandleFunc(ControlCommandSetRate, super.SetRate)
 	http.HandleFunc(ControlCommandGetRate, super.GetRate)
-	http.HandleFunc(log.SetLogLevelPath,log.SetLogLevel)
+	http.HandleFunc(log.SetLogLevelPath, log.SetLogLevel)
 	go func() {
 		fmt.Println(http.ListenAndServe(":"+opt.Profport, nil))
 	}()
