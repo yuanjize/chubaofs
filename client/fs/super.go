@@ -49,6 +49,24 @@ type MountOption struct {
 	UmpDatadir    string
 }
 
+func (mo *MountOption) String() string {
+	return fmt.Sprint(
+		"\nMountPoint: ", mo.MountPoint,
+		"\nVolname: ", mo.Volname,
+		"\nOwner: ", mo.Owner,
+		"\nMaster: ", mo.Master,
+		"\nLogpath: ", mo.Logpath,
+		"\nLoglvl: ", mo.Loglvl,
+		"\nProfport: ", mo.Profport,
+		"\nRdonly: ", mo.Rdonly,
+		"\nIcacheTimeout: ", mo.IcacheTimeout,
+		"\nLookupValid: ", mo.LookupValid,
+		"\nAttrValid: ", mo.AttrValid,
+		"\nUmpDatadir: ", mo.UmpDatadir,
+		"\n",
+	)
+}
+
 type Super struct {
 	cluster string
 	volname string
