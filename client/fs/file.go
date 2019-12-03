@@ -191,7 +191,8 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	}
 
 	elapsed := time.Since(start)
-	log.LogDebugf("TRACE Read: ino(%v) req(%v) size(%v) (%v)ns", f.inode.ino, req, size, elapsed.Nanoseconds())
+	log.LogDebugf("TRACE Read: ino(%v) req(%v) offset(%v) size(%v) (%v)ns", f.inode.ino, req, req.Offset, size, elapsed.Nanoseconds())
+
 	return nil
 }
 
