@@ -80,14 +80,14 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 		log.LogErrorf("Attr: ino(%v) err(%v)", ino, err)
 		return ParseError(err)
 	}
-
-	inode.fillAttr(a)
 	fileSize := f.super.ec.GetFileSize(ino)
 	writeSize := f.super.ec.GetWriteSize(ino)
-	if fileSize > a.Size || writeSize > a.Size {
-		a.Size = uint64(util.Max(int(fileSize), int(writeSize)))
+	size:=uint64(util.Max(int(fileSize), int(writeSize)))
+	if size>inode.size{
+		inode.size=size
+		f.super.ic.Put(inode)
 	}
-
+	inode.fillAttr(a)
 	log.LogDebugf("TRACE Attr: inode(%v) attr(%v) fileSize(%v) writeSize(%v) resp(%v)", inode, a, fileSize, writeSize, a)
 	return nil
 }
@@ -191,7 +191,8 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	}
 
 	elapsed := time.Since(start)
-	log.LogDebugf("TRACE Read: ino(%v) req(%v) size(%v) (%v)ns", f.inode.ino, req, size, elapsed.Nanoseconds())
+	log.LogDebugf("TRACE Read: ino(%v) req(%v) offset(%v) size(%v) (%v)ns", f.inode.ino, req, req.Offset, size, elapsed.Nanoseconds())
+
 	return nil
 }
 

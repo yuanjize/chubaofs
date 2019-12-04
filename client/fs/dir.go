@@ -194,8 +194,9 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.Lo
 		d.super.nodeCache[ino] = child
 	}
 	d.super.fslock.Unlock()
-
 	resp.EntryValid = LookupValidDuration
+	log.LogDebugf("TRACE Lookup exit: parent(%v) name(%v) inode(%v) inodeSize(%v)", d.inode.ino, req.Name,ino, inode.size)
+
 	return child, nil
 }
 
