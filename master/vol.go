@@ -39,6 +39,8 @@ type Vol struct {
 	MetaPartitions             map[uint64]*MetaPartition
 	mpsLock                    sync.RWMutex
 	dataPartitions             *DataPartitionMap
+	tokens                     map[string]*proto.Token
+	tokensLock                 sync.RWMutex
 	mpsCache                   []byte
 	viewCache                  []byte
 	isAllMetaPartitionReadonly bool
@@ -60,12 +62,36 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64) (vol
 	}
 	vol.Capacity = capacity
 	vol.viewCache = make([]byte, 0)
+	vol.tokens = make(map[string]*proto.Token, 0)
 	return
 }
 
 func (vol *Vol) String() string {
 	return fmt.Sprintf("name[%v],dpNum[%v],mpNum[%v],cap[%v],status[%v]",
 		vol.Name, vol.dpReplicaNum, vol.mpReplicaNum, vol.Capacity, vol.Status)
+}
+
+func (vol *Vol) getToken(token string) (tokenObj *proto.Token, err error) {
+	vol.tokensLock.Lock()
+	defer vol.tokensLock.Unlock()
+	tokenObj, ok := vol.tokens[token]
+	if !ok {
+		return nil, TokenNotFound
+	}
+	return
+}
+
+func (vol *Vol) deleteToken(token string) {
+	vol.tokensLock.RLock()
+	defer vol.tokensLock.RUnlock()
+	delete(vol.tokens, token)
+}
+
+func (vol *Vol) putToken(token *proto.Token) {
+	vol.tokensLock.Lock()
+	defer vol.tokensLock.Unlock()
+	vol.tokens[token.Value] = token
+	return
 }
 
 func (vol *Vol) AddMetaPartition(mp *MetaPartition) {

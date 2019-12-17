@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"math"
 	"strings"
 	"sync"
 	"time"
-	"github.com/chubaofs/chubaofs/util"
 )
 
 type DataPartition struct {
@@ -38,14 +38,14 @@ type DataPartition struct {
 	PartitionType    string
 	PersistenceHosts []string
 	sync.RWMutex
-	total            uint64
-	used             uint64
-	VolName          string
-	modifyTime       int64
-	createTime       int64
-	FileInCoreMap    map[string]*FileInCore
-	MissNodes        map[string]int64
-	FileMissReplica  map[string]int64
+	total           uint64
+	used            uint64
+	VolName         string
+	modifyTime      int64
+	createTime      int64
+	FileInCoreMap   map[string]*FileInCore
+	MissNodes       map[string]int64
+	FileMissReplica map[string]int64
 }
 
 func newDataPartition(ID uint64, replicaNum uint8, partitionType, volName string) (partition *DataPartition) {

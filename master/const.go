@@ -20,6 +20,8 @@ const (
 	ParaNodeAddr          = "addr"
 	ParaDiskPath          = "disk"
 	ParaName              = "name"
+	ParaToken             = "token"
+	ParaTokenType         = "tokenType"
 	ParaId                = "id"
 	ParaCount             = "count"
 	ParaReplicas          = "replicas"

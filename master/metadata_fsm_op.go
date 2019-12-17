@@ -43,6 +43,9 @@ const (
 	OpSyncDeleteVol            uint32 = 0x0F
 	OpSyncDeleteDataPartition  uint32 = 0x10
 	OpSyncDeleteMetaPartition  uint32 = 0x11
+	OpSyncAddToken             uint32 = 0x20
+	OpSyncDelToken             uint32 = 0x21
+	OpSyncUpdateToken          uint32 = 0x22
 )
 
 const (
@@ -53,12 +56,14 @@ const (
 	MetaPartitionAcronym = "mp"
 	VolAcronym           = "vol"
 	ClusterAcronym       = "c"
+	TokenAcronym         = "t"
 	MetaNodePrefix       = KeySeparator + MetaNodeAcronym + KeySeparator
 	DataNodePrefix       = KeySeparator + DataNodeAcronym + KeySeparator
 	DataPartitionPrefix  = KeySeparator + DataPartitionAcronym + KeySeparator
 	VolPrefix            = KeySeparator + VolAcronym + KeySeparator
 	MetaPartitionPrefix  = KeySeparator + MetaPartitionAcronym + KeySeparator
 	ClusterPrefix        = KeySeparator + ClusterAcronym + KeySeparator
+	TokenPrefix          = KeySeparator + TokenAcronym + KeySeparator
 )
 
 type MetaPartitionValue struct {
@@ -133,6 +138,21 @@ func newVolValue(vol *Vol) (vv *VolValue) {
 	return
 }
 
+type TokenValue struct {
+	VolName   string
+	Value     string
+	TokenType int8
+}
+
+func newTokenValue(token *bsProto.Token) (tv *TokenValue) {
+	tv = &TokenValue{
+		TokenType: token.TokenType,
+		Value:     token.Value,
+		VolName:   token.VolName,
+	}
+	return
+}
+
 type Metadata struct {
 	Op uint32 `json:"op"`
 	K  string `json:"k"`
@@ -178,9 +198,35 @@ func (m *Metadata) setOpType() {
 		m.Op = OpSyncAddVol
 	case ClusterAcronym:
 		m.Op = OpSyncPutCluster
+	case TokenAcronym:
+		m.Op = OpSyncAddToken
 	default:
 		log.LogWarnf("action[setOpType] unknown opCode[%v]", keyArr[1])
 	}
+}
+
+func (c *Cluster) syncDeleteToken(token *bsProto.Token) (err error) {
+	return c.syncPutTokenInfo(OpSyncAddToken, token)
+}
+
+func (c *Cluster) syncAddToken(token *bsProto.Token) (err error) {
+	return c.syncPutTokenInfo(OpSyncDelToken, token)
+}
+
+func (c *Cluster) syncUpdateToken(token *bsProto.Token) (err error) {
+	return c.syncPutTokenInfo(OpSyncUpdateToken, token)
+}
+
+func (c *Cluster) syncPutTokenInfo(opType uint32, token *bsProto.Token) (err error) {
+	metadata := new(Metadata)
+	metadata.Op = opType
+	metadata.K = TokenPrefix + token.VolName + KeySeparator + token.Value
+	tv := newTokenValue(token)
+	metadata.V, err = json.Marshal(tv)
+	if err != nil {
+		return
+	}
+	return c.submit(metadata)
 }
 
 func (c *Cluster) syncPutCluster() (err error) {
@@ -461,6 +507,38 @@ func (c *Cluster) loadVols() (err error) {
 		c.putVol(vol)
 		encodedKey.Free()
 		log.LogInfof("action[loadVols],vol[%v]", vol)
+	}
+	return
+}
+
+func (c *Cluster) loadTokens() (err error) {
+	snapshot := c.fsm.store.RocksDBSnapshot()
+	it := c.fsm.store.Iterator(snapshot)
+	defer func() {
+		it.Close()
+		c.fsm.store.ReleaseSnapshot(snapshot)
+	}()
+	prefixKey := []byte(TokenPrefix)
+	it.Seek(prefixKey)
+	for ; it.ValidForPrefix(prefixKey); it.Next() {
+		encodedKey := it.Key()
+		encodedValue := it.Value()
+		tv := &TokenValue{}
+		if err = json.Unmarshal(encodedValue.Data(), tv); err != nil {
+			err = fmt.Errorf("action[loadTokens],value:%v,err:%v", encodedValue.Data(), err)
+			return err
+		}
+		vol, err1 := c.getVol(tv.VolName)
+		if err1 != nil {
+			// if vol not found,record log and continue
+			log.LogErrorf("action[loadTokens] err:%v", err1.Error())
+			continue
+		}
+		token := &bsProto.Token{VolName: tv.VolName, TokenType: tv.TokenType, Value: tv.Value}
+		vol.putToken(token)
+		encodedKey.Free()
+		encodedValue.Free()
+		log.LogInfof("action[loadTokens],vol[%v],token[%v]", vol.Name, token.Value)
 	}
 	return
 }

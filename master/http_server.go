@@ -71,6 +71,12 @@ const (
 	// Operation response
 	MetaNodeResponse = "/metaNode/response" // Method: 'POST', ContentType: 'application/json'
 	DataNodeResponse = "/dataNode/response" // Method: 'POST', ContentType: 'application/json'
+
+	//token
+	TokenGetURI    = "/token/get"
+	TokenAddURI    = "/token/add"
+	TokenDelURI    = "/token/delete"
+	TokenUpdateURI = "/token/update"
 )
 
 func (m *Master) startHttpService() (err error) {
@@ -120,6 +126,10 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminSetCompactStatus, m.handlerWithInterceptor())
 	http.Handle(AdminGetCompactStatus, m.handlerWithInterceptor())
 	http.Handle(AdminSetMetaNodeThreshold, m.handlerWithInterceptor())
+	http.Handle(TokenAddURI, m.handlerWithInterceptor())
+	http.Handle(TokenGetURI, m.handlerWithInterceptor())
+	http.Handle(TokenDelURI, m.handlerWithInterceptor())
+	http.Handle(TokenUpdateURI, m.handlerWithInterceptor())
 
 	return
 }
@@ -236,6 +246,14 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.getCompactStatus(w, r)
 	case AdminSetMetaNodeThreshold:
 		m.setMetaNodeThreshold(w, r)
+	case TokenAddURI:
+		m.addToken(w, r)
+	case TokenGetURI:
+		m.getToken(w, r)
+	case TokenDelURI:
+		m.deleteToken(w, r)
+	case TokenUpdateURI:
+		m.updateToken(w, r)
 	default:
 
 	}

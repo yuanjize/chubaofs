@@ -1,14 +1,14 @@
 package master
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
+	"net/http"
 	"testing"
 	"time"
-	"github.com/chubaofs/chubaofs/proto"
-	"encoding/json"
-	"net/http"
 )
 
 func TestAutoCreateDataPartitions(t *testing.T) {
@@ -196,7 +196,7 @@ func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 	mp2.Status = proto.ReadWrite
 	vol.updateViewCache(server.cluster)
 	if vol.isAllMetaPartitionReadonly {
-		t.Errorf("isAllMetaPartitionReadonly[%v] should be false,vol.MetaPartitions[%v]\n", vol.isAllMetaPartitionReadonly,vol.MetaPartitions)
+		t.Errorf("isAllMetaPartitionReadonly[%v] should be false,vol.MetaPartitions[%v]\n", vol.isAllMetaPartitionReadonly, vol.MetaPartitions)
 		return
 	}
 
@@ -204,7 +204,6 @@ func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 	fmt.Println(reqUrl)
 	processWithStatus(reqUrl, http.StatusOK, t)
 }
-
 
 func TestConcurrentReadWriteDataPartitionMap(t *testing.T) {
 	name := "TestConcurrentReadWriteDataPartitionMap"
@@ -221,12 +220,12 @@ func TestConcurrentReadWriteDataPartitionMap(t *testing.T) {
 		var id uint64
 		for {
 			id++
-			dp := newDataPartition(id,3,proto.ExtentPartition,name)
+			dp := newDataPartition(id, 3, proto.ExtentPartition, name)
 			vol.dataPartitions.putDataPartition(dp)
 			time.Sleep(time.Second)
 		}
 	}()
-	for i :=0;i< 10;i++{
+	for i := 0; i < 10; i++ {
 		time.Sleep(time.Second)
 		vol.updateViewCache(server.cluster)
 	}

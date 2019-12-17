@@ -19,6 +19,11 @@ package proto
   or send command to datanode
 */
 
+const (
+	ReadOnlyToken  = 1
+	ReadWriteToken = 2
+)
+
 type RegisterMetaNodeResp struct {
 	ID uint64
 }
@@ -190,4 +195,10 @@ type MetaPartitionOfflineResponse struct {
 	VolName     string
 	Status      uint8
 	Result      string
+}
+
+type Token struct {
+	TokenType int8
+	Value     string
+	VolName   string
 }

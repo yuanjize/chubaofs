@@ -27,6 +27,7 @@ var (
 	DataNodeNotFound      = errors.New("data node not found")
 	MetaNodeNotFound      = errors.New("meta node not found")
 	VolNotFound           = errors.New("vol not found")
+	TokenNotFound         = errors.New("token not found")
 	MetaPartitionNotFound = errors.New("meta partition not found")
 	DataReplicaNotFound   = errors.New("data replica not found")
 	UnMatchPara           = errors.New("para not unmatched")
