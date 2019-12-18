@@ -16,6 +16,7 @@ package metanode
 
 import (
 	"strings"
+	"time"
 
 	"github.com/chubaofs/chubaofs/proto"
 )
@@ -53,6 +54,12 @@ func (mp *metaPartition) createDentry(dentry *Dentry) (status uint8) {
 		}
 		status = proto.OpExistErr
 	}
+
+	if item := mp.inodeTree.Get(NewInode(dentry.ParentId, 0)); item != nil {
+		inode := item.(*Inode)
+		mtime := time.Now().Unix()
+		inode.ModifyTime = mtime
+	}
 	return
 }
 
@@ -77,6 +84,13 @@ func (mp *metaPartition) deleteDentry(dentry *Dentry) (resp *ResponseDentry) {
 		resp.Status = proto.OpNotExistErr
 		return
 	}
+
+	if parent := mp.inodeTree.Get(NewInode(dentry.ParentId, 0)); parent != nil {
+		inode := parent.(*Inode)
+		mtime := time.Now().Unix()
+		inode.ModifyTime = mtime
+	}
+
 	resp.Msg = item.(*Dentry)
 	return
 }
