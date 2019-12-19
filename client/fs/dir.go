@@ -96,6 +96,8 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 	d.super.nodeCache[inode.ino] = child
 	d.super.fslock.Unlock()
 
+	d.super.ic.Delete(d.inode.ino)
+
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Create: parent(%v) req(%v) resp(%v) ino(%v) (%v)ns", d.inode.ino, req, resp, inode.ino, elapsed.Nanoseconds())
 	return child, child, nil
@@ -147,6 +149,8 @@ func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 		log.LogDebugf("Remove: add to orphan inode list, ino(%v)", info.Inode)
 	}
 
+	d.super.ic.Delete(d.inode.ino)
+
 	elapsed := time.Since(start)
 	log.LogDebugf("TRACE Remove: parent(%v) req(%v) (%v)ns", d.inode.ino, req, elapsed.Nanoseconds())
 	return nil
@@ -195,7 +199,7 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.Lo
 	}
 	d.super.fslock.Unlock()
 	resp.EntryValid = LookupValidDuration
-	log.LogDebugf("TRACE Lookup exit: parent(%v) name(%v) inode(%v) inodeSize(%v)", d.inode.ino, req.Name,ino, inode.size)
+	log.LogDebugf("TRACE Lookup exit: parent(%v) name(%v) inode(%v) inodeSize(%v)", d.inode.ino, req.Name, ino, inode.size)
 
 	return child, nil
 }
