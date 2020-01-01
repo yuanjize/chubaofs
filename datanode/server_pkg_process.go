@@ -202,6 +202,7 @@ func (s *DataNode) reciveFromAllReplicates(msgH *MessageHandler) (request *Packe
 		_, err := s.receiveFromNext(request, index)
 		if err != nil {
 			request.PackErrorBody(ActionReceiveFromNext, err.Error())
+			log.LogErrorf(err.Error())
 			return
 		}
 	}
@@ -260,6 +261,12 @@ func (s *DataNode) receiveFromNext(request *Packet, index int) (reply *Packet, e
 
 func (s *DataNode) sendToAllReplicates(pkg *Packet, msgH *MessageHandler) (index int, err error) {
 	msgH.PushListElement(pkg)
+	defer func() {
+		if err != nil {
+			pkg.forceDestoryAllConnect()
+			log.LogErrorf(err.Error())
+		}
+	}()
 	for index = 0; index < len(pkg.NextConns); index++ {
 		err = msgH.AllocateNextConn(pkg, index)
 		if err != nil {
