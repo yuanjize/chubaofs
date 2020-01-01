@@ -415,7 +415,7 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 }
 
 func IsDiskErr(errMsg string) bool {
-	if strings.Contains(errMsg, syscall.EIO.Error())  || strings.Contains(errMsg,syscall.EROFS.Error()){
+	if strings.Contains(errMsg, syscall.EIO.Error()) || strings.Contains(errMsg, syscall.EROFS.Error()) {
 		return true
 	}
 	return false

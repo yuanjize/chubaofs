@@ -93,7 +93,7 @@ func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
 	case proto.OpTinyExtentRepairRead:
 		s.handleTinyExtentRepairRead(pkg, c)
 	case proto.OpMarkDelete:
-		s.handleMarkDelete(pkg,c)
+		s.handleMarkDelete(pkg, c)
 	case proto.OpNotifyExtentRepair:
 		s.handleNotifyExtentRepair(pkg)
 	case proto.OpGetWatermark:
@@ -195,11 +195,10 @@ func (s *DataNode) handleHeartbeats(pkg *Packet) {
 	task := &proto.AdminTask{}
 	json.Unmarshal(pkg.Data, task)
 	pkg.PackOkReply()
-	go s.asyncResponseHeartBeat(pkg,task)
+	go s.asyncResponseHeartBeat(pkg, task)
 }
 
-
-func (s *DataNode)asyncResponseHeartBeat(pkg *Packet,task *proto.AdminTask){
+func (s *DataNode) asyncResponseHeartBeat(pkg *Packet, task *proto.AdminTask) {
 	request := &proto.HeartBeatRequest{}
 	response := &proto.DataNodeHeartBeatResponse{}
 
@@ -315,7 +314,7 @@ func (s *DataNode) handleLoadDataPartition(pkg *Packet) {
 
 // Handle OpMarkDelete packet.
 // Handle OpMarkDelete packet.
-func (s *DataNode) handleMarkDelete(pkg *Packet,c net.Conn) {
+func (s *DataNode) handleMarkDelete(pkg *Packet, c net.Conn) {
 	var (
 		err error
 	)
@@ -325,13 +324,13 @@ func (s *DataNode) handleMarkDelete(pkg *Packet,c net.Conn) {
 		if err == nil {
 			err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, int64(ext.ExtentOffset), int64(ext.Size))
 			log.LogInfof("action[MarkDeleteTiny]  id(%v_%v_%v_%v_%v) from (%v) err %v",
-				pkg.ReqID, pkg.PartitionID, pkg.FileID, ext.ExtentOffset, ext.Size,c.RemoteAddr().String(), err)
+				pkg.ReqID, pkg.PartitionID, pkg.FileID, ext.ExtentOffset, ext.Size, c.RemoteAddr().String(), err)
 			pkg.Offset = int64(ext.ExtentOffset)
 		}
 	} else {
 		err = pkg.DataPartition.GetExtentStore().MarkDelete(pkg.FileID, 0, 0)
 		log.LogInfof("action[MarkDeleteNormal] id(%v_%v_%v) from (%v) err %v",
-			pkg.ReqID, pkg.PartitionID, pkg.FileID,c.RemoteAddr().String(), err)
+			pkg.ReqID, pkg.PartitionID, pkg.FileID, c.RemoteAddr().String(), err)
 	}
 	if err != nil {
 		err = errors.Annotatef(err, "Request(%v) MarkDelete Error", pkg.GetUniqueLogId())
