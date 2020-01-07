@@ -1,12 +1,12 @@
 package master
 
 import (
-	"testing"
 	"fmt"
-	"net/http"
-	"io/ioutil"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/tiglabs/raft/proto"
+	"io/ioutil"
+	"net/http"
+	"testing"
 )
 
 func TestHandleLeaderChange(t *testing.T) {

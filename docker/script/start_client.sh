@@ -8,6 +8,24 @@ Master1Addr="192.168.0.11:17010"
 LeaderAddr=""
 VolName="ltptest"
 TryTimes=5
+Token=""
+
+getToken() {
+    echo -n "get token "
+    for i in $(seq 1 100) ; do
+        Token=$(curl -s "http://$Master1Addr/admin/getVol?name=ltptest" | jq . | grep -A 1 'TokenType": 2' | grep "Value" | sed 's/.*"Value": "\(.*\)".*/\1/g')
+        if [ "x$Token" != "x" ] ; then
+            break
+        fi
+        echo -n "."
+        sleep 1
+    done
+    if [ "$Token" == "x" ] ; then
+        echo -n "timeout, exit\n"
+        exit 1
+    fi
+    echo "ok"
+}
 
 getLeaderAddr() {
     echo -n "check Master "
@@ -67,18 +85,6 @@ create_vol() {
     echo "ok"
 }
 
-create_dp() {
-    echo -n "create datapartition "
-    res=$(curl -s "http://$LeaderAddr/dataPartition/create?count=20&name=$VolName&type=extent" )
-    code=$(echo "$res" | jq .code)
-    if [[ $code -ne 0 ]] ; then
-        echo "failed, exit"
-        #curl -s "http://$LeaderAddr/admin/getCluster" | jq
-        exit 1
-    fi
-    echo "ok"
-}
-
 print_error_info() {
     echo "------ err ----"
     cat /cfs/log/cfs.out
@@ -94,8 +100,10 @@ print_error_info() {
 
 start_client() {
     echo -n "start client "
+    # replace client.json token
+    cat /cfs/conf/client.json |  sed -e 's/"token": ".*"/"token": "'$Token'"/' > /cfs/conf/client2.json
     for((i=0; i<$TryTimes; i++)) ; do
-        nohup /cfs/bin/cfs-client -c /cfs/conf/client.json >/cfs/log/cfs.out 2>&1 &
+        nohup /cfs/bin/cfs-client -c /cfs/conf/client2.json >/cfs/log/cfs.out 2>&1 &
         sleep 4
         sta=$(stat $MntPoint 2>/dev/null | tr ":：" " "  | awk '/Inode/{print $4}')
         if [[ "x$sta" == "x1" ]] ; then
@@ -113,5 +121,6 @@ getLeaderAddr
 check_status "MetaNode"
 check_status "DataNode"
 create_vol
+getToken
 start_client
 

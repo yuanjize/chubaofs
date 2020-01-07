@@ -1,9 +1,10 @@
 {
-  "mountpoint": "/mnt/ltptest",
-  "volname": "intest",
+  "mountpoint": "/cfs/mnt",
+  "volname": "ltptest",
   "master": "10.196.31.173:80,10.196.31.141:80,10.196.30.200:80",
-  "logpath": "/export/Logs/bdfs",
+  "logpath": "/cfs/log",
   "profport": "10094",
-  "loglvl": "debug"
+  "loglvl": "debug",
+  "token": "bHRwdGVzdCMxIzE1NzY3MjcxNzc="
 }
 

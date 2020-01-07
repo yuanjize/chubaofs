@@ -16,13 +16,15 @@ package master
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
-	"fmt"
 )
 
 type VolStatInfo struct {
@@ -270,6 +272,60 @@ func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 errDeal:
 	logMsg := getReturnMessage("getMetaPartition", r.RemoteAddr, err.Error(), code)
 	HandleError(logMsg, err, code, w)
+	return
+}
+
+func (m *Master) getToken(w http.ResponseWriter, r *http.Request) {
+	var (
+		body     []byte
+		code     = http.StatusBadRequest
+		err      error
+		name     string
+		token    string
+		tokenObj *proto.Token
+		vol      *Vol
+	)
+	if name, token, err = parseGetTokenPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
+		goto errDeal
+	}
+
+	if tokenObj, err = vol.getToken(token); err != nil {
+		goto errDeal
+	}
+
+	if body, err = json.Marshal(tokenObj); err != nil {
+		goto errDeal
+	}
+	w.Write(body)
+	return
+errDeal:
+	logMsg := getReturnMessage("getToken", r.RemoteAddr, err.Error(), code)
+	HandleError(logMsg, err, code, w)
+	return
+}
+
+func parseGetTokenPara(r *http.Request) (name string, token string, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if token, err = checkTokenValue(r); err != nil {
+		return
+	}
+	return
+}
+
+func checkTokenValue(r *http.Request) (token string, err error) {
+	if token = r.FormValue(ParaToken); token == "" {
+		err = paraNotFound(ParaToken)
+		return
+	}
+	token, err = url.QueryUnescape(token)
 	return
 }
 

@@ -28,6 +28,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (
@@ -362,4 +363,50 @@ func TestTransferLeader(t *testing.T) {
 		hostAddr, RaftTransferLeader, server.id, fmt.Sprintf("%v:%v", server.ip, server.port))
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
+}
+
+func TestAddToken(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v?name=%v&tokenType=%v&authKey=%v",
+		hostAddr, TokenAddURI, commonVol.Name, proto.ReadWriteToken, buildAuthKey())
+	fmt.Println(reqUrl)
+	process(reqUrl, t)
+}
+
+func TestDelToken(t *testing.T) {
+	for _, token := range commonVol.tokens {
+		reqUrl := fmt.Sprintf("%v%v?name=%v&token=%v&authKey=%v",
+			hostAddr, TokenDelURI, commonVol.Name, token.Value, buildAuthKey())
+		fmt.Println(reqUrl)
+		process(reqUrl, t)
+		_, ok := commonVol.tokens[token.Value]
+		if ok {
+			t.Errorf("delete token[%v] failed\n", token.Value)
+			return
+		}
+		reqUrl = fmt.Sprintf("%v%v?name=%v&tokenType=%v&authKey=%v",
+			hostAddr, TokenAddURI, commonVol.Name, token.TokenType,buildAuthKey())
+		fmt.Println(reqUrl)
+		process(reqUrl, t)
+	}
+}
+
+func TestUpdateToken(t *testing.T) {
+	var tokenType int8
+	for _, token := range commonVol.tokens {
+		if token.TokenType == proto.ReadWriteToken {
+			tokenType = proto.ReadOnlyToken
+		} else {
+			tokenType = proto.ReadWriteToken
+		}
+
+		reqUrl := fmt.Sprintf("%v%v?name=%v&token=%v&tokenType=%v&authKey=%v",
+			hostAddr, TokenUpdateURI, commonVol.Name, token.Value, tokenType, buildAuthKey())
+		fmt.Println(reqUrl)
+		process(reqUrl, t)
+		token := commonVol.tokens[token.Value]
+		if token.TokenType != tokenType {
+			t.Errorf("expect tokenType[%v],real tokenType[%v]\n", tokenType, token.TokenType)
+			return
+		}
+	}
 }

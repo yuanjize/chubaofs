@@ -19,10 +19,10 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
+	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"sync"
 	"time"
-	"github.com/chubaofs/chubaofs/util"
 )
 
 type Cluster struct {
@@ -522,7 +522,6 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 	wg.Wait()
 	select {
 	case err = <-errChannel:
-		goto errDeal
 		for _, host := range targetHosts {
 			wg.Add(1)
 			go func(host string) {
@@ -535,6 +534,7 @@ func (c *Cluster) createDataPartition(volName, partitionType string) (dp *DataPa
 				c.putDataNodeTasks(tasks)
 			}(host)
 		}
+		goto errDeal
 	default:
 		dp.total = util.DefaultDataPartitionSize
 		dp.Status = proto.ReadWrite
@@ -732,6 +732,10 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		return
 	}
 
+	if dp.isRecover == true {
+		return
+	}
+
 	if vol, err = c.getVol(volName); err != nil {
 		goto errDeal
 	}
@@ -910,6 +914,18 @@ errDeal:
 	return
 }
 
+func (c *Cluster) createToken(vol *Vol, tokenType int8) (err error) {
+	token, err := createToken(vol.Name, tokenType)
+	if err != nil {
+		return
+	}
+	if err = c.syncAddToken(token); err != nil {
+		return
+	}
+	vol.putToken(token)
+	return
+}
+
 func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
 	c.createVolLock.Lock()
 	defer c.createVolLock.Unlock()
@@ -919,6 +935,12 @@ func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint
 	}
 	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity))
 	if err = c.syncAddVol(vol); err != nil {
+		goto errDeal
+	}
+	if err = c.createToken(vol, proto.ReadOnlyToken); err != nil {
+		goto errDeal
+	}
+	if err = c.createToken(vol, proto.ReadWriteToken); err != nil {
 		goto errDeal
 	}
 	c.putVol(vol)
@@ -1139,4 +1161,62 @@ func (c *Cluster) clearMetaNodes() {
 		c.metaNodes.Delete(key)
 		return true
 	})
+}
+
+func (c *Cluster) deleteToken(vol *Vol, token, authKey string) (err error) {
+	var serverAuthKey string
+	if vol.Owner != "" {
+		serverAuthKey = vol.Owner
+	} else {
+		serverAuthKey = vol.Name
+	}
+	if !matchKey(serverAuthKey, authKey) {
+		return VolAuthKeyNotMatch
+	}
+	var tokenObj *proto.Token
+	if tokenObj, err = vol.getToken(token); err != nil {
+		return
+	}
+	if err = c.syncDeleteToken(tokenObj); err != nil {
+		return
+	}
+	vol.deleteToken(token)
+	return
+}
+
+func (c *Cluster) addToken(vol *Vol, tokenType int8, authKey string) (err error) {
+	var serverAuthKey string
+	if vol.Owner != "" {
+		serverAuthKey = vol.Owner
+	} else {
+		serverAuthKey = vol.Name
+	}
+	if !matchKey(serverAuthKey, authKey) {
+		return VolAuthKeyNotMatch
+	}
+	return c.createToken(vol, tokenType)
+}
+
+func (c *Cluster) updateToken(vol *Vol, tokenType int8, token, authKey string) (err error) {
+	var serverAuthKey string
+	if vol.Owner != "" {
+		serverAuthKey = vol.Owner
+	} else {
+		serverAuthKey = vol.Name
+	}
+	if !matchKey(serverAuthKey, authKey) {
+		return VolAuthKeyNotMatch
+	}
+	var tokenObj *proto.Token
+	if tokenObj, err = vol.getToken(token); err != nil {
+		return
+	}
+	oldTokenType := tokenObj.TokenType
+	tokenObj.TokenType = tokenType
+	if err = c.syncUpdateToken(tokenObj); err != nil {
+		tokenObj.TokenType = oldTokenType
+		return
+	}
+	vol.putToken(tokenObj)
+	return
 }

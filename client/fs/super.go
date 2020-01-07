@@ -16,6 +16,7 @@ package fs
 
 import (
 	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"net/http"
 	"strconv"
 	"sync"
@@ -47,6 +48,7 @@ type MountOption struct {
 	EnSyncWrite   int64
 	AutoInvalData int64
 	UmpDatadir    string
+	Token         string
 }
 
 func (mo *MountOption) String() string {
@@ -63,6 +65,7 @@ func (mo *MountOption) String() string {
 		"\nLookupValid: ", mo.LookupValid,
 		"\nAttrValid: ", mo.AttrValid,
 		"\nUmpDatadir: ", mo.UmpDatadir,
+		"\nToken: ", mo.Token,
 		"\n",
 	)
 }
@@ -116,6 +119,14 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 	s.ic = NewInodeCache(inodeExpiration, MaxInodeCache)
 	s.orphan = NewOrphanInodeList()
 	s.nodeCache = make(map[uint64]fs.Node)
+
+	tokenType, err := s.mw.QueryTokenType(opt.Volname, opt.Token)
+	if err != nil {
+		log.LogErrorf("QueryTokenType failed! %v", err.Error())
+		return nil, err
+	}
+
+	opt.Rdonly = tokenType == proto.ReadOnlyToken
 	log.LogInfof("NewSuper: cluster(%v) volname(%v) icacheExpiration(%v) LookupValidDuration(%v) AttrValidDuration(%v)", s.cluster, s.volname, inodeExpiration, LookupValidDuration, AttrValidDuration)
 	return s, nil
 }

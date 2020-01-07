@@ -218,9 +218,11 @@ func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
 	opt.ReadRate = parseConfigString(cfg, "readRate")
 	opt.WriteRate = parseConfigString(cfg, "writeRate")
 	opt.AutoInvalData = parseConfigString(cfg, "autoInvalData")
+	opt.Token = cfg.GetString("token")
 
-	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {
-		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v)", opt.MountPoint, opt.Volname, opt.Master))
+	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" || opt.Token == "" {
+		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v), token(%v)",
+			opt.MountPoint, opt.Volname, opt.Master, opt.Token))
 	}
 
 	return opt, nil

@@ -23,6 +23,7 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
+	"strings"
 )
 
 func newCreateDataPartitionRequest(partitionType, volName string, ID uint64) (req *proto.CreateDataPartitionRequest) {
@@ -126,5 +127,7 @@ func matchKey(serverKey, clientKey string) bool {
 		return false
 	}
 	cipherStr := h.Sum(nil)
-	return clientKey == hex.EncodeToString(cipherStr)
+	clientKey = strings.ToLower(strings.TrimSpace(clientKey))
+	serverKey = strings.ToLower(strings.TrimSpace(hex.EncodeToString(cipherStr)))
+	return clientKey == serverKey
 }

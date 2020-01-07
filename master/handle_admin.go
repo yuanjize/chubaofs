@@ -23,10 +23,11 @@ import (
 
 	"bytes"
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/tiglabs/raft"
 	"io/ioutil"
 	"strings"
-	"github.com/tiglabs/raft"
 )
 
 type ClusterView struct {
@@ -82,6 +83,7 @@ type SimpleVolView struct {
 	MpCnt               int
 	DpCnt               int
 	AvailSpaceAllocated uint64 //GB
+	Tokens              map[string]*proto.Token
 }
 
 func (m *Master) setMetaNodeThreshold(w http.ResponseWriter, r *http.Request) {
@@ -560,6 +562,7 @@ func newSimpleView(vol *Vol) *SimpleVolView {
 		MpCnt:               len(vol.MetaPartitions),
 		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
 		AvailSpaceAllocated: vol.AvailSpaceAllocated,
+		Tokens:              vol.tokens,
 	}
 }
 
@@ -893,6 +896,167 @@ errDeal:
 	logMsg := getReturnMessage("metaNodeTaskResponse", r.RemoteAddr, err.Error(),
 		http.StatusBadRequest)
 	HandleError(logMsg, err, code, w)
+	return
+}
+
+func (m *Master) addToken(w http.ResponseWriter, r *http.Request) {
+	var (
+		code      = http.StatusBadRequest
+		err       error
+		name      string
+		tokenType int8
+		vol       *Vol
+		msg       string
+		authKey   string
+	)
+	if name, tokenType, authKey, err = parseAddTokenPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
+		goto errDeal
+	}
+	if err = m.cluster.addToken(vol, tokenType, authKey); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("add tokenType[%v] of vol [%v] successed,from[%v]", tokenType, name, r.RemoteAddr)
+	log.LogWarn(msg)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("addToken", r.RemoteAddr, err.Error(), code)
+	HandleError(logMsg, err, code, w)
+	return
+}
+
+func (m *Master) updateToken(w http.ResponseWriter, r *http.Request) {
+	var (
+		code      = http.StatusBadRequest
+		err       error
+		name      string
+		tokenType int8
+		vol       *Vol
+		msg       string
+		authKey   string
+		token     string
+	)
+	if name, tokenType, token, authKey, err = parseUpdateTokenPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
+		goto errDeal
+	}
+	if err = m.cluster.updateToken(vol, tokenType, token, authKey); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("update tokenType[%v] of vol [%v] successed,from[%v]", tokenType, name, r.RemoteAddr)
+	log.LogWarn(msg)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("updateToken", r.RemoteAddr, err.Error(), code)
+	HandleError(logMsg, err, code, w)
+	return
+}
+
+func (m *Master) deleteToken(w http.ResponseWriter, r *http.Request) {
+	var (
+		code    = http.StatusBadRequest
+		err     error
+		name    string
+		token   string
+		vol     *Vol
+		msg     string
+		authKey string
+	)
+	if name, token, authKey, err = parseDeleteTokenPara(r); err != nil {
+		goto errDeal
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		err = errors.Annotatef(VolNotFound, "%v not found", name)
+		code = http.StatusNotFound
+		goto errDeal
+	}
+
+	if err = m.cluster.deleteToken(vol, token, authKey); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("delete token[%v] of vol [%v] successed,from[%v]", token, name, r.RemoteAddr)
+	log.LogWarn(msg)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("deleteToken", r.RemoteAddr, err.Error(), code)
+	HandleError(logMsg, err, code, w)
+	return
+}
+
+func parseAddTokenPara(r *http.Request) (name string, tokenType int8, authKey string, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if tokenType, err = checkTokenType(r); err != nil {
+		return
+	}
+	if authKey, err = checkAuthKeyPara(r); err != nil {
+		return
+	}
+	return
+}
+
+func parseUpdateTokenPara(r *http.Request) (name string, tokenType int8, token, authKey string, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if tokenType, err = checkTokenType(r); err != nil {
+		return
+	}
+	if token, err = checkTokenValue(r); err != nil {
+		return
+	}
+	if authKey, err = checkAuthKeyPara(r); err != nil {
+		return
+	}
+	return
+}
+
+func parseDeleteTokenPara(r *http.Request) (name string, token, authKey string, err error) {
+	r.ParseForm()
+	if name, err = checkVolPara(r); err != nil {
+		return
+	}
+	if token, err = checkTokenValue(r); err != nil {
+		return
+	}
+	if authKey, err = checkAuthKeyPara(r); err != nil {
+		return
+	}
+	return
+}
+
+func checkTokenType(r *http.Request) (tokenType int8, err error) {
+	var (
+		tokenTypeStr string
+		iTokenType   int
+	)
+	if tokenTypeStr = r.FormValue(ParaTokenType); tokenTypeStr == "" {
+		err = paraNotFound(ParaTokenType)
+		return
+	}
+	if iTokenType, err = strconv.Atoi(tokenTypeStr); err != nil {
+		return
+	}
+
+	if !(iTokenType == proto.ReadWriteToken || iTokenType == proto.ReadOnlyToken) {
+		err = UnMatchPara
+		return
+	}
+	tokenType = int8(iTokenType)
 	return
 }
 

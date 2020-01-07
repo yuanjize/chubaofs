@@ -16,7 +16,9 @@ package meta
 
 import (
 	"encoding/json"
+	"github.com/chubaofs/chubaofs/proto"
 	"net/http"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -84,6 +86,26 @@ func (mw *MetaWrapper) UpdateClusterInfo() error {
 	mw.cluster = info.Cluster
 	mw.localIP = info.Ip
 	return nil
+}
+
+func (mw *MetaWrapper) QueryTokenType(volume, token string) (int8, error) {
+	params := make(map[string]string)
+	params["name"] = volume
+	params["token"] = url.QueryEscape(token)
+	body, err := mw.master.Request(http.MethodPost, TokenGetURI, params, nil)
+	if err != nil {
+		log.LogWarnf("QueryTokenType request: err(%v)", err)
+		return proto.ReadOnlyToken, err
+	}
+
+	protoToken := new(proto.Token)
+	if err = json.Unmarshal(body, protoToken); err != nil {
+		log.LogWarnf("QueryTokenType unmarshal: err(%v)", err)
+		return proto.ReadOnlyToken, err
+	}
+
+	log.LogInfof("token: %v", protoToken)
+	return protoToken.TokenType, nil
 }
 
 func (mw *MetaWrapper) UpdateVolStatInfo() error {

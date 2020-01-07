@@ -2,9 +2,9 @@ package master
 
 import (
 	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"sync"
 	"testing"
-	"github.com/chubaofs/chubaofs/proto"
 	"time"
 )
 
