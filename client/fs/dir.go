@@ -137,6 +137,34 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	start := time.Now()
+
+	if req.Dir {
+		var err2 error
+
+		target, ok := d.dcache.Get(req.Name)
+		if !ok {
+
+			target, _, err2 = d.super.mw.Lookup_ll(d.inode.ino, req.Name)
+			if err2 != nil {
+				if err2 != syscall.ENOENT {
+					log.LogErrorf("Remove: parent(%v) name(%v) err(%v)", d.inode.ino, req.Name, err2)
+				}
+				return ParseError(err2)
+			}
+		}
+
+		children, err2 := d.super.mw.ReadDir_ll(target)
+		if err2 != nil {
+			log.LogError("Remove: readdir failed, parent(%v), name(%v), err(%v)", d.inode.ino, req.Name, err2)
+			return ParseError(err2)
+		}
+
+		if len(children) != 0 {
+			log.LogWarnf("Remove: dir not empty, parent(%v), name(%v), ino(%v), numOfChildren(%v)", d.inode.ino, req.Name, target, len(children))
+			return ParseError(syscall.ENOTEMPTY)
+		}
+	}
+
 	d.dcache.Delete(req.Name)
 	info, err := d.super.mw.Delete_ll(d.inode.ino, req.Name)
 	if err != nil {
