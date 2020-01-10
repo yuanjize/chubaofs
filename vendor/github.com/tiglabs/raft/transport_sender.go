@@ -1,4 +1,4 @@
-// Copyright 2018 The TigLabs raft Authors.
+// Copyright 2018 The tiglabs raft Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	//"fmt"
 	"github.com/tiglabs/raft/logger"
 	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/util"
@@ -111,10 +112,12 @@ func (s *transportSender) loopSend(recvc chan *proto.Message) {
 				if conn == nil {
 					conn = getConn(s.nodeID, s.senderType, s.resolver, 0, 2*time.Second)
 					if conn == nil {
+						proto.ReturnMessage(msg)
 						// reset chan
 						for {
 							select {
-							case <-recvc:
+							case msg := <-recvc:
+								proto.ReturnMessage(msg)
 								continue
 							default:
 							}
@@ -136,6 +139,7 @@ func (s *transportSender) loopSend(recvc chan *proto.Message) {
 					select {
 					case msg := <-recvc:
 						err = msg.Encode(bufWr)
+						//logger.Debug(fmt.Sprintf("SendMesg %v to (%v) ", msg.ToString(), conn.RemoteAddr()))
 						proto.ReturnMessage(msg)
 						if err != nil {
 							goto flush

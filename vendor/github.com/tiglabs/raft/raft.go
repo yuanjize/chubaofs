@@ -1,4 +1,5 @@
 // Copyright 2015 The etcd Authors
+// Modified work copyright 2018 The tiglabs Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -182,6 +183,7 @@ func (s *raft) stop() {
 		s.doStop()
 	}
 	<-s.done
+
 }
 
 func (s *raft) doStop() {
@@ -192,6 +194,7 @@ func (s *raft) doStop() {
 	case <-s.stopc:
 		return
 	default:
+		s.raftFsm.StopFsm()
 		close(s.stopc)
 		s.restoringSnapshot.Set(false)
 	}
@@ -511,6 +514,7 @@ func (s *raft) reciveMessage(m *proto.Message) {
 	case <-s.stopc:
 	case s.recvc <- m:
 	default:
+		logger.Warn(fmt.Sprintf("raft[%v] discard message(%v)", s.raftConfig.ID, m.ToString()))
 		return
 	}
 }
