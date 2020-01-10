@@ -68,6 +68,8 @@ type Partition interface {
 
 	// Truncate raft log
 	Truncate(index uint64)
+
+	TryToLeader(partitionID uint64) error
 }
 
 // This is the default implementation of Partition interface.
@@ -94,6 +96,13 @@ func (p *partition) Stop() (err error) {
 	return
 }
 
+func (p *partition) TryToLeader(partitionID uint64) (err error) {
+	future := p.raft.TryToLeader(partitionID)
+	_, err = future.Response()
+	return
+}
+
+// Delete stops and deletes the partition.
 func (p *partition) Delete() (err error) {
 	if err = p.Stop(); err != nil {
 		return
