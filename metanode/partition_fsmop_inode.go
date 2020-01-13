@@ -19,8 +19,8 @@ import (
 	"encoding/binary"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/btree"
-	"io"
 	"github.com/chubaofs/chubaofs/util/log"
+	"io"
 )
 
 type ResponseInode struct {
@@ -228,7 +228,7 @@ func (mp *metaPartition) extentsTruncate(ino *Inode) (resp *ResponseInode) {
 		markIno.MarkDelete = 1
 		markIno.Extents = ino.Extents
 		mp.deleteFp.Write(i.MarshalKey())
-		log.LogInfof("extentsTruncate inode(%v) markIno(%v) ",i.String(),markIno.String())
+		log.LogInfof("extentsTruncate inode(%v) markIno(%v) ", i.String(), markIno.String())
 	})
 	if !isFind {
 		resp.Status = proto.OpNotExistErr

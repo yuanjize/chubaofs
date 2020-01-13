@@ -39,6 +39,7 @@ var (
 	clusterInfo    *proto.ClusterInfo
 	configTotalMem int64
 	masterHelper   = util.NewMasterHelper()
+	serverPort     string
 )
 
 // The MetaNode manage Dentry and inode information in multiple metaPartition, and
@@ -190,6 +191,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 		return
 	}
 	m.listen = cfg.GetString(cfgListen)
+	serverPort = m.listen
 	m.metaDir = cfg.GetString(cfgMetaDir)
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)

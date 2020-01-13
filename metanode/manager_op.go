@@ -16,6 +16,7 @@ package metanode
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 
@@ -27,10 +28,9 @@ import (
 	raftProto "github.com/tiglabs/raft/proto"
 )
 
-const(
-	MaxUsedMemFactor=1.1
+const (
+	MaxUsedMemFactor = 1.1
 )
-
 
 func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 	// For ack to master
@@ -105,9 +105,12 @@ end:
 	adminTask.Request = nil
 	adminTask.Response = resp
 	m.respondToMaster(adminTask)
-	data,_:=json.Marshal(resp)
+	data, _ := json.Marshal(resp)
 	log.LogInfof("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
 		req, adminTask, string(data))
+	if adminTask.Status != proto.TaskSuccess {
+		log.LogErrorf(fmt.Sprintf("opMasterHeartbeat failed errResp(%v)", string(data)))
+	}
 	return
 }
 
@@ -122,6 +125,9 @@ func (m *metaManager) opCreateMetaPartition(conn net.Conn, p *Packet) (err error
 		}
 		p.PackErrorWithBody(status, buf)
 		m.respondToClient(conn, p)
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opCreateMetaPartition failed (%v)", err))
+		}
 	}()
 	// GetConnect task from packet.
 	adminTask := &proto.AdminTask{}
@@ -167,6 +173,11 @@ func (m *metaManager) opCreateInode(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opCreateInode request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, []byte(err.Error()))
@@ -179,7 +190,7 @@ func (m *metaManager) opCreateInode(conn net.Conn, p *Packet) (err error) {
 	err = mp.CreateInode(req, p)
 	// Reply operation result to client though TCP connection.
 	m.respondToClient(conn, p)
-	log.LogDebugf("[opCreateInode] req:%v; resp: %v, body: %s remote:%v", req, p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
+	log.LogDebugf("[opCreateInode] req:%v; resp: %v, body: %s remote:%v", req, p.GetResultMesg(), p.Data, conn.RemoteAddr().String())
 	return
 }
 
@@ -190,6 +201,11 @@ func (m *metaManager) opMetaLinkInode(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaLinkInode request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, []byte(err.Error()))
@@ -213,6 +229,11 @@ func (m *metaManager) opCreateDentry(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opCreateDentry request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, []byte(err.Error()))
@@ -237,6 +258,11 @@ func (m *metaManager) opDeleteDentry(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opDeleteDentry request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -250,7 +276,7 @@ func (m *metaManager) opDeleteDentry(conn net.Conn, p *Packet) (err error) {
 	// Reply operation result to client though TCP connection.
 	m.respondToClient(conn, p)
 	log.LogDebugf("[opDeleteDentry] req:%v; resp: %v, body: %s,remote :%v", req,
-		p.GetResultMesg(), p.Data,p.Data,conn.RemoteAddr().String())
+		p.GetResultMesg(), p.Data, p.Data, conn.RemoteAddr().String())
 	return
 }
 
@@ -261,6 +287,11 @@ func (m *metaManager) opUpdateDentry(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opUpdateDentry request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -273,7 +304,7 @@ func (m *metaManager) opUpdateDentry(conn net.Conn, p *Packet) (err error) {
 	err = mp.UpdateDentry(req, p)
 	m.respondToClient(conn, p)
 	log.LogDebugf("[opUpdateDentry] req: %v; resp: %v, body: %s,remote :%v",
-		req, p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
+		req, p.GetResultMesg(), p.Data, conn.RemoteAddr().String())
 	return
 }
 
@@ -284,6 +315,11 @@ func (m *metaManager) opDeleteInode(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opDeleteInode request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -296,7 +332,7 @@ func (m *metaManager) opDeleteInode(conn net.Conn, p *Packet) (err error) {
 	err = mp.DeleteInode(req, p)
 	m.respondToClient(conn, p)
 	log.LogDebugf("[opDeleteInode] req:%v; resp: %v, body: %s,remote :%v", req,
-		p.GetResultMesg(), p.Data,conn.RemoteAddr().String())
+		p.GetResultMesg(), p.Data, conn.RemoteAddr().String())
 	return
 }
 
@@ -308,6 +344,11 @@ func (m *metaManager) opReadDir(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opReadDir request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -333,6 +374,11 @@ func (m *metaManager) opOpen(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opOpen request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -358,6 +404,11 @@ func (m *metaManager) opMetaInodeGet(conn net.Conn, p *Packet) (err error) {
 		err = errors.Errorf("[opMetaInodeGet]: %s", err.Error())
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaInodeGet request(%v) failed (%v)", req, err))
+		}
+	}()
 	log.LogDebugf("[opMetaInodeGet] receive request: %v", req)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
@@ -388,6 +439,11 @@ func (m *metaManager) opMetaEvictInode(conn net.Conn, p *Packet) (err error) {
 		err = errors.Errorf("[opMetaEvictInode] request unmarshal: %v", err.Error())
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaEvictInode request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -415,6 +471,11 @@ func (m *metaManager) opMetaLookup(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaLookup request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -438,6 +499,11 @@ func (m *metaManager) opMetaExtentsAdd(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaExtentsAdd request(%v) failed (%v)", req, err))
+		}
+	}()
 	log.LogDebugf("[opMetaExtentsAdd] receive request: %v", req)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
@@ -468,6 +534,11 @@ func (m *metaManager) opMetaExtentsList(conn net.Conn, p *Packet) (err error) {
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaExtentsList request(%v) failed (%v)", req, err))
+		}
+	}()
 	log.LogDebugf("[opMetaExtentsList] receive request: %v", req)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
@@ -498,6 +569,11 @@ func (m *metaManager) opMetaExtentsTruncate(conn net.Conn, p *Packet) (err error
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaExtentsTruncate request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -521,6 +597,7 @@ func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error
 		m.respondToClient(conn, p)
 		return
 	}
+
 	req := &proto.DeleteMetaPartitionRequest{}
 	reqData, err := json.Marshal(adminTask.Request)
 	if err != nil {
@@ -533,6 +610,11 @@ func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opDeleteMetaPartition request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -585,6 +667,11 @@ func (m *metaManager) opUpdateMetaPartition(conn net.Conn, p *Packet) (err error
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opUpdateMetaPartition request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpErr, nil)
@@ -632,6 +719,7 @@ func (m *metaManager) opLoadMetaPartition(conn net.Conn, p *Packet) (err error) 
 		p.WriteToConn(conn)
 		return
 	}
+
 	m.responseAckOKToMaster(conn, p)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
@@ -679,6 +767,11 @@ func (m *metaManager) opOfflineMetaPartition(conn net.Conn, p *Packet) (err erro
 		m.respondToClient(conn, p)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opOfflineMetaPartition request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpErr, nil)
@@ -726,6 +819,11 @@ func (m *metaManager) opMetaBatchInodeGet(conn net.Conn, p *Packet) (err error) 
 		p.PackErrorWithBody(proto.OpErr, nil)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.LogErrorf(fmt.Sprintf("opMetaBatchInodeGet request(%v) failed (%v)", req, err))
+		}
+	}()
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)

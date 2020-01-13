@@ -1,4 +1,5 @@
 // Copyright 2015 The etcd Authors
+// Modified work copyright 2018 The tiglabs Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,6 +54,7 @@ type raftFsm struct {
 	msgs        []*proto.Message
 	step        stepFunc
 	tick        func()
+	stopCh      chan struct{}
 }
 
 func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
@@ -79,6 +81,12 @@ func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		r.replicas[p.ID] = newReplica(p, 0)
 	}
 	if !hs.IsEmpty() {
+		if raftConfig.Applied > r.raftLog.lastIndex() {
+			raftConfig.Applied = r.raftLog.lastIndex()
+		}
+		if hs.Commit > r.raftLog.lastIndex() {
+			hs.Commit = r.raftLog.lastIndex()
+		}
 		if err := r.loadState(hs); err != nil {
 			return nil, err
 		}
@@ -131,6 +139,7 @@ func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		logger.Debug("newRaft[%v] [peers: [%s], term: %d, commit: %d, applied: %d, lastindex: %d, lastterm: %d]",
 			r.id, strings.Join(peerStrs, ","), r.term, r.raftLog.committed, r.raftLog.applied, r.raftLog.lastIndex(), r.raftLog.lastTerm())
 	}
+	r.stopCh=make(chan struct{},1)
 	go r.doRandomSeed()
 	return r, nil
 }
@@ -141,8 +150,14 @@ func (r *raftFsm) doRandomSeed() {
 		select {
 		case <-ticker:
 			r.rand.Seed(time.Now().UnixNano())
+		case <-r.stopCh:
+			return
 		}
 	}
+}
+
+func (r *raftFsm)StopFsm() {
+	close(r.stopCh)
 }
 
 // raft main method
@@ -352,7 +367,10 @@ func (r *raftFsm) reset(term, lasti uint64, isLeader bool) {
 }
 
 func (r *raftFsm) resetRandomizedElectionTimeout() {
-	r.randElectionTick = r.config.ElectionTick + r.rand.Intn(r.config.ElectionTick)
+	randTick := r.rand.Intn(r.config.ElectionTick)
+	r.randElectionTick = r.config.ElectionTick + randTick
+	logger.Debug("raft[%v] random election timeout randElectionTick=%v, config.ElectionTick=%v, randTick=%v", r.id,
+		r.randElectionTick, r.config.ElectionTick, randTick)
 }
 
 func (r *raftFsm) pastElectionTimeout() bool {
