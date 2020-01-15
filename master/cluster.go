@@ -847,10 +847,11 @@ func (c *Cluster) delMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) updateVol(name, authKey string, capacity int) (err error) {
+func (c *Cluster) updateVol(name, authKey string, capacity uint64, enableToken bool) (err error) {
 	var (
-		vol           *Vol
-		serverAuthKey string
+		vol            *Vol
+		serverAuthKey  string
+		oldEnableToken bool
 	)
 	if vol, err = c.getVol(name); err != nil {
 		goto errDeal
@@ -863,12 +864,25 @@ func (c *Cluster) updateVol(name, authKey string, capacity int) (err error) {
 	if !matchKey(serverAuthKey, authKey) {
 		return VolAuthKeyNotMatch
 	}
-	if uint64(capacity) < vol.Capacity {
-		err = fmt.Errorf("capacity[%v] less than old capacity[%v]", capacity, vol.Capacity)
-		goto errDeal
+	if capacity > 0 {
+		if uint64(capacity) < vol.Capacity {
+			err = fmt.Errorf("capacity[%v] less than old capacity[%v]", capacity, vol.Capacity)
+			goto errDeal
+		}
+		vol.setCapacity(uint64(capacity))
 	}
-	vol.setCapacity(uint64(capacity))
+	if enableToken == true && len(vol.tokens) == 0 {
+		if err = c.createToken(vol, proto.ReadOnlyToken); err != nil {
+			goto errDeal
+		}
+		if err = c.createToken(vol, proto.ReadWriteToken); err != nil {
+			goto errDeal
+		}
+	}
+	oldEnableToken = vol.enableToken
+	vol.enableToken = enableToken
 	if err = c.syncUpdateVol(vol); err != nil {
+		vol.enableToken = oldEnableToken
 		goto errDeal
 	}
 	return
@@ -879,7 +893,7 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity, mpCount int) (err error) {
+func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity, mpCount int, enableToken bool) (err error) {
 	var (
 		vol                     *Vol
 		readWriteDataPartitions int
@@ -888,7 +902,7 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		err = fmt.Errorf("vol type must be extent")
 		goto errDeal
 	}
-	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity); err != nil {
+	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity, enableToken); err != nil {
 		goto errDeal
 	}
 	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
@@ -926,14 +940,14 @@ func (c *Cluster) createToken(vol *Vol, tokenType int8) (err error) {
 	return
 }
 
-func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int) (vol *Vol, err error) {
+func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int, enableToken bool) (vol *Vol, err error) {
 	c.createVolLock.Lock()
 	defer c.createVolLock.Unlock()
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
 	}
-	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity))
+	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity), enableToken)
 	if err = c.syncAddVol(vol); err != nil {
 		goto errDeal
 	}

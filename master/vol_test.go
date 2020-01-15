@@ -171,7 +171,7 @@ func markDeleteVol(name string, t *testing.T) {
 // and the status is not the actual status,don't put to vol view cache and feedback to client
 func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 	name := "afterLeaderChange"
-	vol := NewVol(name, name, "extent", 2, 100)
+	vol := NewVol(name, name, "extent", 2, 100,false)
 	//unavaliable mp
 	mp1 := NewMetaPartition(1, 1, defaultMaxMetaPartitionInodeID, 3, name)
 	vol.AddMetaPartition(mp1)
@@ -207,7 +207,7 @@ func TestUpdateVolViewAfterLeaderChange(t *testing.T) {
 
 func TestConcurrentReadWriteDataPartitionMap(t *testing.T) {
 	name := "TestConcurrentReadWriteDataPartitionMap"
-	vol := NewVol(name, name, "extent", 2, 100)
+	vol := NewVol(name, name, "extent", 2, 100,false)
 	//unavaliable mp
 	mp1 := NewMetaPartition(1, 1, defaultMaxMetaPartitionInodeID, 3, name)
 	vol.AddMetaPartition(mp1)
