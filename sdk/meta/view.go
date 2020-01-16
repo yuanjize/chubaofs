@@ -17,12 +17,10 @@ package meta
 import (
 	"encoding/json"
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"net/http"
-	"net/url"
 	"sync/atomic"
 	"time"
-
-	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 
 	"github.com/chubaofs/chubaofs/util/log"
 )
@@ -32,7 +30,8 @@ const (
 )
 
 var (
-	NotLeader = errors.New("NotLeader")
+	NotLeader    = errors.New("NotLeader")
+	InvalidToken = errors.New("Invalid Token")
 )
 
 type VolumeView struct {
@@ -49,6 +48,12 @@ type VolStatInfo struct {
 	Name      string
 	TotalSize uint64
 	UsedSize  uint64
+}
+
+type SimpleVolView struct {
+	Name        string
+	EnableToken bool
+	Tokens      map[string]*proto.Token
 }
 
 // VolName view managements
@@ -90,22 +95,30 @@ func (mw *MetaWrapper) UpdateClusterInfo() error {
 
 func (mw *MetaWrapper) QueryTokenType(volume, token string) (int8, error) {
 	params := make(map[string]string)
-	params["name"] = volume
-	params["token"] = url.QueryEscape(token)
-	body, err := mw.master.Request(http.MethodPost, TokenGetURI, params, nil)
+	params["name"] = mw.volname
+	body, err := mw.master.Request(http.MethodGet, AdminGetVolURL, params, nil)
 	if err != nil {
-		log.LogWarnf("QueryTokenType request: err(%v)", err)
+		log.LogWarnf("admin/getVol request: err(%v)", err)
 		return proto.ReadOnlyToken, err
 	}
 
-	protoToken := new(proto.Token)
-	if err = json.Unmarshal(body, protoToken); err != nil {
-		log.LogWarnf("QueryTokenType unmarshal: err(%v)", err)
+	volView := new(SimpleVolView)
+	if err = json.Unmarshal(body, volView); err != nil {
+		log.LogWarnf("SimpleVolView unmarshal: err(%v) body(%v)", err, string(body))
 		return proto.ReadOnlyToken, err
 	}
 
-	log.LogInfof("token: %v", protoToken)
-	return protoToken.TokenType, nil
+	log.LogInfof("SimpleVolView: %v", volView)
+	if !volView.EnableToken {
+		return proto.ReadWriteToken, nil
+	}
+
+	tokenObj, ok := volView.Tokens[token]
+	if !ok {
+		return proto.ReadOnlyToken, InvalidToken
+	}
+
+	return tokenObj.TokenType, nil
 }
 
 func (mw *MetaWrapper) UpdateVolStatInfo() error {

@@ -33,7 +33,7 @@ const (
 	MetaPartitionViewURL = "/client/vol"
 	GetVolStatURL        = "/client/volStat"
 	GetClusterInfoURL    = "/admin/getIp"
-	TokenGetURI = "/token/get"
+	AdminGetVolURL       = "/admin/getVol"
 
 	RefreshMetaPartitionsInterval = time.Minute * 5
 

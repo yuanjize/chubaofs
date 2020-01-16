@@ -141,6 +141,7 @@ func main() {
 
 	fsConn, super, err := mount(opt)
 	if err != nil {
+		syslog.Println("mount err", err)
 		daemonize.SignalOutcome(err)
 		os.Exit(1)
 	} else {
@@ -220,9 +221,9 @@ func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
 	opt.AutoInvalData = parseConfigString(cfg, "autoInvalData")
 	opt.Token = cfg.GetString("token")
 
-	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" || opt.Token == "" {
-		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v), token(%v)",
-			opt.MountPoint, opt.Volname, opt.Master, opt.Token))
+	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {
+		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v)",
+			opt.MountPoint, opt.Volname, opt.Master))
 	}
 
 	return opt, nil
