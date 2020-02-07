@@ -83,6 +83,7 @@ type SimpleVolView struct {
 	MpCnt               int
 	DpCnt               int
 	AvailSpaceAllocated uint64 //GB
+	EnableToken         bool
 	Tokens              map[string]*proto.Token
 }
 
@@ -470,16 +471,17 @@ errDeal:
 
 func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		name     string
-		authKey  string
-		err      error
-		msg      string
-		capacity int
+		name        string
+		authKey     string
+		err         error
+		msg         string
+		capacity    int
+		enableToken bool
 	)
-	if name, authKey, capacity, err = parseUpdateVolPara(r); err != nil {
+	if name, authKey, capacity, enableToken, err = parseUpdateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.updateVol(name, authKey, capacity); err != nil {
+	if err = m.cluster.updateVol(name, authKey, uint64(capacity), enableToken); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("update vol[%v] successed\n", name)
@@ -493,22 +495,24 @@ errDeal:
 
 func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		name       string
-		owner      string
-		err        error
-		msg        string
-		volType    string
-		mpCount    int
-		replicaNum int
-		capacity   int
-		vol        *Vol
+		name        string
+		owner       string
+		err         error
+		msg         string
+		volType     string
+		mpCount     int
+		replicaNum  int
+		capacity    int
+		enableToken bool
+		vol         *Vol
 	)
 
-	if name, owner, volType, mpCount, replicaNum, capacity, err = parseCreateVolPara(r); err != nil {
+	if name, owner, volType, mpCount, replicaNum, capacity, enableToken, err = parseCreateVolPara(r);
+		err != nil {
 		goto errDeal
 	}
 
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, mpCount); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, mpCount, enableToken); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -562,6 +566,7 @@ func newSimpleView(vol *Vol) *SimpleVolView {
 		MpCnt:               len(vol.MetaPartitions),
 		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
 		AvailSpaceAllocated: vol.AvailSpaceAllocated,
+		EnableToken:         vol.enableToken,
 		Tokens:              vol.tokens,
 	}
 }
@@ -1200,7 +1205,7 @@ func parseDeleteVolPara(r *http.Request) (name, authKey string, err error) {
 	return
 }
 
-func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, err error) {
+func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1215,10 +1220,12 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, er
 	if authKey, err = checkAuthKeyPara(r); err != nil {
 		return
 	}
+
+	enableToken = parseEnableToken(r)
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity int, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1244,10 +1251,18 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, 
 		err = paraNotFound(ParaVolOwner)
 		return
 	}
-	if mpCountStr := r.FormValue(metaPartitionCountKey); mpCountStr != "" {
+	if mpCountStr := r.FormValue(ParaMetaPartitionCountKey); mpCountStr != "" {
 		if mpCount, err = strconv.Atoi(mpCountStr); err != nil {
 			mpCount = defaultInitMetaPartitionCount
 		}
+	}
+	enableToken = parseEnableToken(r)
+	return
+}
+func parseEnableToken(r *http.Request) (enableToken bool) {
+	enableToken, err := strconv.ParseBool(r.FormValue(ParaEnableToken));
+	if err != nil {
+		enableToken = false
 	}
 	return
 }

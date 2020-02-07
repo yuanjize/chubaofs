@@ -173,16 +173,16 @@ func (s *DataNode) handleCreateDataPartition(pkg *Packet) {
 
 	bytes, err := json.Marshal(task.Request)
 	if err != nil {
-		err = fmt.Errorf("from master Task[%v] cannot unmashal CreateDataPartition", task.ToString())
+		err = errors.Annotatef(err, "cannot mashal task.Request[%v]", task.Request)
 		return
 	}
 	if err = json.Unmarshal(bytes, request); err != nil {
-		err = fmt.Errorf("from master Task[%v] cannot unmash CreateDataPartitionRequest struct", task.ToString())
+		err = fmt.Errorf("[%v] cannot unmash CreateDataPartitionRequest struct", string(bytes))
 		return
 	}
 	if dp, err = s.space.CreatePartition(request.VolumeId, uint32(request.PartitionId),
 		request.PartitionSize, request.PartitionType); err != nil {
-		err = fmt.Errorf("from master Task[%v] cannot unmash CreateDataPartitionRequest struct", task.ToString())
+		err = fmt.Errorf("CreateDataPartitionRequest[%v] create partition fail", request)
 		return
 	}
 	pkg.PackOkWithBody([]byte(dp.Disk().Path))

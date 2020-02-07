@@ -15,25 +15,26 @@
 package master
 
 const (
-	ParaHosts             = "hosts"
-	ParaDestAddr          = "destAddr"
-	ParaNodeAddr          = "addr"
-	ParaDiskPath          = "disk"
-	ParaName              = "name"
-	ParaToken             = "token"
-	ParaTokenType         = "tokenType"
-	ParaId                = "id"
-	ParaCount             = "count"
-	ParaReplicas          = "replicas"
-	ParaDataPartitionType = "type"
-	ParaStart             = "start"
-	ParaEnable            = "enable"
-	ParaThreshold         = "threshold"
-	ParaVolCapacity       = "capacity"
-	ParaVolOwner          = "owner"
-	ParaAuthKey           = "authKey"
-	ParaIsManual          = "isManual"
-	metaPartitionCountKey = "mpCount"
+	ParaHosts                 = "hosts"
+	ParaDestAddr              = "destAddr"
+	ParaNodeAddr              = "addr"
+	ParaDiskPath              = "disk"
+	ParaName                  = "name"
+	ParaToken                 = "token"
+	ParaTokenType             = "tokenType"
+	ParaId                    = "id"
+	ParaCount                 = "count"
+	ParaReplicas              = "replicas"
+	ParaDataPartitionType     = "type"
+	ParaStart                 = "start"
+	ParaEnable                = "enable"
+	ParaThreshold             = "threshold"
+	ParaVolCapacity           = "capacity"
+	ParaVolOwner              = "owner"
+	ParaAuthKey               = "authKey"
+	ParaIsManual              = "isManual"
+	ParaMetaPartitionCountKey = "mpCount"
+	ParaEnableToken           = "enableToken"
 )
 
 const (
@@ -77,7 +78,7 @@ const (
 )
 
 const (
-	OK = iota
+	OK     = iota
 	Failed
 )
 

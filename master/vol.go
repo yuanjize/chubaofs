@@ -39,6 +39,7 @@ type Vol struct {
 	MetaPartitions             map[uint64]*MetaPartition
 	mpsLock                    sync.RWMutex
 	dataPartitions             *DataPartitionMap
+	enableToken                bool
 	tokens                     map[string]*proto.Token
 	tokensLock                 sync.RWMutex
 	mpsCache                   []byte
@@ -49,7 +50,7 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64) (vol *Vol) {
+func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64, enableToken bool) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.Owner = owner
 	vol.dataPartitions = NewDataPartitionMap(name)
@@ -62,6 +63,7 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64) (vol
 	}
 	vol.Capacity = capacity
 	vol.viewCache = make([]byte, 0)
+	vol.enableToken = enableToken
 	vol.tokens = make(map[string]*proto.Token, 0)
 	return
 }

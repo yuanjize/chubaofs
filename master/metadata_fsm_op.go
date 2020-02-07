@@ -120,20 +120,22 @@ func newDataPartitionValue(dp *DataPartition) (dpv *DataPartitionValue) {
 }
 
 type VolValue struct {
-	VolType    string
-	ReplicaNum uint8
-	Status     uint8
-	Capacity   uint64
-	Owner      string
+	VolType     string
+	ReplicaNum  uint8
+	Status      uint8
+	Capacity    uint64
+	Owner       string
+	EnableToken bool
 }
 
 func newVolValue(vol *Vol) (vv *VolValue) {
 	vv = &VolValue{
-		VolType:    vol.VolType,
-		ReplicaNum: vol.dpReplicaNum,
-		Status:     vol.Status,
-		Capacity:   vol.Capacity,
-		Owner:      vol.Owner,
+		VolType:     vol.VolType,
+		ReplicaNum:  vol.dpReplicaNum,
+		Status:      vol.Status,
+		Capacity:    vol.Capacity,
+		Owner:       vol.Owner,
+		EnableToken: vol.enableToken,
 	}
 	return
 }
@@ -502,7 +504,7 @@ func (c *Cluster) loadVols() (err error) {
 			err = fmt.Errorf("action[loadVols],value:%v,err:%v", encodedValue.Data(), err)
 			return err
 		}
-		vol := NewVol(volName, vv.Owner, vv.VolType, vv.ReplicaNum, vv.Capacity)
+		vol := NewVol(volName, vv.Owner, vv.VolType, vv.ReplicaNum, vv.Capacity, vv.EnableToken)
 		vol.Status = vv.Status
 		c.putVol(vol)
 		encodedKey.Free()
