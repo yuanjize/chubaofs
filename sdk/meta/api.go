@@ -91,14 +91,14 @@ func (mw *MetaWrapper) Create_ll(parentID uint64, name string, mode uint32, targ
 
 create_dentry:
 	status, err = mw.dcreate(parentMP, parentID, name, info.Inode, mode)
-	if err != nil || status != statusOK {
-		if status == statusExist {
-			return nil, syscall.EEXIST
-		} else {
+	if err != nil {
+		return nil, statusToErrno(status)
+	} else if status != statusOK {
+		if status != statusExist {
 			mw.idelete(mp, info.Inode)
 			mw.ievict(mp, info.Inode)
-			return nil, statusToErrno(status)
 		}
+		return nil, statusToErrno(status)
 	}
 	return info, nil
 }
