@@ -216,7 +216,7 @@ func (writer *ExtentWriter) isFullExtent(prepareWriteSize int) bool {
 	if writer.storeMode == proto.TinyExtentMode {
 		return writer.hasWriteSize+prepareWriteSize >= util.MB
 	} else {
-		return writer.hasWriteSize+prepareWriteSize >= util.ExtentSize
+		return int64(writer.hasWriteSize)+int64(prepareWriteSize)>= globalExtentSize
 	}
 	return true
 }

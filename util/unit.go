@@ -42,6 +42,7 @@ const (
 	PerBlockCrcSize        = 4
 	DeleteIndexFileName    = "delete.index"
 	ExtentSize             = BlockCount * BlockSize
+	MinExtentSize           = 32*1024*1024
 	ExtentFileSizeLimit    = BlockHeaderSize + ExtentSize
 	PacketHeaderSize       = 45
 	TinyBlockSize          = 1 * MB

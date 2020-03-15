@@ -55,6 +55,7 @@ var (
 
 	globalReadLimiter  *rate.Limiter
 	globalWriteLimiter *rate.Limiter
+	globalExtentSize   int64
 )
 
 type ExtentClient struct {
@@ -64,10 +65,10 @@ type ExtentClient struct {
 	getExtents      GetExtentsFunc
 }
 
-func NewExtentClient(volname, master string, readRate, writeRate int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
+func NewExtentClient(volname, master string, readRate, writeRate,extentSize int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	client = new(ExtentClient)
-
+	globalExtentSize=extentSize
 	var limit int = MaxRetryLimit
 
 retry:
