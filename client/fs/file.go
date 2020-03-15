@@ -82,9 +82,9 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 	}
 	fileSize := f.super.ec.GetFileSize(ino)
 	writeSize := f.super.ec.GetWriteSize(ino)
-	size:=uint64(util.Max(int(fileSize), int(writeSize)))
-	if size>inode.size{
-		inode.size=size
+	size := uint64(util.Max(int(fileSize), int(writeSize)))
+	if size > inode.size {
+		inode.size = size
 		f.super.ic.Put(inode)
 	}
 	inode.fillAttr(a)
@@ -235,7 +235,19 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 }
 
 func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) (err error) {
-	return fuse.ENOSYS
+	start := time.Now()
+	err = f.super.ec.Flush(f.inode.ino)
+	if err != nil {
+		errmsg := fmt.Sprintf("Flush: failed, localIP(%v) ino(%v) err(%v)", f.super.localIP, f.inode.ino, err)
+		log.LogError(errmsg)
+		ump.Alarm(f.super.umpKey("Flush"), errmsg)
+		return fuse.EIO
+	}
+	f.super.ic.Delete(f.inode.ino)
+	elapsed := time.Since(start)
+	log.LogDebugf("TRACE Flush: ino(%v) (%v)ns", f.inode.ino, elapsed.Nanoseconds())
+	return nil
+
 }
 
 func (f *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) (err error) {
