@@ -19,6 +19,7 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -73,6 +74,41 @@ func (mw *MetaWrapper) PullVolumeView() (*VolumeView, error) {
 		return nil, err
 	}
 	return view, nil
+}
+
+func (mw *MetaWrapper) PullMetaPartitions() ([]*MetaPartition, error) {
+	params := make(map[string]string)
+	params["name"] = mw.volname
+	body, err := mw.master.Request(http.MethodPost, ForceUpdateMetaPartitionsURL, params, nil)
+	if err != nil {
+		log.LogWarnf("PullMetaPartitions request: err(%v)", err)
+		return nil, err
+	}
+
+	var mpview []*MetaPartition
+	if err = json.Unmarshal(body, &mpview); err != nil {
+		log.LogWarnf("PullMetaPartitions unmarshal: err(%v) body(%v)", err, string(body))
+		return nil, err
+	}
+	return mpview, nil
+}
+
+func (mw *MetaWrapper) PullMetaPartition(id uint64) (*MetaPartition, error) {
+	params := make(map[string]string)
+	params["name"] = mw.volname
+	params["id"] = strconv.FormatUint(id, 10)
+	body, err := mw.master.Request(http.MethodPost, UpdateMetaPartitionURL, params, nil)
+	if err != nil {
+		log.LogWarnf("PullMetaPartition request: err(%v)", err)
+		return nil, err
+	}
+
+	var mp *MetaPartition
+	if err = json.Unmarshal(body, &mp); err != nil {
+		log.LogWarnf("PullMetaPartition unmarshal: err(%v) body(%v)", err, string(body))
+		return nil, err
+	}
+	return mp, nil
 }
 
 func (mw *MetaWrapper) UpdateClusterInfo() error {
@@ -154,13 +190,51 @@ func (mw *MetaWrapper) UpdateMetaPartitions() error {
 	return nil
 }
 
+func (mw *MetaWrapper) forceUpdateMetaPartitions() error {
+	// Only one forceUpdateMetaPartition is allowed in a specific period of time.
+	if ok := mw.forceUpdateLimit.AllowN(time.Now(), MinForceUpdateMetaPartitionsInterval); !ok {
+		return errors.New("Force update meta partitions throttled!")
+	}
+
+	mps, err := mw.PullMetaPartitions()
+	if err != nil {
+		return err
+	}
+
+	for _, mp := range mps {
+		mw.replaceOrInsertPartition(mp)
+		log.LogInfof("forceUpdateMetaPartitions: mp(%v)", mp)
+	}
+	return nil
+}
+
+// Should be protected by partMutex, otherwise the caller might not be signaled.
+func (mw *MetaWrapper) triggerAndWaitForceUpdate() {
+	mw.partMutex.Lock()
+	select {
+	case mw.forceUpdate <- struct{}{}:
+	default:
+	}
+	mw.partCond.Wait()
+	mw.partMutex.Unlock()
+}
+
 func (mw *MetaWrapper) refresh() {
-	t := time.NewTicker(RefreshMetaPartitionsInterval)
+	t := time.NewTimer(RefreshMetaPartitionsInterval)
+	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
 			mw.UpdateMetaPartitions()
 			mw.UpdateVolStatInfo()
+			t.Reset(RefreshMetaPartitionsInterval)
+		case <-mw.forceUpdate:
+			mw.partMutex.Lock()
+			if err := mw.forceUpdateMetaPartitions(); err == nil {
+				t.Reset(RefreshMetaPartitionsInterval)
+			}
+			mw.partMutex.Unlock()
+			mw.partCond.Broadcast()
 		}
 	}
 }

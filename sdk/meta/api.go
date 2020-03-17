@@ -126,6 +126,30 @@ func (mw *MetaWrapper) InodeGet_ll(inode uint64) (*proto.InodeInfo, error) {
 
 	status, info, err := mw.iget(mp, inode)
 	if err != nil || status != statusOK {
+		if status == statusNoent {
+			// For NOENT error, pull the latest mp and give it another try,
+			// in case the mp view is outdated.
+			newMp, newErr := mw.PullMetaPartition(mp.PartitionID)
+			if newErr == nil && newMp.End != mp.End {
+				// Meta partition is changed, so trigger a full force update
+				mw.triggerAndWaitForceUpdate()
+				return mw.doInodeGet(inode)
+			}
+		}
+		return nil, statusToErrno(status)
+	}
+	return info, nil
+}
+
+func (mw *MetaWrapper) doInodeGet(inode uint64) (*proto.InodeInfo, error) {
+	mp := mw.getPartitionByInode(inode)
+	if mp == nil {
+		log.LogErrorf("InodeGet: No such partition, ino(%v)", inode)
+		return nil, syscall.ENOENT
+	}
+
+	status, info, err := mw.iget(mp, inode)
+	if err != nil || status != statusOK {
 		return nil, statusToErrno(status)
 	}
 	return info, nil
