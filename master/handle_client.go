@@ -246,20 +246,13 @@ func (m *Master) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 		body        []byte
 		code        = http.StatusBadRequest
 		err         error
-		name        string
 		partitionID uint64
-		vol         *Vol
 		mp          *MetaPartition
 	)
-	if name, partitionID, err = parseGetMetaPartitionPara(r); err != nil {
+	if partitionID, err = parseGetMetaPartitionPara(r); err != nil {
 		goto errDeal
 	}
-	if vol, err = m.cluster.getVol(name); err != nil {
-		err = errors.Annotatef(VolNotFound, "%v not found", name)
-		code = http.StatusNotFound
-		goto errDeal
-	}
-	if mp, err = vol.getMetaPartition(partitionID); err != nil {
+	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
 		err = errors.Annotatef(MetaPartitionNotFound, "%v not found", partitionID)
 		code = http.StatusNotFound
 		goto errDeal
@@ -329,11 +322,8 @@ func checkTokenValue(r *http.Request) (token string, err error) {
 	return
 }
 
-func parseGetMetaPartitionPara(r *http.Request) (name string, partitionID uint64, err error) {
+func parseGetMetaPartitionPara(r *http.Request) (partitionID uint64, err error) {
 	r.ParseForm()
-	if name, err = checkVolPara(r); err != nil {
-		return
-	}
 	if partitionID, err = checkMetaPartitionID(r); err != nil {
 		return
 	}
