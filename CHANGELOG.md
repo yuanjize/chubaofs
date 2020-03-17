@@ -3,7 +3,7 @@
 ChubaoFS挂载客户端增加两个新特性，修复一个已知问题。[下载]( http://storage.jd.local/dpgimage/cfsdbbak/cfs-client-withToken)。
 
 ### 新特性
-* 引入token机制，增强安全性，客户端可以通过只读或读写两种方式进行挂载。
+* 引入读写token控制，增强数据安全性。
 
 ChubaoFS申请及旧挂载方式可参考[文档](http://tigcms.jd.com/details/H1VX9KHfN.html)
 
@@ -22,6 +22,7 @@ ChubaoFS申请及旧挂载方式可参考[文档](http://tigcms.jd.com/details/H
   "token": "bHRwdGVzdCMxIzE1NzY3MjcxNzc="
 }
 ```
+请注意：由于`rdonly`属性在新版本已被更为安全的`token`机制取代，请将原配置文件里的`rdonly`属性删除。
 
 * 支持自定义extent大小。 http://git.jd.com/chubaofs/chubaofs/commit/c0444312d6401497bb7d423873b6e352c846524a
 
