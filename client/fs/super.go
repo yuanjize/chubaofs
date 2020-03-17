@@ -50,6 +50,7 @@ type MountOption struct {
 	UmpDatadir    string
 	Token         string
 	ExtentSize    int64
+	DisableDcache bool
 }
 
 func (mo *MountOption) String() string {
@@ -67,7 +68,8 @@ func (mo *MountOption) String() string {
 		"\nAttrValid: ", mo.AttrValid,
 		"\nUmpDatadir: ", mo.UmpDatadir,
 		"\nToken: ", mo.Token,
-		"\nExtentSize: ",mo.ExtentSize,
+		"\nExtentSize: ", mo.ExtentSize,
+		"\nDisableDcache: ", mo.DisableDcache,
 		"\n",
 	)
 }
@@ -83,6 +85,8 @@ type Super struct {
 
 	nodeCache map[uint64]fs.Node
 	fslock    sync.Mutex
+
+	disableDcache bool
 }
 
 //functions that Super needs to implement
@@ -99,7 +103,7 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 		return nil, err
 	}
 
-	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, opt.ReadRate, opt.WriteRate, opt.ExtentSize,s.mw.AppendExtentKey, s.mw.GetExtents)
+	s.ec, err = stream.NewExtentClient(opt.Volname, opt.Master, opt.ReadRate, opt.WriteRate, opt.ExtentSize, s.mw.AppendExtentKey, s.mw.GetExtents)
 	if err != nil {
 		log.LogErrorf("NewExtentClient failed! %v", err.Error())
 		return nil, err
@@ -121,6 +125,7 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 	s.ic = NewInodeCache(inodeExpiration, MaxInodeCache)
 	s.orphan = NewOrphanInodeList()
 	s.nodeCache = make(map[uint64]fs.Node)
+	s.disableDcache = opt.DisableDcache
 
 	tokenType, err := s.mw.QueryTokenType(opt.Volname, opt.Token)
 	if err != nil {
