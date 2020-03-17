@@ -732,7 +732,8 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		return
 	}
 
-	if dp.isRecover == true {
+	if dp.isRecover == true && dp.isNotLatestAddr(offlineAddr) {
+		log.LogErrorf("clusterID[%v],dp[%v] is recovering,can't offline [%v]", c.Name, dp.PartitionID, offlineAddr)
 		return
 	}
 

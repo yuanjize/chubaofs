@@ -18,7 +18,7 @@ func TestMetaPartition(t *testing.T) {
 	}
 	createMetaPartition(commonVol, t)
 	maxPartitionID := commonVol.getMaxPartitionID()
-	getMetaPartition(commonVol.Name, maxPartitionID, t)
+	getMetaPartition(maxPartitionID, t)
 	isManual := false
 	updateMetaPartition(commonVol, maxPartitionID, isManual, t)
 	loadMetaPartitionTest(commonVol, maxPartitionID, t)
@@ -65,9 +65,9 @@ func createMetaPartition(vol *Vol, t *testing.T) {
 	}
 }
 
-func getMetaPartition(volName string, id uint64, t *testing.T) {
-	reqUrl := fmt.Sprintf("%v%v?name=%v&id=%v",
-		hostAddr, ClientMetaPartition, volName, id)
+func getMetaPartition(id uint64, t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v?id=%v",
+		hostAddr, ClientMetaPartition, id)
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
 }
