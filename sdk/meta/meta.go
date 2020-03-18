@@ -16,6 +16,7 @@ package meta
 
 import (
 	"fmt"
+	"golang.org/x/time/rate"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,16 +30,21 @@ import (
 )
 
 const (
-	HostsSeparator       = ","
-	MetaPartitionViewURL = "/client/vol"
-	GetVolStatURL        = "/client/volStat"
-	GetClusterInfoURL    = "/admin/getIp"
-	AdminGetVolURL       = "/admin/getVol"
+	HostsSeparator               = ","
+	MetaPartitionViewURL         = "/client/vol"
+	GetVolStatURL                = "/client/volStat"
+	GetClusterInfoURL            = "/admin/getIp"
+	AdminGetVolURL               = "/admin/getVol"
+	ForceUpdateMetaPartitionsURL = "/client/metaPartitions"
+	UpdateMetaPartitionURL       = "/client/metaPartition"
 
 	RefreshMetaPartitionsInterval = time.Minute * 5
 
 	MaxRetryLimit = 5
 	RetryInterval = time.Second * 5
+
+	// Minimum interval of forceUpdateMetaPartitions in seconds.
+	MinForceUpdateMetaPartitionsInterval = 5
 )
 
 const (
@@ -72,6 +78,14 @@ type MetaWrapper struct {
 
 	totalSize uint64
 	usedSize  uint64
+
+	// Used to signal the go routines which are waiting for partition view update
+	partMutex sync.Mutex
+	partCond  *sync.Cond
+
+	// Used to trigger and throttle instant partition updates
+	forceUpdate      chan struct{}
+	forceUpdateLimit *rate.Limiter
 }
 
 func NewMetaWrapper(volname, masterHosts string) (*MetaWrapper, error) {
@@ -87,6 +101,9 @@ func NewMetaWrapper(volname, masterHosts string) (*MetaWrapper, error) {
 	mw.ranges = btree.New(32)
 	mw.UpdateClusterInfo()
 	mw.UpdateVolStatInfo()
+	mw.partCond = sync.NewCond(&mw.partMutex)
+	mw.forceUpdate = make(chan struct{}, 1)
+	mw.forceUpdateLimit = rate.NewLimiter(1, MinForceUpdateMetaPartitionsInterval)
 
 	var limit int = MaxRetryLimit
 
