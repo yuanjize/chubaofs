@@ -46,7 +46,7 @@ const (
 	// Client APIs
 	ClientDataPartitions = "/client/dataPartitions"
 	ClientVol            = "/client/vol"
-	ClientMetaPartition  = "/metaPartition/get"
+	ClientMetaPartition  = "/client/metaPartition"
 	ClientVolStat        = "/client/volStat"
 	ClientMetaPartitions = "/client/metaPartitions"
 	GetALLVols           = "/admin/listVols"
@@ -67,6 +67,7 @@ const (
 	AdminLoadMetaPartition    = "/metaPartition/load"
 	AdminMetaPartitionOffline = "/metaPartition/offline"
 	AdminMetaPartitionUpdate  = "/metaPartition/update"
+	AdminMetaPartitionGet     = "/metaPartition/get"
 
 	// Operation response
 	MetaNodeResponse = "/metaNode/response" // Method: 'POST', ContentType: 'application/json'
@@ -111,6 +112,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminLoadMetaPartition, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionUpdate, m.handlerWithInterceptor())
+	http.Handle(AdminMetaPartitionGet, m.handlerWithInterceptor())
 	http.Handle(ClientDataPartitions, m.handlerWithInterceptor())
 	http.Handle(ClientVol, m.handlerWithInterceptor())
 	http.Handle(GetALLVols, m.handlerWithInterceptor())
@@ -232,6 +234,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.metaPartitionOffline(w, r)
 	case AdminMetaPartitionUpdate:
 		m.updateMetaPartition(w, r)
+	case AdminMetaPartitionGet:
+		m.getMetaPartition(w, r)
 	case AdminCreateMP:
 		m.createMetaPartition(w, r)
 	case RaftNodeAdd:
