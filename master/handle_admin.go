@@ -31,20 +31,21 @@ import (
 )
 
 type ClusterView struct {
-	Name               string
-	LeaderAddr         string
-	CompactStatus      bool
-	DisableAutoAlloc   bool
-	Applied            uint64
-	MaxDataPartitionID uint64
-	MaxMetaNodeID      uint64
-	MaxMetaPartitionID uint64
-	DataNodeStat       *DataNodeSpaceStat
-	MetaNodeStat       *MetaNodeSpaceStat
-	VolStat            []*VolSpaceStat
-	MetaNodes          []MetaNodeView
-	DataNodes          []DataNodeView
-	BadPartitionIDs    []BadPartitionView
+	Name                string
+	LeaderAddr          string
+	CompactStatus       bool
+	DisableAutoAlloc    bool
+	Applied             uint64
+	MaxDataPartitionID  uint64
+	MaxMetaNodeID       uint64
+	MaxMetaPartitionID  uint64
+	DataNodeStat        *DataNodeSpaceStat
+	MetaNodeStat        *MetaNodeSpaceStat
+	VolStat             []*VolSpaceStat
+	MetaNodes           []MetaNodeView
+	DataNodes           []DataNodeView
+	BadPartitionIDs     []BadPartitionView
+	BadMetaPartitionIDs []BadPartitionView
 }
 
 type VolStatView struct {
@@ -66,7 +67,7 @@ type MetaNodeView struct {
 }
 
 type BadPartitionView struct {
-	DiskPath     string
+	Path         string
 	PartitionIDs []uint64
 }
 
@@ -151,18 +152,19 @@ func (m *Master) getCluster(w http.ResponseWriter, r *http.Request) {
 		err  error
 	)
 	cv := &ClusterView{
-		Name:               m.cluster.Name,
-		LeaderAddr:         m.leaderInfo.addr,
-		CompactStatus:      m.cluster.compactStatus,
-		DisableAutoAlloc:   m.cluster.DisableAutoAlloc,
-		Applied:            m.fsm.applied,
-		MaxDataPartitionID: m.cluster.idAlloc.dataPartitionID,
-		MaxMetaNodeID:      m.cluster.idAlloc.metaNodeID,
-		MaxMetaPartitionID: m.cluster.idAlloc.metaPartitionID,
-		MetaNodes:          make([]MetaNodeView, 0),
-		DataNodes:          make([]DataNodeView, 0),
-		VolStat:            make([]*VolSpaceStat, 0),
-		BadPartitionIDs:    make([]BadPartitionView, 0),
+		Name:                m.cluster.Name,
+		LeaderAddr:          m.leaderInfo.addr,
+		CompactStatus:       m.cluster.compactStatus,
+		DisableAutoAlloc:    m.cluster.DisableAutoAlloc,
+		Applied:             m.fsm.applied,
+		MaxDataPartitionID:  m.cluster.idAlloc.dataPartitionID,
+		MaxMetaNodeID:       m.cluster.idAlloc.metaNodeID,
+		MaxMetaPartitionID:  m.cluster.idAlloc.metaPartitionID,
+		MetaNodes:           make([]MetaNodeView, 0),
+		DataNodes:           make([]DataNodeView, 0),
+		VolStat:             make([]*VolSpaceStat, 0),
+		BadPartitionIDs:     make([]BadPartitionView, 0),
+		BadMetaPartitionIDs: make([]BadPartitionView, 0),
 	}
 
 	vols := m.cluster.getAllVols()
@@ -181,8 +183,15 @@ func (m *Master) getCluster(w http.ResponseWriter, r *http.Request) {
 	m.cluster.BadDataPartitionIds.Range(func(key, value interface{}) bool {
 		badDataPartitionIds := value.([]uint64)
 		path := key.(string)
-		bpv := BadPartitionView{DiskPath: path, PartitionIDs: badDataPartitionIds}
+		bpv := BadPartitionView{Path: path, PartitionIDs: badDataPartitionIds}
 		cv.BadPartitionIDs = append(cv.BadPartitionIDs, bpv)
+		return true
+	})
+	m.cluster.BadMetaPartitionIds.Range(func(key, value interface{}) bool {
+		badPartitionIds := value.([]uint64)
+		path := key.(string)
+		bpv := BadPartitionView{Path: path, PartitionIDs: badPartitionIds}
+		cv.BadMetaPartitionIDs = append(cv.BadMetaPartitionIDs, bpv)
 		return true
 	})
 	if body, err = json.Marshal(cv); err != nil {

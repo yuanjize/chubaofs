@@ -24,6 +24,7 @@ import (
 	"github.com/chubaofs/chubaofs/util/log"
 	"strings"
 	"time"
+	"math"
 )
 
 type MetaReplica struct {
@@ -31,6 +32,7 @@ type MetaReplica struct {
 	start      uint64
 	end        uint64
 	nodeId     uint64
+	MaxInodeID uint64
 	ReportTime int64
 	Status     int8
 	IsLeader   bool
@@ -41,11 +43,12 @@ type MetaPartition struct {
 	PartitionID      uint64
 	Start            uint64
 	End              uint64
-	MaxNodeID        uint64
+	MaxInodeID       uint64
 	IsManual         bool
 	Replicas         []*MetaReplica
 	ReplicaNum       uint8
 	Status           int8
+	IsRecover        bool
 	volName          string
 	PersistenceHosts []string
 	Peers            []proto.Peer
@@ -131,8 +134,8 @@ func (mp *MetaPartition) updateAllReplicasEnd() {
 
 //caller add vol lock
 func (mp *MetaPartition) updateEnd(c *Cluster, end uint64) (err error) {
-	if end <= mp.MaxNodeID {
-		err = errors.Errorf("next meta partition start must be larger than %v", mp.MaxNodeID)
+	if end <= mp.MaxInodeID {
+		err = errors.Errorf("next meta partition start must be larger than %v", mp.MaxInodeID)
 		return
 	}
 	//to prevent overflow
@@ -335,8 +338,8 @@ func (mp *MetaPartition) UpdateMetaPartition(mgr *proto.MetaPartitionReport, met
 		mr = NewMetaReplica(mp.Start, mp.End, metaNode)
 		mp.addReplica(mr)
 	}
-	mp.MaxNodeID = mgr.MaxInodeID
 	mr.updateMetric(mgr)
+	mp.setMaxInodeID()
 	mp.checkAndRemoveMissMetaReplica(metaNode.Addr)
 }
 
@@ -558,6 +561,7 @@ func (mr *MetaReplica) setLastReportTime() {
 func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.Status = (int8)(mgr.Status)
 	mr.IsLeader = mgr.IsLeader
+	mr.MaxInodeID = mgr.MaxInodeID
 	mr.setLastReportTime()
 }
 
@@ -573,4 +577,43 @@ func (mp *MetaPartition) createPartitionSuccessTriggerOperator(nodeAddr string, 
 	mp.addReplica(mr)
 	mp.checkAndRemoveMissMetaReplica(mr.Addr)
 	return
+}
+
+func (mp *MetaPartition) getMinusOfMaxInodeID() (minus float64) {
+	mp.RLock()
+	defer mp.RUnlock()
+	var sentry float64
+	for index, replica := range mp.Replicas {
+		if index == 0 {
+			sentry = float64(replica.MaxInodeID)
+			continue
+		}
+		diff := math.Abs(float64(replica.MaxInodeID) - sentry)
+		if diff > minus {
+			minus = diff
+		}
+	}
+	return
+}
+
+func (mp *MetaPartition) setMaxInodeID() {
+	var maxUsed uint64
+	for _, r := range mp.Replicas {
+		if r.MaxInodeID > maxUsed {
+			maxUsed = r.MaxInodeID
+		}
+	}
+	mp.MaxInodeID = maxUsed
+}
+
+func (mp *MetaPartition) isLatestAddr(addr string) (ok bool) {
+	if len(mp.PersistenceHosts) <= 1 {
+		return
+	}
+	lastHost := mp.PersistenceHosts[len(mp.PersistenceHosts)-1]
+	return lastHost == addr
+}
+
+func (mp *MetaPartition) isNotLatestAddr(addr string) bool {
+	return !mp.isLatestAddr(addr)
 }

@@ -46,6 +46,7 @@ type Cluster struct {
 	metaNodeSpace       *MetaNodeSpaceStat
 	volSpaceStat        sync.Map
 	BadDataPartitionIds *sync.Map
+	BadMetaPartitionIds *sync.Map
 	reloadMetadataTime  int64
 }
 
@@ -62,6 +63,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.dataNodeSpace = new(DataNodeSpaceStat)
 	c.metaNodeSpace = new(MetaNodeSpaceStat)
 	c.BadDataPartitionIds = new(sync.Map)
+	c.BadMetaPartitionIds = new(sync.Map)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -71,6 +73,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckCreateDataPartitions()
 	c.startCheckVolStatus()
 	c.startCheckBadDiskRecovery()
+	c.startCheckMetaPartitionRecoveryProgress()
 	return
 }
 

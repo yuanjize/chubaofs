@@ -164,6 +164,11 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		return
 	}
 
+	if mp.IsRecover && mp.isNotLatestAddr(nodeAddr){
+		err = fmt.Errorf("vol[%v],meta partition[%v] is recovering,[%v] can't be decommissioned", vol.Name, mp.PartitionID, nodeAddr)
+		return
+	}
+
 	if err = mp.canOffline(nodeAddr, int(vol.mpReplicaNum)); err != nil {
 		goto errDeal
 	}
@@ -216,6 +221,8 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 	mp.removeReplicaByAddr(nodeAddr)
 	mp.checkAndRemoveMissMetaReplica(nodeAddr)
 	c.putMetaNodeTasks(tasks)
+	mp.IsRecover = true
+	c.putBadMetaPartitions(nodeAddr, mp.PartitionID)
 	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] success",
 		c.Name, partitionID, nodeAddr))
 	return
@@ -225,6 +232,16 @@ errDeal:
 	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] failed,err:%v",
 		c.Name, partitionID, nodeAddr, err))
 	return
+}
+
+func (c *Cluster) putBadMetaPartitions(offlineAddr string, partitionID uint64) {
+	newBadPartitionIDs := make([]uint64, 0)
+	badPartitionIDs, ok := c.BadMetaPartitionIds.Load(offlineAddr)
+	if ok {
+		newBadPartitionIDs = badPartitionIDs.([]uint64)
+	}
+	newBadPartitionIDs = append(newBadPartitionIDs, partitionID)
+	c.BadMetaPartitionIds.Store(offlineAddr, newBadPartitionIDs)
 }
 
 func (c *Cluster) loadMetaPartitionAndCheckResponse(mp *MetaPartition) {

@@ -75,6 +75,7 @@ const (
 	VolMinAvailSpaceRatio                    = 0.1
 	VolReadWriteDataPartitionRatio           = 0.1
 	DefaultRackName                          = "default"
+	defaultMinusOfMaxInodeID                 = 1000
 )
 
 const (

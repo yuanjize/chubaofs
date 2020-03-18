@@ -58,6 +58,8 @@ type MetaPartitionView struct {
 	Members     []string
 	LeaderAddr  string
 	Status      int8
+	MaxInodeID  uint64
+	IsRecover   bool
 }
 
 type VolView struct {
@@ -238,6 +240,8 @@ func getMetaPartitionView(mp *MetaPartition) (mpView *MetaPartitionView) {
 		return
 	}
 	mpView.LeaderAddr = mr.Addr
+	mpView.MaxInodeID = mp.MaxInodeID
+	mpView.IsRecover = mp.IsRecover
 	return
 }
 
