@@ -348,7 +348,7 @@ func (c *Cluster) addDataNode(nodeAddr string) (err error) {
 	c.dataNodes.Store(nodeAddr, dataNode)
 	return
 errDeal:
-	err = fmt.Errorf("action[addMetaNode],clusterID[%v] dataNodeAddr:%v err:%v ", c.Name, nodeAddr, err.Error())
+	err = fmt.Errorf("action[addDataNode],clusterID[%v] dataNodeAddr:%v err:%v ", c.Name, nodeAddr, err.Error())
 	log.LogError(errors.ErrorStack(err))
 	Warn(c.Name, err.Error())
 	return err
@@ -911,11 +911,11 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		goto errDeal
 	}
 	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
-		if err = c.syncDeleteVol(vol); err != nil {
+		if err = vol.deleteVolFromStore(c); err != nil {
 			log.LogErrorf("action[createVol] failed,vol[%v] err[%v]", vol.Name, err)
 		}
 		c.deleteVol(name)
-		err = fmt.Errorf("action[createVol] initMetaPartitions failed")
+		err = fmt.Errorf("action[createVol] initMetaPartitions failed,err[%v]", err)
 		goto errDeal
 	}
 	for retryCount := 0; readWriteDataPartitions < DefaultInitDataPartitions && retryCount < 3; retryCount++ {
