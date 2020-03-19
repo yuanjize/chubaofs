@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"encoding/json"
 )
 
 func (c *Cluster) putDataNodeTasks(tasks []*proto.AdminTask) {
@@ -246,12 +247,53 @@ func (c *Cluster) putBadMetaPartitions(offlineAddr string, partitionID uint64) {
 
 func (c *Cluster) loadMetaPartitionAndCheckResponse(mp *MetaPartition) {
 	go func() {
-		c.processLoadMetaPartition(mp)
+		c.doLoadMetaPartition(mp)
 	}()
 }
 
-func (c *Cluster) processLoadMetaPartition(mp *MetaPartition) {
-
+func (c *Cluster) doLoadMetaPartition(mp *MetaPartition) {
+	var wg sync.WaitGroup
+	mp.Lock()
+	hosts := make([]string, len(mp.PersistenceHosts))
+	copy(hosts, mp.PersistenceHosts)
+	mp.LoadResponse = make([]*proto.LoadMetaPartitionMetricResponse, 0)
+	mp.Unlock()
+	errChannel := make(chan error, len(hosts))
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer func() {
+				wg.Done()
+			}()
+			mr, err := mp.getMetaReplica(host)
+			if err != nil {
+				errChannel <- err
+				return
+			}
+			task := mr.createTaskToLoadMetaPartition(mp.PartitionID)
+			response, err := mr.metaNode.Sender.syncSendAdminTask(task)
+			if err != nil {
+				errChannel <- err
+				return
+			}
+			loadResponse := &proto.LoadMetaPartitionMetricResponse{}
+			if err = json.Unmarshal(response, loadResponse); err != nil {
+				errChannel <- err
+				return
+			}
+			loadResponse.Addr = host
+			mp.addOrReplaceLoadResponse(loadResponse)
+		}(host)
+	}
+	wg.Wait()
+	select {
+	case err := <-errChannel:
+		msg := fmt.Sprintf("action[doLoadMetaPartition] vol[%v],mpID[%v],err[%v]", mp.VolName, mp.PartitionID, err.Error())
+		Warn(c.Name, msg)
+		return
+	default:
+	}
+	mp.checkSnapshot(c.Name)
 }
 
 func (c *Cluster) processLoadDataPartition(dp *DataPartition) {
@@ -305,9 +347,6 @@ func (c *Cluster) dealMetaNodeTaskResponse(nodeAddr string, task *proto.AdminTas
 	case proto.OpUpdateMetaPartition:
 		response := task.Response.(*proto.UpdateMetaPartitionResponse)
 		err = c.dealUpdateMetaPartitionResp(task.OperatorAddr, response)
-	case proto.OpLoadMetaPartition:
-		response := task.Response.(*proto.LoadMetaPartitionMetricResponse)
-		err = c.dealLoadMetaPartitionResp(task.OperatorAddr, response)
 	case proto.OpOfflineMetaPartition:
 		response := task.Response.(*proto.MetaPartitionOfflineResponse)
 		err = c.dealOfflineMetaPartitionResp(task.OperatorAddr, response)
@@ -336,10 +375,6 @@ func (c *Cluster) dealOfflineMetaPartitionResp(nodeAddr string, resp *proto.Meta
 		Warn(c.Name, msg)
 		return
 	}
-	return
-}
-
-func (c *Cluster) dealLoadMetaPartitionResp(nodeAddr string, resp *proto.LoadMetaPartitionMetricResponse) (err error) {
 	return
 }
 
@@ -616,15 +651,15 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, ha
 		return
 	}
 	var vol *Vol
-	if vol, err = c.getVol(mp.volName); err != nil {
-		log.LogWarnf("action[updateEnd] vol[%v] not found", mp.volName)
+	if vol, err = c.getVol(mp.VolName); err != nil {
+		log.LogWarnf("action[updateEnd] vol[%v] not found", mp.VolName)
 		return
 	}
 
 	hasEnough := c.hasEnoughWritableMetaHosts(int(vol.mpReplicaNum))
 	if !hasEnough {
 		err = NoAnyMetaNodeForCreateMetaPartition
-		Warn(c.Name, fmt.Sprintf("no enough writable meta hosts to split meta partition[%v],vol[%v]", mp.PartitionID, mp.volName))
+		Warn(c.Name, fmt.Sprintf("no enough writable meta hosts to split meta partition[%v],vol[%v]", mp.PartitionID, mp.VolName))
 		return
 	}
 

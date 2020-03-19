@@ -88,11 +88,16 @@ type LoadMetaPartitionMetricRequest struct {
 }
 
 type LoadMetaPartitionMetricResponse struct {
-	Start    uint64
-	End      uint64
-	MaxInode uint64
-	Status   uint8
-	Result   string
+	Start       uint64
+	End         uint64
+	Status      uint8
+	Result      string
+	PartitionID uint64
+	DoCompare   bool
+	ApplyID     uint64
+	MaxInode    uint64
+	DentryCount uint64
+	Addr        string
 }
 
 type HeartBeatRequest struct {

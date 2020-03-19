@@ -74,6 +74,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckVolStatus()
 	c.startCheckBadDiskRecovery()
 	c.startCheckMetaPartitionRecoveryProgress()
+	c.startCheckLoadMetaPartitions()
 	return
 }
 
@@ -410,7 +411,7 @@ func (c *Cluster) getMetaPartitionByID(id uint64) (mp *MetaPartition, err error)
 func (c *Cluster) updateMetaPartition(mp *MetaPartition, isManual bool) (err error) {
 	oldIsManual := mp.IsManual
 	mp.IsManual = isManual
-	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+	if err = c.syncUpdateMetaPartition(mp.VolName, mp); err != nil {
 		mp.IsManual = oldIsManual
 		return
 	}
@@ -991,7 +992,7 @@ func (c *Cluster) CreateMetaPartitionForManual(volName string, start uint64) (er
 func (c *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaPartition) (err error) {
 	hosts := make([]string, 0)
 	hosts = append(hosts, host)
-	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.volName)
+	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.VolName)
 	return c.doSyncCreateMetaPartitionToMetaNode(host, tasks)
 }
 

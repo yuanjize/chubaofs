@@ -49,10 +49,11 @@ type MetaPartition struct {
 	ReplicaNum       uint8
 	Status           int8
 	IsRecover        bool
-	volName          string
+	VolName          string
 	PersistenceHosts []string
 	Peers            []proto.Peer
 	MissNodes        map[string]int64
+	LoadResponse     []*proto.LoadMetaPartitionMetricResponse
 	sync.RWMutex
 }
 
@@ -64,7 +65,7 @@ func NewMetaReplica(start, end uint64, metaNode *MetaNode) (mr *MetaReplica) {
 }
 
 func NewMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string) (mp *MetaPartition) {
-	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, volName: volName}
+	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, VolName: volName}
 	mp.ReplicaNum = replicaNum
 	mp.Replicas = make([]*MetaReplica, 0)
 	mp.Status = proto.Unavaliable
@@ -147,14 +148,14 @@ func (mp *MetaPartition) updateEnd(c *Cluster, end uint64) (err error) {
 		return
 	}
 	if _, err = mp.getLeaderMetaReplica(); err != nil {
-		log.LogWarnf("action[updateEnd] vol[%v] id[%v] no leader", mp.volName, mp.PartitionID)
+		log.LogWarnf("action[updateEnd] vol[%v] id[%v] no leader", mp.VolName, mp.PartitionID)
 		return
 	}
 
 	oldEnd := mp.End
 	mp.End = end
 
-	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+	if err = c.syncUpdateMetaPartition(mp.VolName, mp); err != nil {
 		mp.End = oldEnd
 		log.LogErrorf("action[updateEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
 		return
@@ -179,9 +180,9 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 	if mp.PartitionID < maxPartitionID {
 		return
 	}
-	vol, err := c.getVol(mp.volName)
+	vol, err := c.getVol(mp.VolName)
 	if err != nil {
-		log.LogWarnf("action[checkEnd] vol[%v] not exist", mp.volName)
+		log.LogWarnf("action[checkEnd] vol[%v] not exist", mp.VolName)
 		return
 	}
 	mp.Lock()
@@ -194,7 +195,7 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 	if mp.End != defaultMaxMetaPartitionInodeID {
 		oldEnd := mp.End
 		mp.End = defaultMaxMetaPartitionInodeID
-		if err := c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+		if err := c.syncUpdateMetaPartition(mp.VolName, mp); err != nil {
 			mp.End = oldEnd
 			log.LogErrorf("action[checkEnd] partitionID[%v] err[%v]", mp.PartitionID, err)
 			return
@@ -440,10 +441,10 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID, leaderAddr string, partitio
 			}
 			msg := fmt.Sprintf("action[checkReplicaMiss], clusterID[%v] volName[%v] partition:%v  on Node:%v  "+
 				"miss time > :%v  vlocLastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v",
-				clusterID, mp.volName, mp.PartitionID, replica.Addr, partitionMissSec, replica.ReportTime, lastReportTime, isActive)
+				clusterID, mp.VolName, mp.PartitionID, replica.Addr, partitionMissSec, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
 			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
-				leaderAddr, mp.volName, mp.PartitionID, replica.Addr)
+				leaderAddr, mp.VolName, mp.PartitionID, replica.Addr)
 			log.LogRead(msg)
 		}
 	}
@@ -452,10 +453,10 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID, leaderAddr string, partitio
 		if mp.missedReplica(addr) && mp.needWarnMissReplica(addr, warnInterval) {
 			msg := fmt.Sprintf("action[checkReplicaMiss],clusterID[%v] volName[%v] partition:%v  on Node:%v  "+
 				"miss time  > %v ",
-				clusterID, mp.volName, mp.PartitionID, addr, DefaultMetaPartitionTimeOutSec)
+				clusterID, mp.VolName, mp.PartitionID, addr, DefaultMetaPartitionTimeOutSec)
 			Warn(clusterID, msg)
 			msg = fmt.Sprintf("http://%v/metaPartition/offline?name=%v&id=%v&addr=%v",
-				leaderAddr, mp.volName, mp.PartitionID, addr)
+				leaderAddr, mp.VolName, mp.PartitionID, addr)
 			log.LogRead(msg)
 		}
 	}
@@ -532,7 +533,7 @@ func (mp *MetaPartition) generateUpdateMetaReplicaTask(clusterID string, partiti
 		Warn(clusterID, msg)
 		return
 	}
-	req := &proto.UpdateMetaPartitionRequest{PartitionID: partitionID, End: end, VolName: mp.volName}
+	req := &proto.UpdateMetaPartitionRequest{PartitionID: partitionID, End: end, VolName: mp.VolName}
 	t = proto.NewAdminTask(proto.OpUpdateMetaPartition, mr.Addr, req)
 	resetMetaPartitionTaskID(t, mp.PartitionID)
 	return
@@ -541,6 +542,13 @@ func (mp *MetaPartition) generateUpdateMetaReplicaTask(clusterID string, partiti
 func (mr *MetaReplica) generateDeleteReplicaTask(partitionID uint64) (t *proto.AdminTask) {
 	req := &proto.DeleteMetaPartitionRequest{PartitionID: partitionID}
 	t = proto.NewAdminTask(proto.OpDeleteMetaPartition, mr.Addr, req)
+	resetMetaPartitionTaskID(t, partitionID)
+	return
+}
+
+func (mr *MetaReplica) createTaskToLoadMetaPartition(partitionID uint64) (t *proto.AdminTask) {
+	req := &proto.LoadMetaPartitionMetricResponse{PartitionID: partitionID}
+	t = proto.NewAdminTask(proto.OpLoadMetaPartition, mr.Addr, req)
 	resetMetaPartitionTaskID(t, partitionID)
 	return
 }
@@ -610,10 +618,24 @@ func (mp *MetaPartition) isLatestAddr(addr string) (ok bool) {
 	if len(mp.PersistenceHosts) <= 1 {
 		return
 	}
-	lastHost := mp.PersistenceHosts[len(mp.PersistenceHosts)-1]
+	lastHost := mp.PersistenceHosts[0]
 	return lastHost == addr
 }
 
 func (mp *MetaPartition) isNotLatestAddr(addr string) bool {
 	return !mp.isLatestAddr(addr)
+}
+
+func (mp *MetaPartition) addOrReplaceLoadResponse(response *proto.LoadMetaPartitionMetricResponse) {
+	mp.Lock()
+	defer mp.Unlock()
+	loadResponse := make([]*proto.LoadMetaPartitionMetricResponse, 0)
+	for _, lr := range mp.LoadResponse {
+		if lr.Addr == response.Addr {
+			continue
+		}
+		loadResponse = append(loadResponse, lr)
+	}
+	loadResponse = append(loadResponse, response)
+	mp.LoadResponse = loadResponse
 }

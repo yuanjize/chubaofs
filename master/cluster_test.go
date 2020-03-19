@@ -187,7 +187,7 @@ func TestUpdateEnd(t *testing.T) {
 		Status:      int(mp.Status),
 		MaxInodeID:  mp.Start + 1,
 		IsLeader:    false,
-		VolName:     mp.volName,
+		VolName:     mp.VolName,
 	}
 	metaNode, err := server.cluster.getMetaNode(mp.PersistenceHosts[0])
 	if err != nil {

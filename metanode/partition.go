@@ -152,6 +152,7 @@ type OpPartition interface {
 	DeletePartition() (err error)
 	UpdatePartition(req *UpdatePartitionReq, resp *UpdatePartitionResp) (err error)
 	DeleteRaft() error
+	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
 }
 
 type MetaPartition interface {
@@ -471,5 +472,16 @@ func (mp *metaPartition) Reset() (err error) {
 	mp.deleteApplyFile()
 	mp.deleteDentryFile()
 	mp.deleteInodeFile()
+	return
+}
+
+func (mp *metaPartition) ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse) {
+	resp = &proto.LoadMetaPartitionMetricResponse{
+		PartitionID: mp.config.PartitionId,
+		DoCompare:   true,
+	}
+	resp.MaxInode = mp.GetCursor()
+	resp.DentryCount = uint64(mp.dentryTree.Len())
+	resp.ApplyID = mp.applyID
 	return
 }
