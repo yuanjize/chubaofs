@@ -249,6 +249,9 @@ func diskOffline(addr, path string, t *testing.T) {
 		hostAddr, DiskOffLine, addr, path)
 	fmt.Println(reqUrl)
 	process(reqUrl, t)
+	server.cluster.checkDataNodeHeartbeat()
+	time.Sleep(5 * time.Second)
+	server.cluster.checkBadDiskRecovery()
 }
 
 func TestMarkDeleteVol(t *testing.T) {
@@ -356,6 +359,7 @@ func TestDataPartitionOffline(t *testing.T) {
 		t.Errorf("offlineAddr[%v],hosts[%v]", offlineAddr, partition.PersistenceHosts)
 		return
 	}
+	partition.isRecover = false
 }
 
 func TestTransferLeader(t *testing.T) {

@@ -46,6 +46,7 @@ type Cluster struct {
 	metaNodeSpace       *MetaNodeSpaceStat
 	volSpaceStat        sync.Map
 	BadDataPartitionIds *sync.Map
+	BadMetaPartitionIds *sync.Map
 	reloadMetadataTime  int64
 }
 
@@ -62,6 +63,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.dataNodeSpace = new(DataNodeSpaceStat)
 	c.metaNodeSpace = new(MetaNodeSpaceStat)
 	c.BadDataPartitionIds = new(sync.Map)
+	c.BadMetaPartitionIds = new(sync.Map)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -71,6 +73,8 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckCreateDataPartitions()
 	c.startCheckVolStatus()
 	c.startCheckBadDiskRecovery()
+	c.startCheckMetaPartitionRecoveryProgress()
+	c.startCheckLoadMetaPartitions()
 	return
 }
 
@@ -344,7 +348,7 @@ func (c *Cluster) addDataNode(nodeAddr string) (err error) {
 	c.dataNodes.Store(nodeAddr, dataNode)
 	return
 errDeal:
-	err = fmt.Errorf("action[addMetaNode],clusterID[%v] dataNodeAddr:%v err:%v ", c.Name, nodeAddr, err.Error())
+	err = fmt.Errorf("action[addDataNode],clusterID[%v] dataNodeAddr:%v err:%v ", c.Name, nodeAddr, err.Error())
 	log.LogError(errors.ErrorStack(err))
 	Warn(c.Name, err.Error())
 	return err
@@ -407,7 +411,7 @@ func (c *Cluster) getMetaPartitionByID(id uint64) (mp *MetaPartition, err error)
 func (c *Cluster) updateMetaPartition(mp *MetaPartition, isManual bool) (err error) {
 	oldIsManual := mp.IsManual
 	mp.IsManual = isManual
-	if err = c.syncUpdateMetaPartition(mp.volName, mp); err != nil {
+	if err = c.syncUpdateMetaPartition(mp.VolName, mp); err != nil {
 		mp.IsManual = oldIsManual
 		return
 	}
@@ -907,11 +911,11 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		goto errDeal
 	}
 	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
-		if err = c.syncDeleteVol(vol); err != nil {
+		if err = vol.deleteVolFromStore(c); err != nil {
 			log.LogErrorf("action[createVol] failed,vol[%v] err[%v]", vol.Name, err)
 		}
 		c.deleteVol(name)
-		err = fmt.Errorf("action[createVol] initMetaPartitions failed")
+		err = fmt.Errorf("action[createVol] initMetaPartitions failed,err[%v]", err)
 		goto errDeal
 	}
 	for retryCount := 0; readWriteDataPartitions < DefaultInitDataPartitions && retryCount < 3; retryCount++ {
@@ -988,7 +992,7 @@ func (c *Cluster) CreateMetaPartitionForManual(volName string, start uint64) (er
 func (c *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaPartition) (err error) {
 	hosts := make([]string, 0)
 	hosts = append(hosts, host)
-	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.volName)
+	tasks := mp.generateCreateMetaPartitionTasks(hosts, mp.Peers, mp.VolName)
 	return c.doSyncCreateMetaPartitionToMetaNode(host, tasks)
 }
 

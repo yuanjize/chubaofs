@@ -198,7 +198,7 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) {
 	for _, mp := range mps {
 		doSplit = mp.checkStatus(true, int(vol.mpReplicaNum), maxPartitionID)
 		if doSplit {
-			nextStart := mp.Start + mp.MaxNodeID + defaultMetaPartitionInodeIDStep
+			nextStart := mp.Start + mp.MaxInodeID + defaultMetaPartitionInodeIDStep
 			if err = vol.splitMetaPartition(c, mp, nextStart); err != nil {
 				Warn(c.Name, fmt.Sprintf("vol[%v],meta partition[%v] splits failed,err[%v]", vol.Name, mp.PartitionID, err))
 			}
@@ -415,16 +415,26 @@ func (vol *Vol) checkStatus(c *Cluster) {
 
 }
 
-func (vol *Vol) deleteVolFromStore(c *Cluster) {
+func (vol *Vol) deleteVolFromStore(c *Cluster) (err error) {
 
-	if err := c.syncDeleteVol(vol); err != nil {
+	if err = c.syncDeleteVol(vol); err != nil {
 		return
 	}
 	//delete mp and dp metadata first, then delete vol in case new vol with same name create
 	vol.deleteDataPartitionsFromStore(c)
 	vol.deleteMetaPartitionsFromStore(c)
+	vol.deleteTokensFromStore(c)
 	c.deleteVol(vol.Name)
 	c.volSpaceStat.Delete(vol.Name)
+	return
+}
+
+func (vol *Vol) deleteTokensFromStore(c *Cluster) {
+	vol.tokensLock.RLock()
+	defer vol.tokensLock.RUnlock()
+	for _, token := range vol.tokens {
+		c.syncDeleteToken(token)
+	}
 }
 
 func (vol *Vol) deleteMetaPartitionsFromStore(c *Cluster) {

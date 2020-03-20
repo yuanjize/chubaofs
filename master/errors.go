@@ -36,6 +36,7 @@ var (
 	DataReplicaExcessError              = errors.New("data replica Excess error")
 	DataReplicaLackError                = errors.New("data replica Lack error")
 	DataReplicaHasMissOneError          = errors.New("data replica has miss one ,cannot miss any one")
+	MetaReplicaHasMissOneError          = errors.New("meta replica has miss one ,cannot miss any one")
 	NoHaveAnyDataNodeToWrite            = errors.New("No have any data node for create data partition")
 	NoHaveAnyMetaNodeToWrite            = errors.New("No have any meta node for create meta partition")
 	CannotOffLineErr                    = errors.New("cannot offline because avail data replica <0")

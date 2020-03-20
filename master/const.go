@@ -55,26 +55,28 @@ const (
 )
 
 const (
-	defaultInitMetaPartitionCount            = 1
-	defaultMaxInitMetaPartitionCount         = 10
-	defaultMaxMetaPartitionInodeID   uint64  = 1<<63 - 1
-	defaultMetaPartitionInodeIDStep  uint64  = 1 << 24
-	DefaultMetaNodeReservedMem       uint64  = 1 << 32
-	RuntimeStackBufSize                      = 4096
-	NodesAliveRate                   float32 = 0.5
-	SpaceAvailRate                           = 0.90
-	CheckMissFileReplicaTime                 = 600
-	MinReadWriteDataPartitions               = 20
-	DefaultInitDataPartitions                = 10
-	EmptyCrcValue                    uint32  = 4045511210
-	DefaultVolCapacity                       = 200
-	LoadDataPartitionPeriod                  = 12 * 60 * 60
-	VolExpandDataPartitionStepRatio          = 0.1
-	VolMaxExpandDataPartitionCount           = 100
-	VolWarningRatio                          = 0.7
-	VolMinAvailSpaceRatio                    = 0.1
-	VolReadWriteDataPartitionRatio           = 0.1
-	DefaultRackName                          = "default"
+	defaultInitMetaPartitionCount                 = 1
+	defaultMaxInitMetaPartitionCount              = 10
+	defaultMaxMetaPartitionInodeID        uint64  = 1<<63 - 1
+	defaultMetaPartitionInodeIDStep       uint64  = 1 << 24
+	DefaultMetaNodeReservedMem            uint64  = 1 << 32
+	RuntimeStackBufSize                           = 4096
+	NodesAliveRate                        float32 = 0.5
+	SpaceAvailRate                                = 0.90
+	CheckMissFileReplicaTime                      = 600
+	MinReadWriteDataPartitions                    = 20
+	DefaultInitDataPartitions                     = 10
+	EmptyCrcValue                         uint32  = 4045511210
+	DefaultVolCapacity                            = 200
+	LoadDataPartitionPeriod                       = 12 * 60 * 60
+	VolExpandDataPartitionStepRatio               = 0.1
+	VolMaxExpandDataPartitionCount                = 100
+	VolWarningRatio                               = 0.7
+	VolMinAvailSpaceRatio                         = 0.1
+	VolReadWriteDataPartitionRatio                = 0.1
+	DefaultRackName                               = "default"
+	defaultMinusOfMaxInodeID                      = 1000
+	defaultRangeOfCountDifferencesAllowed         = 50
 )
 
 const (

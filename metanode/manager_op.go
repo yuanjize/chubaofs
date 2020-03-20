@@ -720,24 +720,31 @@ func (m *metaManager) opLoadMetaPartition(conn net.Conn, p *Packet) (err error) 
 		return
 	}
 
-	m.responseAckOKToMaster(conn, p)
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
-		resp.Status = proto.OpErr
-		resp.Result = err.Error()
-		adminTask.Response = resp
-		adminTask.Request = nil
-		m.respondToMaster(adminTask)
+		p.PackErrorWithBody(proto.OpErr, ([]byte)(err.Error()))
+		log.LogErrorf("%s [opLoadMetaPartition] req[%v], "+
+			"response marshal[%v]", conn.RemoteAddr(), req, err.Error())
+		m.respondToClient(conn, p)
 		return
 	}
+	resp = mp.ResponseLoadMetaPartition(p)
 	mConf := mp.GetBaseConfig()
 	resp.Start = mConf.Start
 	resp.End = mConf.End
-	resp.MaxInode = mConf.Cursor
 	resp.Status = proto.OpOk
 	adminTask.Response = resp
 	adminTask.Request = nil
-	m.respondToMaster(adminTask)
+	data, err := json.Marshal(resp)
+	if err != nil {
+		p.PackErrorWithBody(proto.OpErr, ([]byte)(err.Error()))
+		log.LogErrorf("[opLoadMetaPartition] req[%v], "+
+			"response marshal[%v]", req, err.Error())
+		m.respondToClient(conn, p)
+		return
+	}
+	p.PackOkWithBody(data)
+	m.respondToClient(conn, p)
 	log.LogDebugf("[opLoadMetaPartition] req[%v], response[%v].", req, adminTask)
 	return
 }
