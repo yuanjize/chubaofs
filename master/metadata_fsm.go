@@ -98,23 +98,7 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 	cmdMap[cmd.K] = cmd.V
 	cmdMap[Applied] = []byte(strconv.FormatUint(uint64(index), 10))
 	switch cmd.Op {
-	case OpSyncDeleteDataNode:
-		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
-			panic(err)
-		}
-	case OpSyncDeleteMetaNode:
-		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
-			panic(err)
-		}
-	case OpSyncDeleteVol:
-		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
-			panic(err)
-		}
-	case OpSyncDeleteDataPartition:
-		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
-			panic(err)
-		}
-	case OpSyncDeleteMetaPartition:
+	case OpSyncDeleteDataNode,OpSyncDeleteMetaNode,OpSyncDeleteVol,OpSyncDeleteDataPartition,OpSyncDeleteMetaPartition,OpSyncDelToken:
 		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
 			panic(err)
 		}

@@ -208,11 +208,11 @@ func (m *Metadata) setOpType() {
 }
 
 func (c *Cluster) syncDeleteToken(token *bsProto.Token) (err error) {
-	return c.syncPutTokenInfo(OpSyncAddToken, token)
+	return c.syncPutTokenInfo(OpSyncDelToken, token)
 }
 
 func (c *Cluster) syncAddToken(token *bsProto.Token) (err error) {
-	return c.syncPutTokenInfo(OpSyncDelToken, token)
+	return c.syncPutTokenInfo(OpSyncAddToken, token)
 }
 
 func (c *Cluster) syncUpdateToken(token *bsProto.Token) (err error) {
