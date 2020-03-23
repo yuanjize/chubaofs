@@ -96,6 +96,8 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 	d.super.nodeCache[inode.ino] = child
 	d.super.fslock.Unlock()
 
+	resp.EntryValid = LookupValidDuration
+
 	d.super.ic.Delete(d.inode.ino)
 
 	elapsed := time.Since(start)
