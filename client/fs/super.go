@@ -132,8 +132,11 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 		log.LogErrorf("QueryTokenType failed! %v", err.Error())
 		return nil, err
 	}
-
-	opt.Rdonly = tokenType == proto.ReadOnlyToken
+	if opt.Rdonly && opt.Token==""{
+		opt.Rdonly=true
+	}else {
+		opt.Rdonly = tokenType == proto.ReadOnlyToken
+	}
 	log.LogInfof("NewSuper: cluster(%v) volname(%v) icacheExpiration(%v) LookupValidDuration(%v) AttrValidDuration(%v)", s.cluster, s.volname, inodeExpiration, LookupValidDuration, AttrValidDuration)
 	return s, nil
 }
