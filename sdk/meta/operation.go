@@ -428,20 +428,20 @@ func (mw *MetaWrapper) batchIget(wg *sync.WaitGroup, mp *MetaPartition, inodes [
 
 	packet, err = mw.sendToMetaPartition(mp, packet)
 	if err != nil {
-		log.LogErrorf("batchIget: mp(%v) req(%v) err(%v)", mp, *req, err)
+		log.LogWarnf("batchIget: volume(%v) mp(%v) err(%v)", req.VolName, mp, err)
 		return
 	}
 
 	status := parseStatus(packet.ResultCode)
 	if status != statusOK {
-		log.LogErrorf("batchIget: mp(%v) req(%v) result(%v)", mp, *req, packet.GetResultMesg())
+		log.LogWarnf("batchIget: volume(%v) mp(%v) result(%v)", req.VolName, mp, packet.GetResultMesg())
 		return
 	}
 
 	resp := new(proto.BatchInodeGetResponse)
 	err = packet.UnmarshalData(resp)
 	if err != nil {
-		log.LogErrorf("batchIget: mp(%v) err(%v) PacketData(%v)", mp, err, string(packet.Data))
+		log.LogWarnf("batchIget: volume(%v) mp(%v) err(%v) PacketData(%v)", req.VolName, mp, err, string(packet.Data))
 		return
 	}
 
