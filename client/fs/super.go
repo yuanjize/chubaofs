@@ -126,16 +126,14 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 	s.orphan = NewOrphanInodeList()
 	s.nodeCache = make(map[uint64]fs.Node)
 	s.disableDcache = opt.DisableDcache
-
-	tokenType, err := s.mw.QueryTokenType(opt.Volname, opt.Token)
-	if err != nil {
-		log.LogErrorf("QueryTokenType failed! %v", err.Error())
-		return nil, err
-	}
-	if opt.Rdonly && opt.Token==""{
-		opt.Rdonly=true
-	}else {
-		opt.Rdonly = tokenType == proto.ReadOnlyToken
+	if !opt.Rdonly {
+		tokenType, err := s.mw.QueryTokenType(opt.Volname, opt.Token)
+		if err==nil {
+			opt.Rdonly = tokenType == proto.ReadOnlyToken
+		}else {
+			log.LogErrorf("QueryTokenType failed! %v", err.Error())
+			return nil, err
+		}
 	}
 	log.LogInfof("NewSuper: cluster(%v) volname(%v) icacheExpiration(%v) LookupValidDuration(%v) AttrValidDuration(%v)", s.cluster, s.volname, inodeExpiration, LookupValidDuration, AttrValidDuration)
 	return s, nil
