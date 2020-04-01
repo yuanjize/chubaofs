@@ -83,10 +83,7 @@ func main() {
 	flag.Parse()
 
 	if *configVersion {
-		fmt.Printf("CFS Client\n")
-		fmt.Printf("Branch: %s\n", BranchName)
-		fmt.Printf("Commit: %s\n", CommitID)
-		fmt.Printf("Build: %s %s %s %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH, BuildTime)
+		fmt.Print(dumpVersion())
 		os.Exit(0)
 	}
 
@@ -135,7 +132,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	syslog.Print(opt)
+	syslog.Print(dumpVersion(), opt)
 	changeRlimit(defaultRlimit)
 
 	registerInterceptedSignal()
@@ -160,6 +157,10 @@ func main() {
 		syslog.Printf("fs Serve returns err(%v)\n", err)
 		os.Exit(1)
 	}
+}
+
+func dumpVersion() string {
+	return fmt.Sprintf("CFS Client\nBranch: %s\nCommit: %s\nBuild: %s %s %s %s\n", BranchName, CommitID, runtime.Version(), runtime.GOOS, runtime.GOARCH, BuildTime)
 }
 
 func startDaemon() error {
