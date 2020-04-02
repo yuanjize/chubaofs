@@ -17,18 +17,20 @@ package stream
 import (
 	"fmt"
 	"golang.org/x/time/rate"
+	"io"
+	syslog "log"
+	"os/exec"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/sdk/data/wrapper"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
-	"io"
-	"runtime"
-	"strings"
-	"time"
 )
 
 const (
@@ -63,13 +65,26 @@ type ExtentClient struct {
 	writerLock      sync.RWMutex
 	appendExtentKey AppendExtentKeyFunc
 	getExtents      GetExtentsFunc
+	evictOnClose    bool
 }
 
-func NewExtentClient(volname, master string, readRate, writeRate,extentSize int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
+func NewExtentClient(volname, master string, readRate, writeRate, extentSize int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	client = new(ExtentClient)
-	globalExtentSize=extentSize
+	globalExtentSize = extentSize
 	var limit int = MaxRetryLimit
+
+	osinfo, err := exec.Command("uname", "-r").Output()
+	if err == nil {
+		syslog.Printf("Kernel version: %v", string(osinfo))
+		s := strings.Split(string(osinfo), ".")
+		if s[0] == "2" {
+			syslog.Print("=== Enable evictOnClose ===")
+			client.evictOnClose = true
+		}
+	} else {
+		syslog.Printf("Failed to get kernel version: %v", err)
+	}
 
 retry:
 	gDataWrapper, err = wrapper.NewDataPartitionWrapper(volname, master)
@@ -187,7 +202,11 @@ func (client *ExtentClient) CloseStream(inode uint64, flag uint32) (err error) {
 		client.writerLock.Unlock()
 		return
 	}
-	return s.IssueReleaseRequest(request, flag)
+	err = s.IssueReleaseRequest(request, flag)
+	if client.evictOnClose {
+		err = client.EvictStream(inode)
+	}
+	return
 }
 
 func (client *ExtentClient) EvictStream(inode uint64) error {
