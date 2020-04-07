@@ -1,0 +1,11 @@
+{
+  "role": "checktool",
+  "prof": "7000",
+  "clusterID": "checktool",
+  "logDir": "/export/chubaofs/logs",
+  "logLevel": "debug",
+  "usedRatio": 0.7,
+  "availSpaceRatio": 0.3,
+  "readWriteDpRatio": 0.3,
+  "minRWCnt": 20
+}
