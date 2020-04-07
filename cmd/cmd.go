@@ -31,6 +31,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"github.com/chubaofs/chubaofs/checktool"
 )
 
 var (
@@ -50,12 +51,14 @@ const (
 	RoleMaster = "master"
 	RoleMeta   = "metanode"
 	RoleData   = "datanode"
+	RoleCheckTool   = "checktool"
 )
 
 const (
 	ModuleMaster = "master"
 	ModuleMeta   = "metaNode"
 	ModuleData   = "dataNode"
+	ModuleCheckTool   = "checkTool"
 )
 
 var (
@@ -147,6 +150,9 @@ func main() {
 	case RoleData:
 		server = datanode.NewServer()
 		module = ModuleData
+	case RoleCheckTool:
+		server = checktool.NewServer()
+		module = ModuleCheckTool
 	default:
 		log.LogInfo("Fatal: role mismatch: ", role)
 		os.Exit(1)
@@ -187,7 +193,7 @@ func main() {
 	interceptSignal(server)
 	err = server.Start(cfg)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Fatal: failed to start the baud storage daemon - ", err))
+		fmt.Println(fmt.Sprintf("Fatal: failed to start the baud storage daemon - [%v] ", err))
 		log.LogFatal("Fatal: failed to start the baud storage daemon - ", err)
 		log.LogFlush()
 		os.Exit(1)
