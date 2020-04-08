@@ -228,6 +228,7 @@ func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
 		opt.ExtentSize = extentSize
 	}
 	opt.DisableDcache = cfg.GetBool("disableDcache")
+	opt.SubDir = cfg.GetString("subdir")
 
 	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {
 		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v)",
