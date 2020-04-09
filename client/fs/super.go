@@ -16,16 +16,18 @@ package fs
 
 import (
 	"fmt"
-	"github.com/chubaofs/chubaofs/proto"
+	"golang.org/x/net/context"
+	syslog "log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/chubaofs/chubaofs/third_party/fuse"
 	"github.com/chubaofs/chubaofs/third_party/fuse/fs"
-	"golang.org/x/net/context"
 
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/sdk/data/stream"
 	"github.com/chubaofs/chubaofs/sdk/meta"
 	"github.com/chubaofs/chubaofs/util/log"
@@ -51,6 +53,7 @@ type MountOption struct {
 	Token         string
 	ExtentSize    int64
 	DisableDcache bool
+	SubDir        string
 }
 
 func (mo *MountOption) String() string {
@@ -70,6 +73,7 @@ func (mo *MountOption) String() string {
 		"\nToken: ", mo.Token,
 		"\nExtentSize: ", mo.ExtentSize,
 		"\nDisableDcache: ", mo.DisableDcache,
+		"\nSubDir: ", mo.SubDir,
 		"\n",
 	)
 }
@@ -87,6 +91,7 @@ type Super struct {
 	fslock    sync.Mutex
 
 	disableDcache bool
+	rootIno       uint64
 }
 
 //functions that Super needs to implement
@@ -128,19 +133,47 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 	s.disableDcache = opt.DisableDcache
 	if !opt.Rdonly {
 		tokenType, err := s.mw.QueryTokenType(opt.Volname, opt.Token)
-		if err==nil {
+		if err == nil {
 			opt.Rdonly = tokenType == proto.ReadOnlyToken
-		}else {
+		} else {
 			log.LogErrorf("QueryTokenType failed! %v", err.Error())
 			return nil, err
 		}
+	}
+	s.rootIno, err = s.getRootIno(opt.SubDir)
+	if err != nil {
+		return nil, err
 	}
 	log.LogInfof("NewSuper: cluster(%v) volname(%v) icacheExpiration(%v) LookupValidDuration(%v) AttrValidDuration(%v)", s.cluster, s.volname, inodeExpiration, LookupValidDuration, AttrValidDuration)
 	return s, nil
 }
 
+func (s *Super) getRootIno(subdir string) (uint64, error) {
+	rootIno := RootInode
+	if subdir == "" || subdir == "/" {
+		return rootIno, nil
+	}
+
+	dirs := strings.Split(subdir, "/")
+	for idx, dir := range dirs {
+		if dir == "/" || dir == "" {
+			continue
+		}
+		child, mode, err := s.mw.Lookup_ll(rootIno, dir)
+		if err != nil {
+			return 0, fmt.Errorf("getRootIno: Lookup failed, subdir(%v) idx(%v) dir(%v) err(%v)", subdir, idx, dir, err)
+		}
+		if mode != ModeDir {
+			return 0, fmt.Errorf("getRootIno: not directory, subdir(%v) idx(%v) dir(%v) child(%v) mode(%v) err(%v)", subdir, idx, dir, child, mode, err)
+		}
+		rootIno = child
+	}
+	syslog.Printf("getRootIno: %v\n", rootIno)
+	return rootIno, nil
+}
+
 func (s *Super) Root() (fs.Node, error) {
-	inode, err := s.InodeGet(RootInode)
+	inode, err := s.InodeGet(s.rootIno)
 	if err != nil {
 		return nil, err
 	}
