@@ -200,8 +200,8 @@ func NewStreamWriter(inode uint64, client *ExtentClient, appendExtentKey AppendE
 	s = new(StreamWriter)
 	s.appendExtentKey = appendExtentKey
 	s.inode = inode
-	s.requestCh = make(chan interface{}, 1000)
-	s.exitCh = make(chan struct{}, 10)
+	s.requestCh = make(chan interface{}, 64)
+	s.exitCh = make(chan struct{}, 8)
 	s.excludePartition = make([]uint32, 0)
 	s.hasUpdateKey = make(map[string]int, 0)
 	s.metaNodeStreamKey = new(proto.StreamKey)
