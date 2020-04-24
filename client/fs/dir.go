@@ -111,6 +111,8 @@ func (d *Dir) Forget() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
 
+	d.super.ic.Delete(ino)
+
 	d.super.fslock.Lock()
 	delete(d.super.nodeCache, ino)
 	d.super.fslock.Unlock()
