@@ -98,6 +98,8 @@ func (f *File) Forget() {
 		log.LogDebugf("TRACE Forget: ino(%v)", ino)
 	}()
 
+	f.super.ic.Delete(ino)
+
 	f.super.fslock.Lock()
 	delete(f.super.nodeCache, ino)
 	f.super.fslock.Unlock()
