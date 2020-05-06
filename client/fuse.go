@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/util"
 	syslog "log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -253,7 +254,19 @@ func mount(opt *cfs.MountOption) (fsConn *fuse.Conn, super *cfs.Super, err error
 	http.HandleFunc(ControlCommandGetRate, super.GetRate)
 	http.HandleFunc(log.SetLogLevelPath, log.SetLogLevel)
 	go func() {
-		fmt.Println(http.ListenAndServe(":"+opt.Profport, nil))
+		if opt.Profport != "" {
+			syslog.Println("Start pprof with port:", opt.Profport)
+			http.ListenAndServe(":"+opt.Profport, nil)
+		} else {
+			pprofListener, err := net.Listen("tcp", ":0")
+			if err != nil {
+				daemonize.SignalOutcome(err)
+				os.Exit(1)
+			}
+
+			syslog.Println("Start pprof with port:", pprofListener.Addr().(*net.TCPAddr).Port)
+			http.Serve(pprofListener, nil)
+		}
 	}()
 
 	ump.InitUmp(UmpModuleName)
