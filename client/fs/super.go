@@ -54,6 +54,7 @@ type MountOption struct {
 	ExtentSize    int64
 	DisableDcache bool
 	SubDir        string
+	MaxCPUs       int64
 }
 
 func (mo *MountOption) String() string {
@@ -74,6 +75,7 @@ func (mo *MountOption) String() string {
 		"\nExtentSize: ", mo.ExtentSize,
 		"\nDisableDcache: ", mo.DisableDcache,
 		"\nSubDir: ", mo.SubDir,
+		"\nMaxCpus: ", mo.MaxCPUs,
 		"\n",
 	)
 }

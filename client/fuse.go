@@ -78,8 +78,6 @@ var (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	flag.Parse()
 
 	if *configVersion {
@@ -105,6 +103,12 @@ func main() {
 	if err != nil {
 		daemonize.SignalOutcome(err)
 		os.Exit(1)
+	}
+
+	if opt.MaxCPUs > 0 {
+		runtime.GOMAXPROCS(int(opt.MaxCPUs))
+	} else {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
 	level := parseLogLevel(opt.Loglvl)
@@ -229,6 +233,7 @@ func parseMountOption(cfg *config.Config) (*cfs.MountOption, error) {
 	}
 	opt.DisableDcache = cfg.GetBool("disableDcache")
 	opt.SubDir = cfg.GetString("subdir")
+	opt.MaxCPUs = parseConfigString(cfg, "maxcpus")
 
 	if opt.MountPoint == "" || opt.Volname == "" || opt.Master == "" {
 		return nil, errors.New(fmt.Sprintf("invalid config file: lack of mandatory fields, mountPoint(%v), volName(%v), masterAddr(%v)",

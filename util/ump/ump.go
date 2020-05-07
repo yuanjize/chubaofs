@@ -15,7 +15,6 @@
 package ump
 
 import (
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -57,7 +56,6 @@ var (
 )
 
 func InitUmp(module string) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := initLogName(module); err != nil {
 		panic("init UMP Monitor failed " + err.Error())
 	}
