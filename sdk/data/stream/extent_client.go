@@ -20,7 +20,6 @@ import (
 	"io"
 	syslog "log"
 	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,7 +68,6 @@ type ExtentClient struct {
 }
 
 func NewExtentClient(volname, master string, readRate, writeRate, extentSize int64, appendExtentKey AppendExtentKeyFunc, getExtents GetExtentsFunc) (client *ExtentClient, err error) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	client = new(ExtentClient)
 	globalExtentSize = extentSize
 	var limit int = MaxRetryLimit
