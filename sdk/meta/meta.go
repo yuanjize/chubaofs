@@ -71,6 +71,7 @@ type MetaWrapper struct {
 
 	// Partition map indexed by ID
 	partitions map[uint64]*MetaPartition
+	epoch      uint64
 
 	// Partition tree indexed by Start, in order to find a partition in which
 	// a specific inode locate.

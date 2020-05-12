@@ -67,26 +67,18 @@ func (mw *MetaWrapper) Create_ll(parentID uint64, name string, mode uint32, targ
 	}
 
 	// Create inode
-
-	mp = mw.getLatestPartition()
-	if mp != nil {
-		status, info, err = mw.icreate(mp, mode, target)
-		if err == nil {
-			if status == statusOK {
-				goto create_dentry
-			} else if status == statusFull {
-				mw.UpdateMetaPartitions()
-			}
-		}
-	}
-
 	rwPartitions = mw.getRWPartitions()
-	for _, mp = range rwPartitions {
+	length := len(rwPartitions)
+	epoch := atomic.AddUint64(&mw.epoch, 1)
+	for i := 0; i < length; i++ {
+		index := (int(epoch) + i) % length
+		mp = rwPartitions[index]
 		status, info, err = mw.icreate(mp, mode, target)
 		if err == nil && status == statusOK {
 			goto create_dentry
 		}
 	}
+
 	return nil, syscall.ENOMEM
 
 create_dentry:
