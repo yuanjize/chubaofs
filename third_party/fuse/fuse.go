@@ -832,6 +832,7 @@ loop:
 		}
 		buf := m.bytes()[writeInSize(c.proto):]
 		if uint32(len(buf)) < in.Size {
+			err = fmt.Errorf("(len(buf))[%v] < in.Size[%v]", len(buf), in.Size)
 			goto corrupt
 		}
 		r.Data = buf
@@ -1050,9 +1051,11 @@ loop:
 	return req, nil
 
 corrupt:
+	err = fmt.Errorf("fuse: malformed message, m.hdr[%v], m.len[%v], m.off[%v], err %v", m.hdr, m.len(), m.off, err)
+
 	Debug(malformedMessage{})
 	putMessage(m)
-	return nil, fmt.Errorf("fuse: malformed message")
+	return nil, err
 
 unrecognized:
 	// Unrecognized message.
