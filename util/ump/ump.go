@@ -55,6 +55,12 @@ var (
 	}}
 )
 
+var (
+	ClusterID string
+	VolName   string
+	LocalIP   string
+)
+
 func InitUmp(module string) {
 	if err := initLogName(module); err != nil {
 		panic("init UMP Monitor failed " + err.Error())

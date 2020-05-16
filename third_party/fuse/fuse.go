@@ -111,6 +111,8 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 // A Conn represents a connection to a mounted FUSE file system.
@@ -603,12 +605,19 @@ loop:
 	case opLookup:
 		buf := m.bytes()
 		n := len(buf)
-		if n == 0 || buf[n-1] != '\x00' {
+		if n == 0 {
 			goto corrupt
 		}
+
 		req = &LookupRequest{
 			Header: m.Header(),
 			Name:   string(buf[:n-1]),
+		}
+
+		if buf[n-1] != '\x00' {
+			umpKey := fmt.Sprintf("%v_fuse_malformed_message", ump.ClusterID)
+			umpMsg := fmt.Sprintf("volname[%v] localip[%v] op[lookup] m.hdr[%v], m.len[%v], m.off[%v] name[%v] last char[%v]", ump.VolName, ump.LocalIP, m.hdr, m.len(), m.off, string(buf[:n-1]), buf[n-1])
+			ump.Alarm(umpKey, umpMsg)
 		}
 
 	case opForget:
@@ -1052,7 +1061,6 @@ loop:
 
 corrupt:
 	err = fmt.Errorf("fuse: malformed message, m.hdr[%v], m.len[%v], m.off[%v], err %v", m.hdr, m.len(), m.off, err)
-
 	Debug(malformedMessage{})
 	putMessage(m)
 	return nil, err
