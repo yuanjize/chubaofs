@@ -31,6 +31,7 @@ import (
 	"github.com/chubaofs/chubaofs/sdk/data/stream"
 	"github.com/chubaofs/chubaofs/sdk/meta"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 type MountOption struct {
@@ -119,6 +120,9 @@ func NewSuper(opt *MountOption) (s *Super, err error) {
 	s.volname = opt.Volname
 	s.cluster = s.mw.Cluster()
 	s.localIP = s.mw.LocalIP()
+	ump.ClusterID = s.cluster
+	ump.VolName = s.volname
+	ump.LocalIP = s.localIP
 	inodeExpiration := DefaultInodeExpiration
 	if opt.IcacheTimeout >= 0 {
 		inodeExpiration = time.Duration(opt.IcacheTimeout) * time.Second
