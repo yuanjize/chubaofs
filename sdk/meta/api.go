@@ -371,3 +371,19 @@ func (mw *MetaWrapper) Evict(inode uint64) error {
 	}
 	return nil
 }
+
+func (mw *MetaWrapper) Unlink_ll(inode uint64) error {
+	mp := mw.getPartitionByInode(inode)
+	if mp == nil {
+		log.LogWarnf("Unlink_ll: No such partition, ino(%v)", inode)
+		return syscall.EINVAL
+	}
+
+	status, info, err := mw.idelete(mp, inode)
+	if err != nil || status != statusOK {
+		log.LogWarnf("Unlink_ll: ino(%v) err(%v) status(%v)", inode, err, status)
+		return statusToErrno(status)
+	}
+	log.LogWrite(info)
+	return nil
+}
