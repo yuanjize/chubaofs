@@ -88,6 +88,9 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 		f.super.ic.Put(inode)
 	}
 	inode.fillAttr(a)
+	if inode.mode == proto.ModeSymlink {
+		a.Size = uint64(len(inode.target))
+	}
 	log.LogDebugf("TRACE Attr: inode(%v) attr(%v) fileSize(%v) writeSize(%v) resp(%v)", inode, a, fileSize, writeSize, a)
 	return nil
 }
