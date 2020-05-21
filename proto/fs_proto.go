@@ -39,6 +39,16 @@ type InodeInfo struct {
 	CreateTime time.Time `json:"ct"`
 	AccessTime time.Time `json:"at"`
 	Target     []byte    `json:"tgt"`
+
+	expiration int64
+}
+
+func (info *InodeInfo) Expiration() int64 {
+	return info.expiration
+}
+
+func (info *InodeInfo) SetExpiration(e int64) {
+	info.expiration = e
 }
 
 func (info *InodeInfo) String() string {
