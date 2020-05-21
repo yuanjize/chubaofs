@@ -22,6 +22,14 @@ func init() {
 	flag.StringVar(&DensFile, "dens", "", "dentry list file")
 }
 
+var (
+	inodeDumpFileName          string = "inode.dump"
+	dentryDumpFileName         string = "dentry.dump"
+	inodeUpdateDumpFileName    string = "inode.dump.update"
+	obsoleteInodeDumpFileName  string = "inode.dump.obsolete"
+	obsoleteDentryDumpFileName string = "dentry.dump.obsolete"
+)
+
 type VolStat struct {
 	Name      string
 	TotalSize uint64
