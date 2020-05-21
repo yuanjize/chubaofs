@@ -15,6 +15,7 @@
 package fs
 
 import (
+	"os"
 	"syscall"
 	"time"
 
@@ -42,6 +43,15 @@ const (
 	ModeDir     = proto.ModeDir
 	ModeSymlink = proto.ModeSymlink
 )
+
+func Mode(osMode os.FileMode) uint32 {
+	if osMode.IsDir() {
+		return ModeDir
+	} else if osMode&os.ModeSymlink != 0 {
+		return ModeSymlink
+	}
+	return ModeRegular
+}
 
 const (
 	DefaultInodeExpiration = 120 * time.Second

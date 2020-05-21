@@ -18,6 +18,8 @@ import (
 	"container/list"
 	"sync"
 	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (
@@ -46,27 +48,27 @@ func NewInodeCache(exp time.Duration, maxElements int) *InodeCache {
 	return ic
 }
 
-func (ic *InodeCache) Put(inode *Inode) {
+func (ic *InodeCache) Put(info *proto.InodeInfo) {
 	ic.Lock()
-	old, ok := ic.cache[inode.ino]
+	old, ok := ic.cache[info.Inode]
 	if ok {
 		ic.lruList.Remove(old)
-		delete(ic.cache, inode.ino)
+		delete(ic.cache, info.Inode)
 	}
 
 	if ic.lruList.Len() >= ic.maxElements {
 		ic.evict(true)
 	}
 
-	inode.setExpiration(ic.expiration)
-	element := ic.lruList.PushFront(inode)
-	ic.cache[inode.ino] = element
+	inodeSetExpiration(info, ic.expiration)
+	element := ic.lruList.PushFront(info)
+	ic.cache[info.Inode] = element
 	ic.Unlock()
 
 	//log.LogDebugf("InodeCache Put: inode(%v)", inode)
 }
 
-func (ic *InodeCache) Get(ino uint64) *Inode {
+func (ic *InodeCache) Get(ino uint64) *proto.InodeInfo {
 	ic.RLock()
 	element, ok := ic.cache[ino]
 	if !ok {
@@ -74,14 +76,14 @@ func (ic *InodeCache) Get(ino uint64) *Inode {
 		return nil
 	}
 
-	inode := element.Value.(*Inode)
-	if inode.expired() {
+	info := element.Value.(*proto.InodeInfo)
+	if inodeExpired(info) {
 		ic.RUnlock()
 		//log.LogDebugf("InodeCache Get expired: now(%v) inode(%v)", time.Now().Format(LogTimeFormat), inode)
 		return nil
 	}
 	ic.RUnlock()
-	return inode
+	return info
 }
 
 func (ic *InodeCache) Delete(ino uint64) {
@@ -113,13 +115,13 @@ func (ic *InodeCache) evict(foreground bool) {
 		// evicted, just return.
 		// But for foreground eviction, we need to meet the minimum inode
 		// cache evict number requirement.
-		inode := element.Value.(*Inode)
-		if !foreground && !inode.expired() {
+		info := element.Value.(*proto.InodeInfo)
+		if !foreground && !inodeExpired(info) {
 			return
 		}
 
 		ic.lruList.Remove(element)
-		delete(ic.cache, inode.ino)
+		delete(ic.cache, info.Inode)
 		//log.LogInfof("InodeCache: evict inode(%v)", inode)
 		count++
 	}
@@ -135,12 +137,12 @@ func (ic *InodeCache) evict(foreground bool) {
 		if element == nil {
 			break
 		}
-		inode := element.Value.(*Inode)
-		if !inode.expired() {
+		info := element.Value.(*proto.InodeInfo)
+		if !inodeExpired(info) {
 			break
 		}
 		ic.lruList.Remove(element)
-		delete(ic.cache, inode.ino)
+		delete(ic.cache, info.Inode)
 		//log.LogInfof("InodeCache: evict inode(%v)", inode)
 		count++
 	}

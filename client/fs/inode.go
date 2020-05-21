@@ -15,7 +15,6 @@
 package fs
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -29,28 +28,7 @@ const (
 	LogTimeFormat = "20060102150405000"
 )
 
-type Inode struct {
-	ino    uint64
-	size   uint64
-	mode   uint32
-	nlink  uint32
-	ctime  time.Time
-	mtime  time.Time
-	atime  time.Time
-	osMode os.FileMode
-	target []byte
-
-	// protected under the inode cache lock
-	expiration int64
-}
-
-func NewInode(info *proto.InodeInfo) *Inode {
-	inode := new(Inode)
-	inode.fill(info)
-	return inode
-}
-
-func (s *Super) InodeGet(ino uint64) (*Inode, error) {
+func (s *Super) InodeGet(ino uint64) (*proto.InodeInfo, error) {
 	inode := s.ic.Get(ino)
 	if inode != nil {
 		//log.LogDebugf("InodeGet: InodeCache hit, inode(%v)", inode)
@@ -66,55 +44,40 @@ func (s *Super) InodeGet(ino uint64) (*Inode, error) {
 			return nil, fuse.ENOENT
 		}
 	}
-	inode = NewInode(info)
+	inode = info
 	s.ic.Put(inode)
 	//log.LogDebugf("InodeGet: inode(%v)", inode)
 	return inode, nil
 }
 
-func (inode *Inode) String() string {
-	return fmt.Sprintf("ino(%v) mode(%v) size(%v) nlink(%v) exp(%v) mtime(%v)", inode.ino, inode.mode, inode.size, inode.nlink, time.Unix(0, inode.expiration).Format(LogTimeFormat), inode.mtime)
-}
+func fillAttr(info *proto.InodeInfo, attr *fuse.Attr) {
+	attr.Valid = AttrValidDuration
+	attr.Nlink = info.Nlink
+	attr.Inode = info.Inode
+	attr.Size = info.Size
+	attr.Blocks = attr.Size >> 9 // In 512 bytes
+	attr.Atime = info.AccessTime
+	attr.Ctime = info.CreateTime
+	attr.Mtime = info.ModifyTime
+	attr.BlockSize = DefaultBlksize
 
-func (inode *Inode) fill(info *proto.InodeInfo) {
-	inode.ino = info.Inode
-	inode.mode = info.Mode
-	inode.size = info.Size
-	inode.nlink = info.Nlink
-	inode.ctime = info.CreateTime
-	inode.atime = info.AccessTime
-	inode.mtime = info.ModifyTime
-	inode.target = info.Target
-
-	if inode.mode == ModeDir {
-		inode.osMode = os.ModeDir | os.ModePerm
-	} else if inode.mode == ModeSymlink {
-		inode.osMode = os.ModeSymlink | os.ModePerm
-	} else {
-		inode.osMode = os.ModePerm
+	switch info.Mode {
+	case proto.ModeDir:
+		attr.Mode = os.ModeDir | os.ModePerm
+	case proto.ModeSymlink:
+		attr.Mode = os.ModeSymlink | os.ModePerm
+	default:
+		attr.Mode = os.ModePerm
 	}
 }
 
-func (inode *Inode) fillAttr(attr *fuse.Attr) {
-	attr.Valid = AttrValidDuration
-	attr.Nlink = inode.nlink
-	attr.Inode = inode.ino
-	attr.Mode = inode.osMode
-	attr.Size = inode.size
-	attr.Blocks = attr.Size >> 9 // In 512 bytes
-	attr.Atime = inode.atime
-	attr.Ctime = inode.ctime
-	attr.Mtime = inode.mtime
-	attr.BlockSize = DefaultBlksize
-}
-
-func (inode *Inode) expired() bool {
-	if time.Now().UnixNano() > inode.expiration {
+func inodeExpired(info *proto.InodeInfo) bool {
+	if time.Now().UnixNano() > info.Expiration() {
 		return true
 	}
 	return false
 }
 
-func (inode *Inode) setExpiration(t time.Duration) {
-	inode.expiration = time.Now().Add(t).UnixNano()
+func inodeSetExpiration(info *proto.InodeInfo, t time.Duration) {
+	info.SetExpiration(time.Now().Add(t).UnixNano())
 }
