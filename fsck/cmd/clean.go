@@ -63,24 +63,38 @@ func cleanInodes() error {
 		if e := json.Unmarshal(data, inode); e != nil {
 			return e
 		}
-		/*
-		 * Do clean inode with the following exceptions:
-		 * 1. nlink == 0, might be a temorary inode
-		 * 2. size == 0 && ctime is close to current time, might be in the process of file creation
-		 */
-		if inode.NLink > 0 &&
-			(inode.Size != 0 ||
-				time.Unix(inode.CreateTime, 0).Add(24*time.Hour).Before(time.Now())) {
-			// ignore errors
-			doCleanInode(inode)
-		}
+		doEvictInode(inode)
 		return nil
 	})
 
 	return nil
 }
 
-func doCleanInode(inode *Inode) error {
+func doEvictInode(inode *Inode) error {
+	if inode.NLink != 0 || time.Unix(inode.ModifyTime, 0).Add(24*time.Hour).After(time.Now()) {
+		return nil
+	}
+	err := gMetaWrapper.Evict(inode.Inode)
+	if err != nil {
+		if err != syscall.ENOENT {
+			return err
+		}
+	}
+	return nil
+}
+
+func doUnlinkInode(inode *Inode) error {
+	/*
+	 * Do clean inode with the following exceptions:
+	 * 1. nlink == 0, might be a temorary inode
+	 * 2. size == 0 && ctime is close to current time, might be in the process of file creation
+	 */
+	if inode.NLink == 0 ||
+		(inode.Size == 0 &&
+			time.Unix(inode.CreateTime, 0).Add(24*time.Hour).After(time.Now())) {
+		return nil
+	}
+
 	err := gMetaWrapper.Unlink_ll(inode.Inode)
 	if err != nil {
 		if err != syscall.ENOENT {
