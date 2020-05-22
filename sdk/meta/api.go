@@ -261,6 +261,7 @@ func (mw *MetaWrapper) Rename_ll(srcParentID uint64, srcName string, dstParentID
 		inodeMP := mw.getPartitionByInode(oldInode)
 		if inodeMP != nil {
 			mw.idelete(inodeMP, oldInode)
+			mw.ievict(inodeMP, oldInode)
 		}
 	}
 
