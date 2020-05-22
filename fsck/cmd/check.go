@@ -10,14 +10,22 @@ import (
 	"strings"
 )
 
-func Check() (err error) {
-	var remote bool
+const (
+	InodeCheckOpt int = 1 << iota
+	DentryCheckOpt
+)
+
+func Check(chkopt string) (err error) {
+	var (
+		remote bool
+		opt    int
+	)
 
 	if InodesFile == "" || DensFile == "" {
 		remote = true
 	}
 
-	if VolName == "" || (remote && MasterAddr == "") {
+	if VolName == "" || (remote && (MasterAddr == "" || (chkopt != "inode" && chkopt != "dentry"))) {
 		flag.Usage()
 		return
 	}
@@ -26,9 +34,8 @@ func Check() (err error) {
 	 * Record all the inodes and dentries retrieved from metanode
 	 */
 	var (
-		ifile       *os.File
-		dfile       *os.File
-		ifileUpdate *os.File
+		ifile *os.File
+		dfile *os.File
 	)
 
 	dirPath := fmt.Sprintf("_export_%s", VolName)
@@ -37,6 +44,11 @@ func Check() (err error) {
 	}
 
 	if remote {
+		if chkopt == "dentry" {
+			opt = DentryCheckOpt
+		} else {
+			opt = InodeCheckOpt
+		}
 		if ifile, err = os.Create(fmt.Sprintf("%s/%s", dirPath, inodeDumpFileName)); err != nil {
 			return
 		}
@@ -45,18 +57,14 @@ func Check() (err error) {
 			return
 		}
 		defer dfile.Close()
-		if ifileUpdate, err = os.Create(fmt.Sprintf("%s/%s", dirPath, inodeUpdateDumpFileName)); err != nil {
-			return
-		}
-		defer ifileUpdate.Close()
-		if err = importRawDataFromRemote(ifile, dfile, ifileUpdate); err != nil {
+		if err = importRawDataFromRemote(ifile, dfile, opt); err != nil {
 			return
 		}
 		// go back to the beginning of the files
 		ifile.Seek(0, 0)
 		dfile.Seek(0, 0)
-		ifileUpdate.Seek(0, 0)
 	} else {
+		opt = InodeCheckOpt | DentryCheckOpt
 		if ifile, err = os.Open(InodesFile); err != nil {
 			return
 		}
@@ -75,31 +83,20 @@ func Check() (err error) {
 		return
 	}
 
-	/*
-	 * Export obsolete inodes
-	 */
-	if err = dumpObsoleteInode(imap, fmt.Sprintf("%s/%s", dirPath, obsoleteInodeDumpFileName)); err != nil {
-		return
-	}
-
-	if remote {
-		/*
-		 * To get safe obsolete dentry list, dentry dump should be
-		 * performed ahead of the inode dump.
-		 */
-		if _, dlist, err = analyze(ifileUpdate, dfile); err != nil {
+	if opt&InodeCheckOpt != 0 {
+		if err = dumpObsoleteInode(imap, fmt.Sprintf("%s/%s", dirPath, obsoleteInodeDumpFileName)); err != nil {
 			return
 		}
 	}
-
-	if err = dumpObsoleteDentry(dlist, fmt.Sprintf("%s/%s", dirPath, obsoleteDentryDumpFileName)); err != nil {
-		return
+	if opt&DentryCheckOpt != 0 {
+		if err = dumpObsoleteDentry(dlist, fmt.Sprintf("%s/%s", dirPath, obsoleteDentryDumpFileName)); err != nil {
+			return
+		}
 	}
-
 	return
 }
 
-func importRawDataFromRemote(ifile, dfile, ifileUpdate *os.File) error {
+func importRawDataFromRemote(ifile, dfile *os.File, opt int) error {
 	/*
 	 * Get all the meta partitions info
 	 */
@@ -112,27 +109,37 @@ func importRawDataFromRemote(ifile, dfile, ifileUpdate *os.File) error {
 	 * Note that if we are about to clean obsolete inodes,
 	 * we should get all inodes before geting all dentries.
 	 */
-	for _, mp := range vol.MetaPartitions {
-		cmdline := fmt.Sprintf("http://%s:9092/getInodeRange?id=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
-		if err := exportToFile(ifile, cmdline); err != nil {
-			return err
+	if opt&InodeCheckOpt != 0 {
+		for _, mp := range vol.MetaPartitions {
+			cmdline := fmt.Sprintf("http://%s:9092/getInodeRange?id=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
+			if err := exportToFile(ifile, cmdline); err != nil {
+				return err
+			}
 		}
-	}
 
-	for _, mp := range vol.MetaPartitions {
-		cmdline := fmt.Sprintf("http://%s:9092/getDentry?pid=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
-		if err = exportToFile(dfile, cmdline); err != nil {
-			return err
+		for _, mp := range vol.MetaPartitions {
+			cmdline := fmt.Sprintf("http://%s:9092/getDentry?pid=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
+			if err = exportToFile(dfile, cmdline); err != nil {
+				return err
+			}
 		}
-	}
-
-	for _, mp := range vol.MetaPartitions {
-		cmdline := fmt.Sprintf("http://%s:9092/getInodeRange?id=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
-		if err := exportToFile(ifileUpdate, cmdline); err != nil {
-			return err
+	} else if opt&DentryCheckOpt != 0 {
+		for _, mp := range vol.MetaPartitions {
+			cmdline := fmt.Sprintf("http://%s:9092/getDentry?pid=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
+			if err = exportToFile(dfile, cmdline); err != nil {
+				return err
+			}
 		}
-	}
 
+		for _, mp := range vol.MetaPartitions {
+			cmdline := fmt.Sprintf("http://%s:9092/getInodeRange?id=%d", strings.Split(mp.LeaderAddr, ":")[0], mp.PartitionID)
+			if err := exportToFile(ifile, cmdline); err != nil {
+				return err
+			}
+		}
+	} else {
+		return fmt.Errorf("Invalid opt: %v", opt)
+	}
 	return nil
 }
 

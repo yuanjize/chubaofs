@@ -9,20 +9,20 @@ import (
 )
 
 var (
-	checkOnly bool
-	cleanOpt  string
+	checkOpt string
+	cleanOpt string
 )
 
 func init() {
-	flag.BoolVar(&checkOnly, "check", false, "check and export obselete inodes and dentries")
+	flag.StringVar(&checkOpt, "check", "", "check and export obsolete inodes and dentries")
 	flag.StringVar(&cleanOpt, "clean", "", "clean inodes or dentries")
 
 	flag.Parse()
 }
 
 func main() {
-	if checkOnly {
-		err := cmd.Check()
+	if checkOpt != "" {
+		err := cmd.Check(checkOpt)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
