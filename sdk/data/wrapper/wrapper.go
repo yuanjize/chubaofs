@@ -58,6 +58,7 @@ type Wrapper struct {
 	partitions            map[uint32]*DataPartition
 	rwPartition           []*DataPartition
 	localLeaderPartitions []*DataPartition
+	HostsStatus           map[string]bool
 }
 
 func NewDataPartitionWrapper(volName, masterHosts string) (w *Wrapper, err error) {
@@ -71,11 +72,15 @@ func NewDataPartitionWrapper(volName, masterHosts string) (w *Wrapper, err error
 	GVolname = volName
 	w.rwPartition = make([]*DataPartition, 0)
 	w.partitions = make(map[uint32]*DataPartition)
+	w.HostsStatus = make(map[string]bool)
 	if err = w.updateDataPartition(); err != nil {
 		return
 	}
 	if err = w.updateClusterInfo(); err != nil {
 		return
+	}
+	if err = w.updateDataNodeStatus(); err != nil {
+		log.LogErrorf("NewDataPartitionWrapper: init DataNodeStatus failed, [%v]", err)
 	}
 	go w.update()
 	return
@@ -111,6 +116,10 @@ func (w *Wrapper) update() {
 			err := w.updateDataPartition()
 			if err != nil {
 				log.LogWarnf("vol %v update DataPartition error (%v)", w.volName, err.Error())
+			}
+			err = w.updateDataNodeStatus()
+			if err != nil {
+				log.LogErrorf("NewDataPartitionWrapper: init DataNodeStatus failed, [%v]", err)
 			}
 		}
 	}
@@ -181,6 +190,7 @@ func (w *Wrapper) replaceOrInsertPartition(dp *DataPartition) {
 		old.Hosts = dp.Hosts
 	} else {
 		dp.Metrics = NewDataPartitionMetrics()
+		dp.ClientWrapper = w
 		w.partitions[dp.PartitionID] = dp
 	}
 
@@ -256,4 +266,32 @@ func (w *Wrapper) GetDataPartition(partitionID uint32) (*DataPartition, error) {
 
 func (w *Wrapper) UmpWarningKey() string {
 	return fmt.Sprintf("%s_client_warning", w.clusterName)
+}
+
+func (w *Wrapper) updateDataNodeStatus() (err error) {
+	masterHelper := util.NewMasterHelper()
+	for _, ip := range w.masters {
+		masterHelper.AddNode(ip)
+	}
+	body, err := masterHelper.Request(http.MethodPost, AdminGetCluster, nil, nil)
+	if err != nil {
+		log.LogWarnf("updateDataNodeStatus request: err(%v)", err)
+		return err
+	}
+
+	info := new(ClusterView)
+	if err = json.Unmarshal(body, info); err != nil {
+		log.LogWarnf("updateDataNodeStatus unmarshal: err(%v)", err)
+		return err
+	}
+
+	newHostsStatus := make(map[string]bool)
+	for _, node := range info.DataNodes {
+		newHostsStatus[node.Addr] = node.Status
+	}
+	log.LogInfof("updateDataNodeStatus: update %d hosts status", len(newHostsStatus))
+
+	w.HostsStatus = newHostsStatus
+
+	return
 }

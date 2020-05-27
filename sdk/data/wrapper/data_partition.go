@@ -12,6 +12,7 @@ type DataPartition struct {
 	ReplicaNum    uint8
 	PartitionType string
 	Hosts         []string
+	ClientWrapper *Wrapper
 	Metrics       *DataPartitionMetrics
 }
 

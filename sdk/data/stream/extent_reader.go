@@ -85,7 +85,7 @@ func (reader *ExtentReader) read(data []byte, offset, size, kerneloffset, kernel
 
 func (reader *ExtentReader) readDataFromDataPartition(offset, size int, data []byte, kerneloffset, kernelsize int) (err error) {
 	var host string
-	if _, host, err = reader.streamReadDataFromHost(offset, size, data, kerneloffset, kernelsize); err != nil {
+	if _, host, err = reader.streamReadDataFromHost(offset, size, data, kerneloffset, kernelsize, ""); err != nil {
 		if reader.isUseCloseConnectErr(err) {
 			reader.forceDestoryAllConnect(host)
 		}
@@ -95,16 +95,16 @@ func (reader *ExtentReader) readDataFromDataPartition(offset, size int, data []b
 	return
 forLoop:
 	mesg := ""
-	for i := 0; i < len(reader.dp.Hosts); i++ {
-		_, host, err = reader.streamReadDataFromHost(offset, size, data, kerneloffset, kernelsize)
+	hosts := sortByStatus(reader.dp, true)
+	for _, addr := range hosts {
+		_, host, err = reader.streamReadDataFromHost(offset, size, data, kerneloffset, kernelsize, addr)
 		if err == nil {
 			return
 		} else if reader.isUseCloseConnectErr(err) {
 			reader.forceDestoryAllConnect(host)
-			i--
 		}
 		log.LogWarn(err.Error())
-		mesg += fmt.Sprintf(" (index(%v) err(%v))", i, err.Error())
+		mesg += fmt.Sprintf(" (addr(%v) err(%v))", addr, err.Error())
 	}
 	log.LogWarn(mesg)
 	err = fmt.Errorf(mesg)
@@ -120,20 +120,38 @@ func (reader *ExtentReader) forceDestoryAllConnect(host string) {
 	ReadConnectPool.ReleaseAllConnect(host)
 }
 
+// Param addr used to specify datanode.
+// If addr is "", this function will select a random host and check its status.
 func (reader *ExtentReader) streamReadDataFromHost(offset, expectReadSize int, data []byte, kerneloffset,
-	kernelsize int) (actualReadSize int, host string, err error) {
+	kernelsize int, addr string) (actualReadSize int, host string, err error) {
 	request := NewStreamReadPacket(&reader.key, offset, expectReadSize)
 	var connect *net.TCPConn
-	index := atomic.LoadUint32(&reader.readerIndex)
-	if index >= uint32(reader.dp.ReplicaNum) {
-		index = 0
-		atomic.StoreUint32(&reader.readerIndex, 0)
+	if addr == "" {
+		index := atomic.LoadUint32(&reader.readerIndex)
+		if index >= uint32(reader.dp.ReplicaNum) {
+			index = 0
+			atomic.StoreUint32(&reader.readerIndex, 0)
+		}
+		host = reader.dp.Hosts[index]
+
+		// if host status is false, skip it
+		hostsStatus := reader.dp.ClientWrapper.HostsStatus
+		status, ok := hostsStatus[host]
+		if ok {
+			if !status {
+				atomic.AddUint32(&reader.readerIndex, 1)
+				return 0, host, errors.Annotatef(err, reader.toString()+
+					"streamReadDataFromHost dp(%v) skip failed host(%v) request(%v) ",
+					reader.key.PartitionId, host, request.GetUniqueLogId())
+			}
+		}
+	} else {
+		host = addr
 	}
 
 	ctx := context.Background()
 	globalReadLimiter.Wait(ctx)
 
-	host = reader.dp.Hosts[index]
 	connect, err = ReadConnectPool.Get(host)
 	if err != nil {
 		atomic.AddUint32(&reader.readerIndex, 1)
@@ -223,4 +241,31 @@ func (reader *ExtentReader) updateKey(key proto.ExtentKey) (update bool) {
 func (reader *ExtentReader) toString() (m string) {
 	return fmt.Sprintf("inode (%v) extentKey(%v) start(%v) end(%v)", reader.inode,
 		reader.key.Marshal(), reader.startInodeOffset, reader.endInodeOffset)
+}
+
+// sortByStatus will return hosts list sort by host status for DataPartition.
+// If param selectAll is true, hosts with status(true) is in front and hosts with status(false) is in behind.
+// If param selectAll is false, only return hosts with status(true).
+func sortByStatus(dp *wrapper.DataPartition, selectAll bool) (hosts []string) {
+	var failedHosts []string
+	hostsStatus := dp.ClientWrapper.HostsStatus
+	for _, addr := range dp.Hosts {
+		status, ok := hostsStatus[addr]
+		if ok {
+			if status {
+				hosts = append(hosts, addr)
+			} else {
+				failedHosts = append(failedHosts, addr)
+			}
+		} else {
+			failedHosts = append(failedHosts, addr)
+			log.LogWarnf("sortByStatus: can not find host[%v] in HostsStatus, dp[%d]", addr, dp.PartitionID)
+		}
+	}
+
+	if selectAll {
+		hosts = append(hosts, failedHosts...)
+	}
+
+	return
 }
