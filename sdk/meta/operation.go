@@ -221,8 +221,10 @@ func (mw *MetaWrapper) dcreate(mp *MetaPartition, parentID uint64, name string, 
 	}
 
 	status = parseStatus(packet.ResultCode)
-	if status != statusOK {
+	if (status != statusOK) && (status != statusExist) {
 		log.LogErrorf("dcreate: mp(%v) req(%v) result(%v)", mp, *req, packet.GetResultMesg())
+	} else if status == statusExist {
+		log.LogWarnf("dcreate: mp(%v) req(%v) result(%v)", mp, *req, packet.GetResultMesg())
 	}
 	log.LogDebugf("dcreate exit: mp(%v) req(%v) result(%v)", mp, *req, packet.GetResultMesg())
 	return
