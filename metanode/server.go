@@ -17,6 +17,7 @@ package metanode
 import (
 	"io"
 	"net"
+	"time"
 
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/log"
@@ -82,6 +83,7 @@ func (m *MetaNode) serveConn(conn net.Conn, stopC chan uint8) {
 			}
 			return
 		}
+		p.ReadT = time.Now().UnixNano()
 		// Start a goroutine for packet handling. Do not block connection read goroutine.
 		go func() {
 			if err := m.handlePacket(conn, p); err != nil {

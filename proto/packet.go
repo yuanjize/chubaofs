@@ -148,6 +148,7 @@ type Packet struct {
 
 func NewPacket() *Packet {
 	p := new(Packet)
+	p.ReqID = GetReqID()
 	p.Magic = ProtoMagic
 	p.StartT = time.Now().UnixNano()
 

@@ -22,6 +22,9 @@ import (
 
 type Packet struct {
 	proto.Packet
+	ReadT   int64
+	HandleT int64
+	RespT   int64
 }
 
 // For send delete request to dataNode
