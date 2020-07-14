@@ -16,10 +16,13 @@ package metanode
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
+	"time"
 
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
 )
 
 const (
@@ -63,11 +66,25 @@ func (m *metaManager) respondToClient(conn net.Conn, p *Packet) (err error) {
 		}
 	}()
 	// Process data and send reply though specified tcp connection.
+	p.HandleT = time.Now().UnixNano()
 	err = p.WriteToConn(conn)
+	p.RespT = time.Now().UnixNano()
 	if err != nil {
-		log.LogErrorf("response to client[%s], "+
-			"request[%s], response packet[%s]",
-			err.Error(), p.GetOpMsg(), p.GetResultMesg())
+		recieveDuration := time.Unix(0, p.ReadT).Sub(time.Unix(0, p.StartT))
+		if p.StartT == 0 {
+			recieveDuration = 0
+		}
+		handleDuration := time.Unix(0, p.HandleT).Sub(time.Unix(0, p.ReadT))
+		respDuration := time.Unix(0, p.RespT).Sub(time.Unix(0, p.HandleT))
+
+		umpKey := UMPKey + "_respondToClientFailed"
+		umpMsg := fmt.Sprintf("response to client[%s] failed, request[%s], ReqID[%d], response status[%s], time "+
+			"duration [recieve: %v, handle: %v, response: %v]",
+			err.Error(), p.GetOpMsg(), p.ReqID, p.GetResultMesg(),
+			recieveDuration, handleDuration, respDuration)
+		ump.Alarm(umpKey, umpMsg)
+
+		log.LogErrorf(umpMsg)
 	}
 	return
 }
