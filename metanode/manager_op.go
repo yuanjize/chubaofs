@@ -108,7 +108,7 @@ end:
 	data, _ := json.Marshal(resp)
 	log.LogInfof("[opMasterHeartbeat] req:%v; respAdminTask: %v, resp: %v",
 		req, adminTask, string(data))
-	if adminTask.Status != proto.TaskSuccess {
+	if resp.Status != proto.TaskSuccess {
 		log.LogErrorf(fmt.Sprintf("opMasterHeartbeat failed errResp(%v)", string(data)))
 	}
 	return
