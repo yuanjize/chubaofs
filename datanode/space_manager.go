@@ -88,7 +88,7 @@ func (space *SpaceManager) Stats() *Stats {
 	return space.stats
 }
 
-func (space *SpaceManager) LoadDisk(path string, restSize uint64, maxErrs int) (err error) {
+func (space *SpaceManager) LoadDisk(path string, restSize uint64, maxErrs int, persistenceDataPartitions []uint64) (err error) {
 	var (
 		disk    *Disk
 		visitor PartitionVisitor
@@ -105,7 +105,7 @@ func (space *SpaceManager) LoadDisk(path string, restSize uint64, maxErrs int) (
 	if _, err = space.GetDisk(path); err != nil {
 
 		disk = NewDisk(path, restSize, maxErrs)
-		disk.RestorePartition(visitor)
+		disk.RestorePartition(persistenceDataPartitions, visitor)
 		space.putDisk(disk)
 		err = nil
 	}

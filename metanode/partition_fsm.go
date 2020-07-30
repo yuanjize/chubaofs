@@ -244,9 +244,9 @@ func (mp *metaPartition) HandleFatalEvent(err *raft.FatalError) {
 func (mp *metaPartition) HandleLeaderChange(leader uint64) {
 	ump.Alarm(UMPKey, fmt.Sprintf("LeaderChange: partition=%d, "+
 		"newLeader=%d", mp.config.PartitionId, leader))
-	if mp.config.NodeId==leader{
+	if mp.config.NodeId == leader {
 		conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", serverPort), time.Second)
-		if err!=nil {
+		if err != nil {
 			log.LogErrorf(fmt.Sprintf("HandleLeaderChange metaPartition(%v) serverPort not exsit ,error (%v)", mp.config.PartitionId, err))
 			mp.raftPartition.TryToLeader(mp.config.PartitionId)
 			return
