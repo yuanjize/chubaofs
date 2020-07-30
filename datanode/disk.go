@@ -286,7 +286,11 @@ func (d *Disk) triggerDiskError(err error) {
 	return
 }
 
-func (d *Disk) RestorePartition(visitor PartitionVisitor) {
+const (
+	ExpiredPartitionPrefix = "expired_"
+)
+
+func (d *Disk) RestorePartition(persistenceDataPartitions []uint64, visitor PartitionVisitor) {
 	var (
 		partitionId   uint32
 		partitionSize int
@@ -296,6 +300,7 @@ func (d *Disk) RestorePartition(visitor PartitionVisitor) {
 		log.LogErrorf("action[RestorePartition] read dir[%v] err[%v].", d.Path, err)
 		return
 	}
+
 	var wg sync.WaitGroup
 	for _, fileInfo := range fileInfoList {
 		filename := fileInfo.Name()
@@ -308,6 +313,16 @@ func (d *Disk) RestorePartition(visitor PartitionVisitor) {
 				filename, d.Path, err.Error())
 			continue
 		}
+
+		if isExpiredPartition(uint64(partitionId), persistenceDataPartitions) {
+			log.LogErrorf("action[RestorePartition]: find expired partition[%s], rename it and you can delete it "+
+				"manually", filename)
+			oldName := path.Join(d.Path, filename)
+			newName := path.Join(d.Path, ExpiredPartitionPrefix+filename)
+			os.Rename(oldName, newName)
+			continue
+		}
+
 		log.LogDebugf("acton[RestorePartition] disk[%v] path[%v] partitionId[%v] partitionSize[%v].",
 			d.Path, fileInfo.Name(), partitionId, partitionSize)
 		wg.Add(1)
@@ -332,4 +347,19 @@ func (d *Disk) RestorePartition(visitor PartitionVisitor) {
 	}
 	wg.Wait()
 	go d.ForceLoadPartitionHeader()
+}
+
+// isExpiredPartition return whether one partition is expired
+// if one partition does not exist in master, we decided that it is one expired partition
+func isExpiredPartition(id uint64, partitions []uint64) bool {
+	if len(partitions) == 0 {
+		return true
+	}
+
+	for _, existId := range partitions {
+		if existId == id {
+			return false
+		}
+	}
+	return true
 }

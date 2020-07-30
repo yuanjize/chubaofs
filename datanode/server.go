@@ -156,28 +156,15 @@ const (
 )
 
 func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
-	params := make(map[string]string)
-	params["addr"] = s.localServeAddr
-	var data interface{}
-	for i := 0; i < 3; i++ {
-		data, err = MasterHelper.Request(http.MethodGet, GetDataNode, params, nil)
-		if err != nil {
-			log.LogErrorf("checkLocalPartitionMatchWithMaster error %v", err)
-			continue
-		}
-		break
+	persistenceDataPartitions,err:=s.getDataPartitionFromMaster()
+	if err!=nil {
+		return  err
 	}
-	dinfo := new(DataNodeInfo)
-	if err = json.Unmarshal(data.([]byte), dinfo); err != nil {
-		err = fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v", err)
-		log.LogErrorf(err.Error())
-		return
-	}
-	if len(dinfo.PersistenceDataPartitions) == 0 {
+	if len(persistenceDataPartitions) == 0 {
 		return
 	}
 	lackPartitions := make([]uint64, 0)
-	for _, partitionID := range dinfo.PersistenceDataPartitions {
+	for _, partitionID := range persistenceDataPartitions {
 		dp := s.space.GetPartition(uint32(partitionID))
 		if dp == nil {
 			lackPartitions = append(lackPartitions, partitionID)
@@ -229,16 +216,45 @@ func (s *DataNode) parseConfig(cfg *config.Config) (err error) {
 	return
 }
 
+func (s *DataNode) getDataPartitionFromMaster() (persistenceDataPartitions []uint64, err error) {
+	params := make(map[string]string)
+	params["addr"] = s.localServeAddr
+	var data interface{}
+	for i := 0; i < 3; i++ {
+		data, err = MasterHelper.Request(http.MethodGet, GetDataNode, params, nil)
+		if err != nil {
+			log.LogErrorf("getDataPartitionFromMaster error %v", err)
+			continue
+		}
+		break
+	}
+	dinfo := new(DataNodeInfo)
+	if err = json.Unmarshal(data.([]byte), dinfo); err != nil {
+		err = fmt.Errorf("getDataPartitionFromMaster jsonUnmarsh failed %v", err)
+		log.LogErrorf(err.Error())
+		return
+	}
+	persistenceDataPartitions = make([]uint64, len(dinfo.PersistenceDataPartitions))
+	copy(persistenceDataPartitions, dinfo.PersistenceDataPartitions)
+	return
+}
+
 func (s *DataNode) startSpaceManager(cfg *config.Config) (err error) {
 	s.space = NewSpaceManager(s.rackName)
 	if err != nil || len(strings.TrimSpace(s.port)) == 0 {
 		err = ErrBadConfFile
 		return
 	}
+
+	persistenceDataPartitions, err := s.getDataPartitionFromMaster()
+	if err != nil {
+		err = fmt.Errorf("cannot get dataPartition from master %v", err)
+		return
+	}
+
 	var wg sync.WaitGroup
 	for _, d := range cfg.GetArray(ConfigKeyDisks) {
 		log.LogDebugf("action[startSpaceManager] load disk raw config[%v].", d)
-		// Format "PATH:RESET_SIZE:MAX_ERR
 		arr := strings.Split(d.(string), ":")
 		if len(arr) != 3 {
 			return ErrBadConfFile
@@ -252,11 +268,13 @@ func (s *DataNode) startSpaceManager(cfg *config.Config) (err error) {
 		if err != nil {
 			return ErrBadConfFile
 		}
+		dataPartitionOnMaster := make([]uint64, len(persistenceDataPartitions))
+		copy(dataPartitionOnMaster, persistenceDataPartitions)
 		wg.Add(1)
-		go func(wg *sync.WaitGroup, path string, restSize uint64, maxErrs int) {
+		go func(wg *sync.WaitGroup, path string, restSize uint64, maxErrs int, persistenceDataPartitionsOnMaster []uint64) {
 			defer wg.Done()
-			s.space.LoadDisk(path, restSize, maxErrs)
-		}(&wg, path, restSize, maxErr)
+			s.space.LoadDisk(path, restSize, maxErrs, persistenceDataPartitionsOnMaster)
+		}(&wg, path, restSize, maxErr, dataPartitionOnMaster)
 	}
 	wg.Wait()
 	return nil

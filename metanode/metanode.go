@@ -134,29 +134,42 @@ const (
 	GetMetaNode = "/metaNode/get"
 )
 
-func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
+func (m *MetaNode) getMetaPartitionFromMaster() (persistenceMetaPartitions []uint64, err error) {
 	params := make(map[string]string)
 	params["addr"] = fmt.Sprintf("%v:%v", m.localAddr, m.listen)
 	var data interface{}
 	for i := 0; i < 3; i++ {
 		data, err = masterHelper.Request(http.MethodGet, GetMetaNode, params, nil)
 		if err != nil {
-			log.LogErrorf("checkLocalPartitionMatchWithMaster error %v", err)
+			log.LogErrorf("getMetaPartitionFromMaster error %v", err)
 			continue
 		}
 		break
 	}
 	minfo := new(MetaNodeInfo)
 	if err = json.Unmarshal(data.([]byte), minfo); err != nil {
-		err = fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v", err)
+		err = fmt.Errorf("getMetaPartitionFromMaster jsonUnmarsh failed %v", err)
 		log.LogErrorf(err.Error())
 		return
 	}
 	if len(minfo.PersistenceMetaPartitions) == 0 {
 		return
 	}
+	persistenceMetaPartitions = make([]uint64, len(minfo.PersistenceMetaPartitions))
+	copy(persistenceMetaPartitions, minfo.PersistenceMetaPartitions)
+	return
+}
+
+func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
+	persistenceMetaPartitions, err := m.getMetaPartitionFromMaster()
+	if err != nil {
+		return
+	}
+	if len(persistenceMetaPartitions) == 0 {
+		return
+	}
 	lackPartitions := make([]uint64, 0)
-	for _, partitionID := range minfo.PersistenceMetaPartitions {
+	for _, partitionID := range persistenceMetaPartitions {
 		_, err = m.metaManager.GetPartition(partitionID)
 		if err != nil {
 			lackPartitions = append(lackPartitions, partitionID)
@@ -238,6 +251,10 @@ func (m *MetaNode) startMetaManager() (err error) {
 			return
 		}
 	}
+	metaPartitionsFromMaster, err := m.getMetaPartitionFromMaster()
+	if err != nil {
+		return err
+	}
 	// Load metaManager
 	conf := MetaManagerConfig{
 		NodeID:    m.nodeId,
@@ -245,7 +262,7 @@ func (m *MetaNode) startMetaManager() (err error) {
 		RaftStore: m.raftStore,
 	}
 	m.metaManager = NewMetaManager(conf)
-	err = m.metaManager.Start()
+	err = m.metaManager.Start(metaPartitionsFromMaster)
 	log.LogDebugf("[startMetaManager] manager start finish.")
 	return
 }

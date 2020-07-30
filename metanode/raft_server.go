@@ -41,7 +41,7 @@ func (m *MetaNode) startRaftServer() (err error) {
 		IpAddr:        m.localAddr,
 		HeartbeatPort: heartbeatPort,
 		ReplicatePort: replicatePort,
-		RetainLogs:    2000000,
+		RetainLogs:    raftstore.DefaultRetainLogs * 2,
 	}
 	m.raftStore, err = raftstore.NewRaftStore(raftConf)
 	if err != nil {

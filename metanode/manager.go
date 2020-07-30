@@ -40,7 +40,7 @@ const partitionPrefix = "partition_"
 // MetaManager manage all metaPartition and make mapping between volName and
 // metaPartition.
 type MetaManager interface {
-	Start() error
+	Start(metaPartitionsFromMaster []uint64) error
 	Stop()
 	//CreatePartition(id string, start, end uint64, peers []proto.Peer) error
 	HandleMetaOperation(conn net.Conn, p *Packet) error
@@ -123,7 +123,7 @@ func (m *metaManager) HandleMetaOperation(conn net.Conn, p *Packet) (err error) 
 	return
 }
 
-func (m *metaManager) Start() (err error) {
+func (m *metaManager) Start(metaPartitionsFromMaster []uint64) (err error) {
 	if atomic.CompareAndSwapUint32(&m.state, StateStandby, StateStart) {
 		defer func() {
 			var newState uint32
@@ -134,7 +134,7 @@ func (m *metaManager) Start() (err error) {
 			}
 			atomic.StoreUint32(&m.state, newState)
 		}()
-		err = m.onStart()
+		err = m.onStart(metaPartitionsFromMaster)
 	}
 	return
 }
@@ -146,9 +146,9 @@ func (m *metaManager) Stop() {
 	}
 }
 
-func (m *metaManager) onStart() (err error) {
+func (m *metaManager) onStart(metaPartitionsFromMaster []uint64) (err error) {
 	m.connPool = pool.NewConnectPool()
-	err = m.loadPartitions()
+	err = m.loadPartitions(metaPartitionsFromMaster)
 	return
 }
 
@@ -174,9 +174,28 @@ func (m *metaManager) getPartition(id uint64) (mp MetaPartition, err error) {
 	return
 }
 
+const (
+	ExpiredPartitionPrefix = "expired_"
+)
+
+// isExpiredPartition return whether one partition is expired
+// if one partition does not exist in master, we decided that it is one expired partition
+func isExpiredPartition(id uint64, partitions []uint64) bool {
+	if len(partitions) == 0 {
+		return true
+	}
+
+	for _, existId := range partitions {
+		if existId == id {
+			return false
+		}
+	}
+	return true
+}
+
 // Load meta manager snapshot from data file and restore all  meta range
 // into this meta range manager.
-func (m *metaManager) loadPartitions() (err error) {
+func (m *metaManager) loadPartitions(metaPartitionsFromMaster []uint64) (err error) {
 	// Check metaDir directory
 	fileInfo, err := os.Stat(m.rootDir)
 	if err != nil {
@@ -221,6 +240,16 @@ func (m *metaManager) loadPartitions() (err error) {
 					errLoad = nil
 					return
 				}
+
+				if isExpiredPartition(id, metaPartitionsFromMaster) {
+					log.LogErrorf("action[RestorePartition]: find expired partition[%s], rename it and you can delete it "+
+						"manually", fileName)
+					oldName := path.Join(m.rootDir, fileName)
+					newName := path.Join(m.rootDir, ExpiredPartitionPrefix+fileName)
+					os.Rename(oldName, newName)
+					return
+				}
+
 				partitionConfig := &MetaPartitionConfig{
 					NodeId:    m.nodeId,
 					RaftStore: m.raftStore,
