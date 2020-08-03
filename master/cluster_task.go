@@ -123,7 +123,7 @@ func (c *Cluster) updateMetaPartitionHosts(volName, hosts string, partitionID ui
 		goto errDeal
 	}
 	mp.Replicas = make([]*MetaReplica, 0)
-	mp.Status = proto.Unavaliable
+	mp.Status = proto.UnavaliableDisk
 	mp.MissNodes = make(map[string]int64, 0)
 	log.LogWarnf("action[updateMetaPartitionHosts],vol[%v],mpID[%v] update hosts success,newHosts[%v],oldHosts[%v]",
 		volName, partitionID, hosts, strings.Join(oldHosts, UnderlineSeparator))

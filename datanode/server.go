@@ -423,11 +423,11 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	} else if flag == ReadFlag {
 		d.addReadErr()
 	}
-	d.Status = proto.Unavaliable
+	d.Status = proto.UnavaliableDisk
 	d.Lock()
 	defer d.Unlock()
 	for _, dp := range d.partitionMap {
-		dp.partitionStatus = proto.Unavaliable
+		dp.partitionStatus = proto.UnavaliableDisk
 	}
 
 }

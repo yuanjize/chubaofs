@@ -15,7 +15,8 @@
 package proto
 
 const (
-	ReadOnly    = 1
-	ReadWrite   = 2
-	Unavaliable = -1
+	ReadOnly        = 1
+	ReadWrite       = 2
+	UnavaliableDisk = -1
+	NoLeader       = -2
 )

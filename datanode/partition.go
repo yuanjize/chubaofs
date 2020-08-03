@@ -247,7 +247,7 @@ func (dp *DataPartition) Available() int {
 
 func (dp *DataPartition) ChangeStatus(status int) {
 	switch status {
-	case proto.ReadOnly, proto.ReadWrite, proto.Unavaliable:
+	case proto.ReadOnly, proto.ReadWrite, proto.UnavaliableDisk:
 		dp.partitionStatus = status
 	}
 }
@@ -301,8 +301,8 @@ func (dp *DataPartition) statusUpdate() {
 	if dp.extentStore.GetExtentCount() >= MaxActiveExtents {
 		status = proto.ReadOnly
 	}
-	if dp.Status() == proto.Unavaliable {
-		status = proto.Unavaliable
+	if dp.Status() == proto.UnavaliableDisk {
+		status = proto.UnavaliableDisk
 	}
 	dp.partitionStatus = int(math.Min(float64(status), float64(dp.disk.Status)))
 }
@@ -375,7 +375,7 @@ func (dp *DataPartition) String() (m string) {
 }
 
 func (dp *DataPartition) LaunchRepair(fixExtentType uint8) {
-	if dp.partitionStatus == proto.Unavaliable {
+	if dp.partitionStatus == proto.UnavaliableDisk {
 		return
 	}
 	select {

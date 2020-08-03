@@ -91,7 +91,7 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 		}
 		addr, isLeader := partition.IsLeader()
 		if addr == "" {
-			mpr.Status = proto.Unavaliable
+			mpr.Status = proto.NoLeader
 		}
 		mpr.IsLeader = isLeader
 		if mConf.Cursor >= mConf.End {
