@@ -163,10 +163,7 @@ func (partition *DataPartition) checkDiskError(clusterID, leaderAddr string) (di
 	for _, diskAddr := range diskErrorAddrs {
 		msg := fmt.Sprintf("action[%v],clusterID[%v],partitionID:%v  On :%v  Disk Error,So Remove it From RocksDBHost",
 			CheckDataPartitionDiskErrorErr, clusterID, partition.PartitionID, diskAddr)
-		Warn(clusterID, msg)
-		msg = fmt.Sprintf("http://%v/dataPartition/offline?name=%v&id=%v&addr=%v",
-			leaderAddr, partition.VolName, partition.PartitionID, diskAddr)
-		log.LogRead(msg)
+		log.LogWarnf(msg)
 	}
 
 	return

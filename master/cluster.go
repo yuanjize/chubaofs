@@ -48,6 +48,7 @@ type Cluster struct {
 	BadDataPartitionIds *sync.Map
 	BadMetaPartitionIds *sync.Map
 	reloadMetadataTime  int64
+	toBeOfflineDpChan   chan *BadDiskDataPartition
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *ClusterConfig) (c *Cluster) {
@@ -64,6 +65,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.metaNodeSpace = new(MetaNodeSpaceStat)
 	c.BadDataPartitionIds = new(sync.Map)
 	c.BadMetaPartitionIds = new(sync.Map)
+	c.toBeOfflineDpChan = make(chan *BadDiskDataPartition, defaultOfflineChannelBufferCapacity)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -75,6 +77,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckBadDiskRecovery()
 	c.startCheckMetaPartitionRecoveryProgress()
 	c.startCheckLoadMetaPartitions()
+	c.startCheckOfflineDataPartitions()
 	return
 }
 
@@ -135,6 +138,39 @@ func (c *Cluster) startCheckDataPartitions() {
 			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
 		}
 	}()
+}
+
+func (c *Cluster) startCheckOfflineDataPartitions() {
+	go func() {
+		for {
+			if c.partition.IsLeader() {
+				c.checkOfflineDataPartitions()
+			}
+			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
+		}
+	}()
+}
+
+func (c *Cluster) checkOfflineDataPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkOfflineDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkOfflineDataPartitions occurred panic")
+		}
+	}()
+	var badDp *BadDiskDataPartition
+	for {
+		if c.DisableAutoAlloc {
+			return
+		}
+		select {
+		case badDp = <-c.toBeOfflineDpChan:
+			c.dataPartitionOffline(badDp.diskErrAddr, "", badDp.dp.VolName, badDp.dp, HandleDataPartitionOfflineErr)
+		default:
+			return
+		}
+	}
 }
 
 func (c *Cluster) checkCreateDataPartitions() {

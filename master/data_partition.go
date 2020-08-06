@@ -27,6 +27,11 @@ import (
 	"time"
 )
 
+type BadDiskDataPartition struct {
+	dp          *DataPartition
+	diskErrAddr string
+}
+
 type DataPartition struct {
 	PartitionID      uint64
 	LastLoadTime     int64

@@ -79,6 +79,7 @@ const (
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
 	DefaultVolMinWritableDPNum                    = 0
+	defaultOfflineChannelBufferCapacity           = 1000
 )
 
 const (

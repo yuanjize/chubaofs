@@ -158,7 +158,17 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 		if dp.Status == proto.ReadWrite {
 			readWriteDataPartitions++
 		}
-		dp.checkDiskError(c.Name, c.leaderInfo.addr)
+		diskErrorAddrs := dp.checkDiskError(c.Name, c.leaderInfo.addr)
+		if len(diskErrorAddrs) != 0 {
+			for _, addr := range diskErrorAddrs {
+				badDp := &BadDiskDataPartition{dp: dp, diskErrAddr: addr}
+				select {
+				case c.toBeOfflineDpChan <- badDp:
+				default:
+					log.LogInfof("action[checkDataPartitions], arrived channel buffer capacity")
+				}
+			}
+		}
 		tasks := dp.checkReplicationTask(c.Name)
 		if len(tasks) != 0 {
 			c.putDataNodeTasks(tasks)
