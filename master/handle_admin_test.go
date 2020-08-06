@@ -124,7 +124,7 @@ func createMasterServer() *Master {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	server.cluster.startCheckAvailSpace()
-	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 2,false)
+	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 20, 2,false)
 	vol, err := server.cluster.getVol(commonVolName)
 	if err != nil {
 		panic(err)

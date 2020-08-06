@@ -35,6 +35,7 @@ const (
 	ParaIsManual              = "isManual"
 	ParaMetaPartitionCountKey = "mpCount"
 	ParaEnableToken           = "enableToken"
+	ParaVolMinWritableDPNum   = "minWritableDp"
 )
 
 const (
@@ -77,6 +78,7 @@ const (
 	DefaultRackName                               = "default"
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
+	DefaultVolMinWritableDPNum                    = 0
 )
 
 const (

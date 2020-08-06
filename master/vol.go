@@ -31,6 +31,7 @@ type Vol struct {
 	VolType                    string
 	dpReplicaNum               uint8
 	mpReplicaNum               uint8
+	MinWritableDPNum           uint64
 	threshold                  float32
 	Status                     uint8
 	Capacity                   uint64 //GB
@@ -50,7 +51,7 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64, enableToken bool) (vol *Vol) {
+func NewVol(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum uint64, enableToken bool) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.Owner = owner
 	vol.dataPartitions = NewDataPartitionMap(name)
@@ -62,6 +63,7 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64, enab
 		vol.mpReplicaNum = replicaNum
 	}
 	vol.Capacity = capacity
+	vol.MinWritableDPNum = minWritableDPNum
 	vol.viewCache = make([]byte, 0)
 	vol.enableToken = enableToken
 	vol.tokens = make(map[string]*proto.Token, 0)
@@ -255,6 +257,17 @@ func (vol *Vol) getCapacity() uint64 {
 	defer vol.RUnlock()
 	return vol.Capacity
 }
+func (vol *Vol) setMinWritableDPNum(minWritableDPNum uint64) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.MinWritableDPNum = minWritableDPNum
+}
+
+func (vol *Vol) getMinWritableDPNum() uint64 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.MinWritableDPNum
+}
 
 func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 	if vol.getStatus() == VolMarkDelete {
@@ -280,8 +293,13 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	}
 	usedRatio := float64(vol.UsedSpace) / float64(vol.Capacity)
 	availRatio := float64(vol.AvailSpaceAllocated) / float64(vol.Capacity)
-	if (vol.Capacity > 200000 && vol.dataPartitions.readWriteDataPartitions < 200) || vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) {
+	lackCount := int(vol.MinWritableDPNum) - vol.dataPartitions.readWriteDataPartitions
+	if (vol.Capacity > 200000 && vol.dataPartitions.readWriteDataPartitions < 200) || vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) ||
+		(vol.MinWritableDPNum != 0 && lackCount > 0) {
 		count := vol.calculateExpandNum()
+		if lackCount > count {
+			count = lackCount
+		}
 		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],usedRatio[%v],availRatio[%v]", vol.Name, count, usedRatio, availRatio)
 		for i := 0; i < count; i++ {
 			if c.DisableAutoAlloc {
