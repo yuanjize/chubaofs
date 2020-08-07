@@ -39,6 +39,8 @@ type Vol struct {
 	UsedSpace                  uint64 //GB
 	MetaPartitions             map[uint64]*MetaPartition
 	mpsLock                    sync.RWMutex
+	writableMpCount            int
+	MinWritableMPNum           uint64
 	dataPartitions             *DataPartitionMap
 	enableToken                bool
 	tokens                     map[string]*proto.Token
@@ -114,6 +116,18 @@ func (vol *Vol) getMetaPartition(partitionID uint64) (mp *MetaPartition, err err
 		err = MetaPartitionNotFound
 	}
 	return
+}
+
+func (vol *Vol) setWritableMpCount(count int) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.writableMpCount = count
+}
+
+func (vol *Vol) getWritableMpCount() int {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.writableMpCount
 }
 
 func (vol *Vol) getMaxPartitionID() (maxPartitionID uint64) {

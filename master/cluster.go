@@ -78,6 +78,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckMetaPartitionRecoveryProgress()
 	c.startCheckLoadMetaPartitions()
 	c.startCheckOfflineDataPartitions()
+	c.startCheckCreateMetaPartitions()
 	return
 }
 
