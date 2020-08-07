@@ -492,8 +492,6 @@ func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 	if name, authKey, capacity, minWritableDPNum, enableToken, err = parseUpdateVolPara(r); err != nil {
 		goto errDeal
 	}
-	msg = fmt.Sprintf("yqyupdateVol1 capacity:%d,minWritableDPNum:%d",capacity,minWritableDPNum)
-	log.LogWarn(msg)
 	if err = m.cluster.updateVol(name, authKey, uint64(capacity), uint64(minWritableDPNum), enableToken); err != nil {
 		goto errDeal
 	}
@@ -1225,18 +1223,21 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWri
 		return
 	}
 	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
-		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil || capacity < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		err = paraNotFound(ParaVolCapacity)
 	}
 	if minWritableDPNumStr := r.FormValue(ParaVolMinWritableDPNum); minWritableDPNumStr != "" {
-		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil {
+		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil || minWritableDPNum < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		err = paraNotFound(ParaVolMinWritableDPNum)
+		return
 	}
 	if authKey, err = checkAuthKeyPara(r); err != nil {
 		return
@@ -1261,15 +1262,17 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, 
 		return
 	}
 	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
-		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil || capacity < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		capacity = DefaultVolCapacity
 	}
 	if minWritableDPNumStr := r.FormValue(ParaVolMinWritableDPNum); minWritableDPNumStr != "" {
-		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil {
+		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil || minWritableDPNum < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		minWritableDPNum = DefaultVolMinWritableDPNum
