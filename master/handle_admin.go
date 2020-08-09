@@ -81,6 +81,8 @@ type SimpleVolView struct {
 	Status              uint8
 	Capacity            uint64 // GB
 	MinWritableDPNum    uint64
+	MinWritableMPNum    uint64
+	RwMpCnt 			int
 	RwDpCnt             int
 	MpCnt               int
 	DpCnt               int
@@ -487,12 +489,13 @@ func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 		msg              string
 		capacity         int
 		minWritableDPNum int
+		minWritableMPNum int
 		enableToken      bool
 	)
-	if name, authKey, capacity, minWritableDPNum, enableToken, err = parseUpdateVolPara(r); err != nil {
+	if name, authKey, capacity, minWritableDPNum, minWritableMPNum, enableToken, err = parseUpdateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.updateVol(name, authKey, uint64(capacity), uint64(minWritableDPNum), enableToken); err != nil {
+	if err = m.cluster.updateVol(name, authKey, uint64(capacity), uint64(minWritableDPNum), uint64(minWritableMPNum), enableToken); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("update vol[%v] successed\n", name)
@@ -515,15 +518,16 @@ func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 		replicaNum       int
 		capacity         int
 		minWritableDPNum int
+		minWritableMPNum int
 		enableToken      bool
 		vol              *Vol
 	)
 
-	if name, owner, volType, mpCount, replicaNum, capacity, minWritableDPNum, enableToken, err = parseCreateVolPara(r);
+	if name, owner, volType, mpCount, replicaNum, capacity, minWritableDPNum, minWritableMPNum, enableToken, err = parseCreateVolPara(r);
 		err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, minWritableDPNum, mpCount, enableToken); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, minWritableDPNum, minWritableMPNum, mpCount, enableToken); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -574,6 +578,8 @@ func newSimpleView(vol *Vol) *SimpleVolView {
 		Status:              vol.Status,
 		Capacity:            vol.Capacity,
 		MinWritableDPNum:    vol.MinWritableDPNum,
+		MinWritableMPNum:    vol.MinWritableMPNum,
+		RwMpCnt:			 vol.writableMpCount,
 		RwDpCnt:             vol.dataPartitions.readWriteDataPartitions,
 		MpCnt:               len(vol.MetaPartitions),
 		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
@@ -1217,7 +1223,7 @@ func parseDeleteVolPara(r *http.Request) (name, authKey string, err error) {
 	return
 }
 
-func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWritableDPNum int, enableToken bool, err error) {
+func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWritableDPNum, minWritableMPNum int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1239,6 +1245,15 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWri
 		err = paraNotFound(ParaVolMinWritableDPNum)
 		return
 	}
+	if minWritableMPNumStr := r.FormValue(ParaVolMinWritableMPNum); minWritableMPNumStr != "" {
+		if minWritableMPNum, err = strconv.Atoi(minWritableMPNumStr); err != nil || minWritableMPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		err = paraNotFound(ParaVolMinWritableMPNum)
+		return
+	}
 	if authKey, err = checkAuthKeyPara(r); err != nil {
 		return
 	}
@@ -1247,7 +1262,7 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWri
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity, minWritableDPNum int, enableToken bool, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity, minWritableDPNum, minWritableMPNum int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1277,7 +1292,14 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, 
 	} else {
 		minWritableDPNum = DefaultVolMinWritableDPNum
 	}
-
+	if minWritableMPNumStr := r.FormValue(ParaVolMinWritableMPNum); minWritableMPNumStr != "" {
+		if minWritableMPNum, err = strconv.Atoi(minWritableMPNumStr); err != nil || minWritableMPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		minWritableMPNum = DefaultVolMinWritableMPNum
+	}
 	if owner = r.FormValue(ParaVolOwner); owner == "" {
 		err = paraNotFound(ParaVolOwner)
 		return

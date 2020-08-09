@@ -16,7 +16,7 @@ func buildPanicCluster() *Cluster {
 }
 
 func buildPanicVol() *Vol {
-	vol := NewVol(commonVol.Name, commonVol.Owner, commonVol.VolType, commonVol.dpReplicaNum, commonVol.Capacity, commonVol.MinWritableDPNum, false)
+	vol := NewVol(commonVol.Name, commonVol.Owner, commonVol.VolType, commonVol.dpReplicaNum, commonVol.Capacity, commonVol.MinWritableDPNum, commonVol.MinWritableMPNum, false)
 	vol.dataPartitions = nil
 	return vol
 }
