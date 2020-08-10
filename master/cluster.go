@@ -918,10 +918,6 @@ func (c *Cluster) updateVol(name, authKey string, capacity, minWritableDPNum, mi
 		vol.setMinWritableDPNum(minWritableDPNum)
 	}
 	if minWritableMPNum > 0 {
-		if int(minWritableMPNum) < vol.writableMpCount {
-			err = fmt.Errorf("minWritableMPNum[%v] less than writableMpCount[%v]", minWritableMPNum, vol.writableMpCount)
-			goto errDeal
-		}
 		vol.setMinWritableMPNum(minWritableMPNum)
 	}
 	if enableToken == true && len(vol.tokens) == 0 {

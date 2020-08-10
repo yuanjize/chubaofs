@@ -79,8 +79,8 @@ const (
 	DefaultRackName                               = "default"
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
-	DefaultVolMinWritableDPNum                    = 0
-	DefaultVolMinWritableMPNum                    = 0
+	DefaultVolMinWritableDPNum                    = 5
+	DefaultVolMinWritableMPNum                    = 1
 	defaultOfflineChannelBufferCapacity           = 1000
 )
 
