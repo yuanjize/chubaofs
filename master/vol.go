@@ -53,7 +53,7 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func NewVol(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum uint64, enableToken bool) (vol *Vol) {
+func NewVol(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum, minWritableMPNum uint64, enableToken bool) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.Owner = owner
 	vol.dataPartitions = NewDataPartitionMap(name)
@@ -66,6 +66,7 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity, minWritable
 	}
 	vol.Capacity = capacity
 	vol.MinWritableDPNum = minWritableDPNum
+	vol.MinWritableMPNum = minWritableMPNum
 	vol.viewCache = make([]byte, 0)
 	vol.enableToken = enableToken
 	vol.tokens = make(map[string]*proto.Token, 0)
@@ -213,7 +214,7 @@ func (vol *Vol) ReleaseDataPartitions(releaseCount int, afterLoadSeconds int64) 
 	log.LogInfo(msg)
 }
 
-func (vol *Vol) checkMetaPartitions(c *Cluster) {
+func (vol *Vol) checkMetaPartitions(c *Cluster) (writableMpCount int) {
 	var tasks []*proto.AdminTask
 	maxPartitionID := vol.getMaxPartitionID()
 	mps := vol.cloneMetaPartitionMap()
@@ -233,9 +234,14 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) {
 		mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
 		mp.checkEnd(c, maxPartitionID)
 		mp.checkReplicaMiss(c.Name, c.leaderInfo.addr, DefaultMetaPartitionTimeOutSec, DefaultMetaPartitionWarnInterval)
+		if mp.Status == proto.ReadWrite {
+			writableMpCount++
+		}
+
 		tasks = append(tasks, mp.GenerateReplicaTask(c.Name, vol.Name)...)
 	}
 	c.putMetaNodeTasks(tasks)
+	return
 }
 
 func (vol *Vol) cloneMetaPartitionMap() (mps map[uint64]*MetaPartition) {
@@ -291,6 +297,17 @@ func (vol *Vol) getMinWritableDPNum() uint64 {
 	vol.RLock()
 	defer vol.RUnlock()
 	return vol.MinWritableDPNum
+}
+func (vol *Vol) setMinWritableMPNum(minWritableMPNum uint64) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.MinWritableMPNum = minWritableMPNum
+}
+
+func (vol *Vol) getMinWritableMPNum() uint64 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.MinWritableMPNum
 }
 
 func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {

@@ -125,6 +125,7 @@ type VolValue struct {
 	Status           uint8
 	Capacity         uint64
 	MinWritableDPNum uint64
+	MinWritableMPNum uint64
 	Owner            string
 	EnableToken      bool
 }
@@ -136,6 +137,7 @@ func newVolValue(vol *Vol) (vv *VolValue) {
 		Status:           vol.Status,
 		Capacity:         vol.Capacity,
 		MinWritableDPNum: vol.MinWritableDPNum,
+		MinWritableMPNum: vol.MinWritableMPNum,
 		Owner:            vol.Owner,
 		EnableToken:      vol.enableToken,
 	}
@@ -506,7 +508,7 @@ func (c *Cluster) loadVols() (err error) {
 			err = fmt.Errorf("action[loadVols],value:%v,err:%v", encodedValue.Data(), err)
 			return err
 		}
-		vol := NewVol(volName, vv.Owner, vv.VolType, vv.ReplicaNum, vv.Capacity, vv.MinWritableDPNum, vv.EnableToken)
+		vol := NewVol(volName, vv.Owner, vv.VolType, vv.ReplicaNum, vv.Capacity, vv.MinWritableDPNum, vv.MinWritableMPNum, vv.EnableToken)
 		vol.Status = vv.Status
 		c.putVol(vol)
 		encodedKey.Free()

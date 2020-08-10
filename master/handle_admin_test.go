@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/chubaofs/chubaofs/master/mocktest"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
 	"io/ioutil"
@@ -28,7 +29,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (
@@ -124,7 +124,7 @@ func createMasterServer() *Master {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	server.cluster.startCheckAvailSpace()
-	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 20, 2,false)
+	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 20, 2, 3, false)
 	vol, err := server.cluster.getVol(commonVolName)
 	if err != nil {
 		panic(err)

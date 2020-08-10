@@ -36,6 +36,7 @@ const (
 	ParaMetaPartitionCountKey = "mpCount"
 	ParaEnableToken           = "enableToken"
 	ParaVolMinWritableDPNum   = "minWritableDp"
+	ParaVolMinWritableMPNum   = "minWritableMp"
 )
 
 const (
@@ -79,6 +80,7 @@ const (
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
 	DefaultVolMinWritableDPNum                    = 0
+	DefaultVolMinWritableMPNum                    = 0
 	defaultOfflineChannelBufferCapacity           = 1000
 )
 
