@@ -22,9 +22,9 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util/log"
+	"math"
 	"strings"
 	"time"
-	"math"
 )
 
 type MetaReplica struct {

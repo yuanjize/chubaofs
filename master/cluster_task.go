@@ -15,6 +15,7 @@
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
@@ -23,7 +24,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"encoding/json"
 )
 
 func (c *Cluster) putDataNodeTasks(tasks []*proto.AdminTask) {

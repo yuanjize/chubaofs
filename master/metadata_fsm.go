@@ -98,7 +98,7 @@ func (mf *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, er
 	cmdMap[cmd.K] = cmd.V
 	cmdMap[Applied] = []byte(strconv.FormatUint(uint64(index), 10))
 	switch cmd.Op {
-	case OpSyncDeleteDataNode,OpSyncDeleteMetaNode,OpSyncDeleteVol,OpSyncDeleteDataPartition,OpSyncDeleteMetaPartition,OpSyncDelToken:
+	case OpSyncDeleteDataNode, OpSyncDeleteMetaNode, OpSyncDeleteVol, OpSyncDeleteDataPartition, OpSyncDeleteMetaPartition, OpSyncDelToken:
 		if err = mf.DelKeyAndPutIndex(cmd.K, cmdMap); err != nil {
 			panic(err)
 		}

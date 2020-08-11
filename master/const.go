@@ -85,7 +85,7 @@ const (
 )
 
 const (
-	OK     = iota
+	OK = iota
 	Failed
 )
 
