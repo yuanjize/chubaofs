@@ -836,7 +836,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	tasks = append(tasks, task)
 	c.putDataNodeTasks(tasks)
 errDeal:
-	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
@@ -918,10 +918,6 @@ func (c *Cluster) updateVol(name, authKey string, capacity, minWritableDPNum, mi
 		vol.setMinWritableDPNum(minWritableDPNum)
 	}
 	if minWritableMPNum > 0 {
-		if int(minWritableMPNum) < vol.writableMpCount {
-			err = fmt.Errorf("minWritableMPNum[%v] less than writableMpCount[%v]", minWritableMPNum, vol.writableMpCount)
-			goto errDeal
-		}
 		vol.setMinWritableMPNum(minWritableMPNum)
 	}
 	if enableToken == true && len(vol.tokens) == 0 {

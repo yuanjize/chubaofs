@@ -18,5 +18,5 @@ const (
 	ReadOnly        = 1
 	ReadWrite       = 2
 	UnavaliableDisk = -1
-	NoLeader       = -2
+	NoLeader        = -2
 )

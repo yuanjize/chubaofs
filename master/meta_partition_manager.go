@@ -2,10 +2,10 @@ package master
 
 import (
 	"fmt"
-	"time"
 	"github.com/chubaofs/chubaofs/util/log"
 	"math"
 	"strconv"
+	"time"
 )
 
 func (c *Cluster) startCheckMetaPartitionRecoveryProgress() {

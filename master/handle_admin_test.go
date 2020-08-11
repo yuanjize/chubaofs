@@ -388,7 +388,7 @@ func TestDelToken(t *testing.T) {
 			return
 		}
 		reqUrl = fmt.Sprintf("%v%v?name=%v&tokenType=%v&authKey=%v",
-			hostAddr, TokenAddURI, commonVol.Name, token.TokenType,buildAuthKey())
+			hostAddr, TokenAddURI, commonVol.Name, token.TokenType, buildAuthKey())
 		fmt.Println(reqUrl)
 		process(reqUrl, t)
 	}

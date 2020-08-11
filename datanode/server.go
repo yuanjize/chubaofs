@@ -156,9 +156,9 @@ const (
 )
 
 func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
-	persistenceDataPartitions,err:=s.getDataPartitionFromMaster()
-	if err!=nil {
-		return  err
+	persistenceDataPartitions, err := s.getDataPartitionFromMaster()
+	if err != nil {
+		return err
 	}
 	if len(persistenceDataPartitions) == 0 {
 		return
