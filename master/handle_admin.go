@@ -456,6 +456,27 @@ errDeal:
 	return
 }
 
+// offline data partition which locates on bad disk.
+// When it has been called,data partition which locates on bad disk will be offline.
+func (m *Master) dataPartitionsAutoOffline(w http.ResponseWriter, r *http.Request) {
+	var (
+		err        error
+		badDpInfos []string
+		rstMsg     string
+	)
+	if badDpInfos, err = m.cluster.badDiskDataPartitionsAutoOffline(); err != nil {
+		goto errDeal
+	}
+	rstMsg = fmt.Sprintf(AdminDataPartitionAutoOffline+"badDpInfos[%v] success", badDpInfos)
+	log.LogInfo(rstMsg)
+	io.WriteString(w, rstMsg)
+	return
+errDeal:
+	logMsg := getReturnMessage(AdminDataPartitionAutoOffline, r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name    string

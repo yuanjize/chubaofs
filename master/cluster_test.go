@@ -294,3 +294,17 @@ func TestPanicCheckOfflineDataPartitions(t *testing.T) {
 	partition = nil
 	c.checkOfflineDataPartitions()
 }
+func TestBadDiskDataPartitionsAutoOffline(t *testing.T) {
+	server.cluster.DisableAutoAlloc = true
+	server.cluster.checkOfflineDataPartitions()
+	server.cluster.DisableAutoAlloc = false
+}
+
+func TestPanicBadDiskDataPartitionsAutoOffline(t *testing.T) {
+	c := buildPanicCluster()
+	partition := &BadDiskDataPartition{}
+	c.toBeOfflineDpChan <- partition
+	partition = nil
+	_, err := c.badDiskDataPartitionsAutoOffline()
+	t.Log(err)
+}

@@ -77,7 +77,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckBadDiskRecovery()
 	c.startCheckMetaPartitionRecoveryProgress()
 	c.startCheckLoadMetaPartitions()
-	c.startCheckOfflineDataPartitions()
+	//c.startCheckOfflineDataPartitions()
 	c.startCheckCreateMetaPartitions()
 	return
 }
@@ -844,6 +844,38 @@ errDeal:
 	}
 	log.LogWarn(msg)
 	return
+}
+
+func (c *Cluster) badDiskDataPartitionsAutoOffline() (badDpInfos []string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("autoOfflineDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"autoOfflineDataPartitions occurred panic")
+			err = errors.Errorf("autoOfflineDataPartitions occurred panic,err[%v]", r)
+		}
+	}()
+	var badDp *BadDiskDataPartition
+	badDpInfos = make([]string, 0)
+	for {
+		if c.DisableAutoAlloc {
+			return
+		}
+		select {
+		case badDp = <-c.toBeOfflineDpChan:
+			err = c.dataPartitionOffline(badDp.diskErrAddr, "", badDp.dp.VolName, badDp.dp, HandleDataPartitionOfflineErr)
+			if err != nil {
+				err = errors.Errorf("dataPartitionOffline diskErrAddr[%s],VolName[%s],PartitionID[%d],err[%v]",
+					badDp.diskErrAddr, badDp.dp.VolName, badDp.dp.PartitionID, err)
+				log.LogError(errors.ErrorStack(err))
+				return
+			}
+			msg := fmt.Sprintf("addr[%s],dp[%d]", badDp.diskErrAddr, badDp.dp.PartitionID)
+			badDpInfos = append(badDpInfos, msg)
+		default:
+			return
+		}
+	}
 }
 
 func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica, dataNode *DataNode, partitionID uint64) {
