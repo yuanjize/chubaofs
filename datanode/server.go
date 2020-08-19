@@ -156,9 +156,9 @@ const (
 )
 
 func (s *DataNode) checkLocalPartitionMatchWithMaster() (err error) {
-	persistenceDataPartitions,err:=s.getDataPartitionFromMaster()
-	if err!=nil {
-		return  err
+	persistenceDataPartitions, err := s.getDataPartitionFromMaster()
+	if err != nil {
+		return err
 	}
 	if len(persistenceDataPartitions) == 0 {
 		return
@@ -315,7 +315,7 @@ func (s *DataNode) registerToMaster() {
 			params["addr"] = fmt.Sprintf("%s:%v", LocalIP, s.port)
 			data, err = MasterHelper.Request(http.MethodPost, master.AddDataNode, params, nil)
 			if err != nil {
-				log.LogErrorf("action[registerToMaster] cannot register this node to master[%] err[%v].",
+				log.LogErrorf("action[registerToMaster] cannot register this node to master[%v] err[%v].",
 					masterAddr, err)
 				continue
 			}
@@ -423,11 +423,11 @@ func (s *DataNode) addDiskErrs(partitionId uint32, err error, flag uint8) {
 	} else if flag == ReadFlag {
 		d.addReadErr()
 	}
-	d.Status = proto.Unavaliable
+	d.Status = proto.UnavaliableDisk
 	d.Lock()
 	defer d.Unlock()
 	for _, dp := range d.partitionMap {
-		dp.partitionStatus = proto.Unavaliable
+		dp.partitionStatus = proto.UnavaliableDisk
 	}
 
 }

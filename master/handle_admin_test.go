@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/chubaofs/chubaofs/master/mocktest"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
 	"io/ioutil"
@@ -28,7 +29,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (
@@ -124,7 +124,7 @@ func createMasterServer() *Master {
 	server.cluster.checkMetaNodeHeartbeat()
 	time.Sleep(5 * time.Second)
 	server.cluster.startCheckAvailSpace()
-	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 2,false)
+	server.cluster.createVol(commonVolName, "cfs", "extent", 3, 100, 20, 2, 3, false)
 	vol, err := server.cluster.getVol(commonVolName)
 	if err != nil {
 		panic(err)
@@ -362,6 +362,12 @@ func TestDataPartitionOffline(t *testing.T) {
 	partition.isRecover = false
 }
 
+func TestDataPartitionsAutoOffline(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v", hostAddr, AdminDataPartitionAutoOffline)
+	fmt.Println(reqUrl)
+	process(reqUrl, t)
+}
+
 func TestTransferLeader(t *testing.T) {
 	reqUrl := fmt.Sprintf("%v%v?id=%v&addr=%v",
 		hostAddr, RaftTransferLeader, server.id, fmt.Sprintf("%v:%v", server.ip, server.port))
@@ -388,7 +394,7 @@ func TestDelToken(t *testing.T) {
 			return
 		}
 		reqUrl = fmt.Sprintf("%v%v?name=%v&tokenType=%v&authKey=%v",
-			hostAddr, TokenAddURI, commonVol.Name, token.TokenType,buildAuthKey())
+			hostAddr, TokenAddURI, commonVol.Name, token.TokenType, buildAuthKey())
 		fmt.Println(reqUrl)
 		process(reqUrl, t)
 	}

@@ -80,6 +80,9 @@ type SimpleVolView struct {
 	MpReplicaNum        uint8
 	Status              uint8
 	Capacity            uint64 // GB
+	MinWritableDPNum    uint64
+	MinWritableMPNum    uint64
+	RwMpCnt             int
 	RwDpCnt             int
 	MpCnt               int
 	DpCnt               int
@@ -453,6 +456,27 @@ errDeal:
 	return
 }
 
+// offline data partition which locates on bad disk.
+// When it has been called,data partition which locates on bad disk will be offline.
+func (m *Master) dataPartitionsAutoOffline(w http.ResponseWriter, r *http.Request) {
+	var (
+		err        error
+		badDpInfos []string
+		rstMsg     string
+	)
+	if badDpInfos, err = m.cluster.badDiskDataPartitionsAutoOffline(); err != nil {
+		goto errDeal
+	}
+	rstMsg = fmt.Sprintf(AdminDataPartitionAutoOffline+"badDpInfos[%v] success", badDpInfos)
+	log.LogInfo(rstMsg)
+	io.WriteString(w, rstMsg)
+	return
+errDeal:
+	logMsg := getReturnMessage(AdminDataPartitionAutoOffline, r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	var (
 		name    string
@@ -480,17 +504,19 @@ errDeal:
 
 func (m *Master) updateVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		name        string
-		authKey     string
-		err         error
-		msg         string
-		capacity    int
-		enableToken bool
+		name             string
+		authKey          string
+		err              error
+		msg              string
+		capacity         int
+		minWritableDPNum int
+		minWritableMPNum int
+		enableToken      bool
 	)
-	if name, authKey, capacity, enableToken, err = parseUpdateVolPara(r); err != nil {
+	if name, authKey, capacity, minWritableDPNum, minWritableMPNum, enableToken, err = parseUpdateVolPara(r); err != nil {
 		goto errDeal
 	}
-	if err = m.cluster.updateVol(name, authKey, uint64(capacity), enableToken); err != nil {
+	if err = m.cluster.updateVol(name, authKey, uint64(capacity), uint64(minWritableDPNum), uint64(minWritableMPNum), enableToken); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("update vol[%v] successed\n", name)
@@ -504,24 +530,24 @@ errDeal:
 
 func (m *Master) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
-		name        string
-		owner       string
-		err         error
-		msg         string
-		volType     string
-		mpCount     int
-		replicaNum  int
-		capacity    int
-		enableToken bool
-		vol         *Vol
+		name             string
+		owner            string
+		err              error
+		msg              string
+		volType          string
+		mpCount          int
+		replicaNum       int
+		capacity         int
+		minWritableDPNum int
+		minWritableMPNum int
+		enableToken      bool
+		vol              *Vol
 	)
 
-	if name, owner, volType, mpCount, replicaNum, capacity, enableToken, err = parseCreateVolPara(r);
-		err != nil {
+	if name, owner, volType, mpCount, replicaNum, capacity, minWritableDPNum, minWritableMPNum, enableToken, err = parseCreateVolPara(r); err != nil {
 		goto errDeal
 	}
-
-	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, mpCount, enableToken); err != nil {
+	if err = m.cluster.createVol(name, owner, volType, uint8(replicaNum), capacity, minWritableDPNum, minWritableMPNum, mpCount, enableToken); err != nil {
 		goto errDeal
 	}
 	if vol, err = m.cluster.getVol(name); err != nil {
@@ -571,6 +597,9 @@ func newSimpleView(vol *Vol) *SimpleVolView {
 		MpReplicaNum:        vol.mpReplicaNum,
 		Status:              vol.Status,
 		Capacity:            vol.Capacity,
+		MinWritableDPNum:    vol.MinWritableDPNum,
+		MinWritableMPNum:    vol.MinWritableMPNum,
+		RwMpCnt:             vol.writableMpCount,
 		RwDpCnt:             vol.dataPartitions.readWriteDataPartitions,
 		MpCnt:               len(vol.MetaPartitions),
 		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
@@ -1214,17 +1243,36 @@ func parseDeleteVolPara(r *http.Request) (name, authKey string, err error) {
 	return
 }
 
-func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, enableToken bool, err error) {
+func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity, minWritableDPNum, minWritableMPNum int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
 	}
 	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
-		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil || capacity < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		err = paraNotFound(ParaVolCapacity)
+	}
+	if minWritableDPNumStr := r.FormValue(ParaVolMinWritableDPNum); minWritableDPNumStr != "" {
+		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil || minWritableDPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		err = paraNotFound(ParaVolMinWritableDPNum)
+		return
+	}
+	if minWritableMPNumStr := r.FormValue(ParaVolMinWritableMPNum); minWritableMPNumStr != "" {
+		if minWritableMPNum, err = strconv.Atoi(minWritableMPNumStr); err != nil || minWritableMPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		err = paraNotFound(ParaVolMinWritableMPNum)
+		return
 	}
 	if authKey, err = checkAuthKeyPara(r); err != nil {
 		return
@@ -1234,7 +1282,7 @@ func parseUpdateVolPara(r *http.Request) (name, authKey string, capacity int, en
 	return
 }
 
-func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity int, enableToken bool, err error) {
+func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, replicaNum, capacity, minWritableDPNum, minWritableMPNum int, enableToken bool, err error) {
 	r.ParseForm()
 	if name, err = checkVolPara(r); err != nil {
 		return
@@ -1249,13 +1297,29 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, 
 		return
 	}
 	if capacityStr := r.FormValue(ParaVolCapacity); capacityStr != "" {
-		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		if capacity, err = strconv.Atoi(capacityStr); err != nil || capacity < 0 {
 			err = UnMatchPara
+			return
 		}
 	} else {
 		capacity = DefaultVolCapacity
 	}
-
+	if minWritableDPNumStr := r.FormValue(ParaVolMinWritableDPNum); minWritableDPNumStr != "" {
+		if minWritableDPNum, err = strconv.Atoi(minWritableDPNumStr); err != nil || minWritableDPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		minWritableDPNum = DefaultVolMinWritableDPNum
+	}
+	if minWritableMPNumStr := r.FormValue(ParaVolMinWritableMPNum); minWritableMPNumStr != "" {
+		if minWritableMPNum, err = strconv.Atoi(minWritableMPNumStr); err != nil || minWritableMPNum < 0 {
+			err = UnMatchPara
+			return
+		}
+	} else {
+		minWritableMPNum = DefaultVolMinWritableMPNum
+	}
 	if owner = r.FormValue(ParaVolOwner); owner == "" {
 		err = paraNotFound(ParaVolOwner)
 		return
@@ -1269,7 +1333,7 @@ func parseCreateVolPara(r *http.Request) (name, owner, volType string, mpCount, 
 	return
 }
 func parseEnableToken(r *http.Request) (enableToken bool) {
-	enableToken, err := strconv.ParseBool(r.FormValue(ParaEnableToken));
+	enableToken, err := strconv.ParseBool(r.FormValue(ParaEnableToken))
 	if err != nil {
 		enableToken = false
 	}

@@ -23,6 +23,7 @@ import (
 
 	"flag"
 	"fmt"
+	"github.com/chubaofs/chubaofs/checktool"
 	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/ump"
 	"net/http"
@@ -31,7 +32,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"github.com/chubaofs/chubaofs/checktool"
 )
 
 var (
@@ -48,17 +48,17 @@ const (
 )
 
 const (
-	RoleMaster = "master"
-	RoleMeta   = "metanode"
-	RoleData   = "datanode"
-	RoleCheckTool   = "checktool"
+	RoleMaster    = "master"
+	RoleMeta      = "metanode"
+	RoleData      = "datanode"
+	RoleCheckTool = "checktool"
 )
 
 const (
-	ModuleMaster = "master"
-	ModuleMeta   = "metaNode"
-	ModuleData   = "dataNode"
-	ModuleCheckTool   = "checkTool"
+	ModuleMaster    = "master"
+	ModuleMeta      = "metaNode"
+	ModuleData      = "dataNode"
+	ModuleCheckTool = "checkTool"
 )
 
 var (
@@ -183,7 +183,7 @@ func main() {
 
 	if profPort != "" {
 		go func() {
-			http.HandleFunc(log.SetLogLevelPath,log.SetLogLevel)
+			http.HandleFunc(log.SetLogLevelPath, log.SetLogLevel)
 			err = http.ListenAndServe(fmt.Sprintf(":%v", profPort), nil)
 			if err != nil {
 				panic(fmt.Sprintf("cannot listen pprof %v err %v", profPort, err.Error()))

@@ -42,6 +42,7 @@ const (
 	AdminSetCompactStatus     = "/compactStatus/set"
 	AdminGetCompactStatus     = "/compactStatus/get"
 	AdminSetMetaNodeThreshold = "/threshold/set"
+	AdminDataPartitionAutoOffline  = "/dataPartition/autoOffline"
 
 	// Client APIs
 	ClientDataPartitions = "/client/dataPartitions"
@@ -95,6 +96,7 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminCreateDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminLoadDataPartition, m.handlerWithInterceptor())
 	http.Handle(AdminDataPartitionOffline, m.handlerWithInterceptor())
+	http.Handle(AdminDataPartitionAutoOffline, m.handlerWithInterceptor())
 	http.Handle(AdminDataPartitionDelete, m.handlerWithInterceptor())
 	http.Handle(AdminDataPartitionUpdate, m.handlerWithInterceptor())
 	http.Handle(AdminCreateVol, m.handlerWithInterceptor())
@@ -184,6 +186,8 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.loadDataPartition(w, r)
 	case AdminDataPartitionOffline:
 		m.dataPartitionOffline(w, r)
+	case AdminDataPartitionAutoOffline:
+		m.dataPartitionsAutoOffline(w, r)
 	case AdminDataPartitionDelete:
 		m.deleteDataPartition(w, r)
 	case AdminDataPartitionUpdate:

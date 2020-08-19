@@ -35,6 +35,8 @@ const (
 	ParaIsManual              = "isManual"
 	ParaMetaPartitionCountKey = "mpCount"
 	ParaEnableToken           = "enableToken"
+	ParaVolMinWritableDPNum   = "minWritableDp"
+	ParaVolMinWritableMPNum   = "minWritableMp"
 )
 
 const (
@@ -77,10 +79,13 @@ const (
 	DefaultRackName                               = "default"
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
+	DefaultVolMinWritableDPNum                    = 5
+	DefaultVolMinWritableMPNum                    = 1
+	defaultOfflineChannelBufferCapacity           = 1000
 )
 
 const (
-	OK     = iota
+	OK = iota
 	Failed
 )
 

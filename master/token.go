@@ -1,10 +1,10 @@
 package master
 
 import (
-	"github.com/chubaofs/chubaofs/proto"
-	"fmt"
-	"time"
 	"encoding/base64"
+	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
+	"time"
 )
 
 func createToken(volName string, tokenType int8) (token *proto.Token, err error) {

@@ -2,10 +2,10 @@ package master
 
 import (
 	"fmt"
-	"time"
 	"github.com/chubaofs/chubaofs/util/log"
 	"math"
 	"strconv"
+	"time"
 )
 
 func (c *Cluster) startCheckMetaPartitionRecoveryProgress() {
@@ -169,5 +169,59 @@ func (mp *MetaPartition) checkDentryCount(clusterID string) {
 			msg = msg + lr.Addr + " applyId[" + applyIDStr + "] dentryCount[" + dentryCountStr + "],"
 		}
 		Warn(clusterID, msg)
+	}
+}
+
+func (c *Cluster) startCheckCreateMetaPartitions() {
+	go func() {
+		for {
+			if c.partition != nil && c.partition.IsLeader() {
+				if c.vols != nil {
+					c.checkCreateMetaPartitions()
+				}
+			}
+			time.Sleep(time.Second * DefaultCheckDataPartitionIntervalSeconds)
+		}
+	}()
+}
+
+func (c *Cluster) checkCreateMetaPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkCreateDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkCreateDataPartitions occurred panic")
+		}
+	}()
+	vols := c.copyVols()
+	for _, vol := range vols {
+		vol.checkNeedAutoCreateMetaPartitions(c)
+	}
+}
+
+func (vol *Vol) checkNeedAutoCreateMetaPartitions(c *Cluster) {
+	if vol.getStatus() == VolMarkDelete {
+		return
+	}
+	if vol.getStatus() == VolNormal && !c.DisableAutoAlloc {
+		vol.autoCreateMetaPartitions(c)
+	}
+}
+
+func (vol *Vol) autoCreateMetaPartitions(c *Cluster) {
+	count := vol.getWritableMpCount()
+	if count < int(vol.MinWritableMPNum) {
+		maxPartitionID := vol.getMaxPartitionID()
+		mp, err := vol.getMetaPartition(maxPartitionID)
+		if err != nil {
+			log.LogErrorf("action[autoCreateMetaPartitions],cluster[%v],vol[%v],err[%v]", c.Name, vol.Name, err)
+			return
+		}
+		nextStart := mp.Start + mp.MaxInodeID + defaultMetaPartitionInodeIDStep
+		if err = vol.splitMetaPartition(c, mp, nextStart); err != nil {
+			msg := fmt.Sprintf("cluster[%v],vol[%v],meta partition[%v] splits failed,err[%v]",
+				c.Name, vol.Name, mp.PartitionID, err)
+			Warn(c.Name, msg)
+		}
 	}
 }

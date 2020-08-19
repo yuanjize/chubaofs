@@ -53,7 +53,7 @@ func (replica *DataReplica) CheckMiss(missSec int64) (isMiss bool) {
 }
 
 func (replica *DataReplica) IsLive(timeOutSec int64) (avail bool) {
-	if replica.dataNode.isActive == true && replica.Status != proto.Unavaliable &&
+	if replica.dataNode.isActive == true && replica.Status != proto.UnavaliableDisk &&
 		replica.IsActive(timeOutSec) == true {
 		avail = true
 	}

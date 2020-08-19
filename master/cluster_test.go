@@ -16,7 +16,7 @@ func buildPanicCluster() *Cluster {
 }
 
 func buildPanicVol() *Vol {
-	vol := NewVol(commonVol.Name, commonVol.Owner, commonVol.VolType, commonVol.dpReplicaNum, commonVol.Capacity, false)
+	vol := NewVol(commonVol.Name, commonVol.Owner, commonVol.VolType, commonVol.dpReplicaNum, commonVol.Capacity, commonVol.MinWritableDPNum, commonVol.MinWritableMPNum, false)
 	vol.dataPartitions = nil
 	return vol
 }
@@ -278,4 +278,33 @@ func TestCheckBadMetaPartitionRecovery(t *testing.T) {
 		t.Errorf("expect bad partition num[0],real num[%v]", count)
 		return
 	}
+}
+
+func TestCheckOfflineDataPartitions(t *testing.T) {
+	server.cluster.DisableAutoAlloc = true
+	server.cluster.checkOfflineDataPartitions()
+	server.cluster.DisableAutoAlloc = false
+	//time.Sleep(150 * time.Second)
+}
+
+func TestPanicCheckOfflineDataPartitions(t *testing.T) {
+	c := buildPanicCluster()
+	partition := &BadDiskDataPartition{}
+	c.toBeOfflineDpChan <- partition
+	partition = nil
+	c.checkOfflineDataPartitions()
+}
+func TestBadDiskDataPartitionsAutoOffline(t *testing.T) {
+	server.cluster.DisableAutoAlloc = true
+	server.cluster.checkOfflineDataPartitions()
+	server.cluster.DisableAutoAlloc = false
+}
+
+func TestPanicBadDiskDataPartitionsAutoOffline(t *testing.T) {
+	c := buildPanicCluster()
+	partition := &BadDiskDataPartition{}
+	c.toBeOfflineDpChan <- partition
+	partition = nil
+	_, err := c.badDiskDataPartitionsAutoOffline()
+	t.Log(err)
 }

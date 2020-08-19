@@ -1,17 +1,17 @@
 package checktool
 
 import (
-	"sync"
-	"github.com/chubaofs/chubaofs/util/config"
-	"fmt"
-	"time"
-	"strconv"
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
-	"github.com/chubaofs/chubaofs/util/ump"
+	"fmt"
+	"github.com/chubaofs/chubaofs/util/config"
 	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/chubaofs/chubaofs/util/ump"
+	"io/ioutil"
+	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 	cfgKeyReadWriteDpRatio = "readWriteDpRatio"
 	cfgKeyMinRWCnt         = "minRWCnt"
 	cfgKeyDomains          = "domains"
-	domainSeparator = ","
+	domainSeparator        = ","
 	UMPKey                 = "checktool"
 	TB                     = 1024 * 1024 * 1024 * 1024
 	GB                     = 1024 * 1024 * 1024
@@ -144,7 +144,7 @@ func (s *Server) CheckVolHealth(host string) {
 	}
 }
 
-func generateAllocateDataPartitionURL(host, volName string, count int, ) string {
+func generateAllocateDataPartitionURL(host, volName string, count int) string {
 	return fmt.Sprintf("http://%v/dataPartition/create?name=%v&count=%v&type=extent", host, volName, count)
 }
 
@@ -251,7 +251,7 @@ func (s *Server) parseConfig(cfg *config.Config) (err error) {
 	}
 	s.hosts = strings.Split(domains, domainSeparator)
 	fmt.Printf("usedRatio[%v],availSpaceRatio[%v],readWriteDpRatio[%v],minRWCnt[%v],domains[%v]\n",
-		s.usedRatio, s.availSpaceRatio, s.readWriteDpRatio, s.minReadWriteCount,s.hosts)
+		s.usedRatio, s.availSpaceRatio, s.readWriteDpRatio, s.minReadWriteCount, s.hosts)
 	return
 }
 

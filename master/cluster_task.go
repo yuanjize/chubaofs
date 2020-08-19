@@ -15,6 +15,7 @@
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
@@ -23,7 +24,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"encoding/json"
 )
 
 func (c *Cluster) putDataNodeTasks(tasks []*proto.AdminTask) {
@@ -123,7 +123,7 @@ func (c *Cluster) updateMetaPartitionHosts(volName, hosts string, partitionID ui
 		goto errDeal
 	}
 	mp.Replicas = make([]*MetaReplica, 0)
-	mp.Status = proto.Unavaliable
+	mp.Status = proto.ReadOnly
 	mp.MissNodes = make(map[string]int64, 0)
 	log.LogWarnf("action[updateMetaPartitionHosts],vol[%v],mpID[%v] update hosts success,newHosts[%v],oldHosts[%v]",
 		volName, partitionID, hosts, strings.Join(oldHosts, UnderlineSeparator))
@@ -165,7 +165,7 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		return
 	}
 
-	if mp.IsRecover && mp.isNotLatestAddr(nodeAddr){
+	if mp.IsRecover && mp.isNotLatestAddr(nodeAddr) {
 		err = fmt.Errorf("vol[%v],meta partition[%v] is recovering,[%v] can't be decommissioned", vol.Name, mp.PartitionID, nodeAddr)
 		return
 	}

@@ -48,6 +48,7 @@ type Cluster struct {
 	BadDataPartitionIds *sync.Map
 	BadMetaPartitionIds *sync.Map
 	reloadMetadataTime  int64
+	toBeOfflineDpChan   chan *BadDiskDataPartition
 }
 
 func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *ClusterConfig) (c *Cluster) {
@@ -64,6 +65,7 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.metaNodeSpace = new(MetaNodeSpaceStat)
 	c.BadDataPartitionIds = new(sync.Map)
 	c.BadMetaPartitionIds = new(sync.Map)
+	c.toBeOfflineDpChan = make(chan *BadDiskDataPartition, defaultOfflineChannelBufferCapacity)
 	c.startCheckDataPartitions()
 	c.startCheckBackendLoadDataPartitions()
 	c.startCheckReleaseDataPartitions()
@@ -75,6 +77,8 @@ func newCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition
 	c.startCheckBadDiskRecovery()
 	c.startCheckMetaPartitionRecoveryProgress()
 	c.startCheckLoadMetaPartitions()
+	//c.startCheckOfflineDataPartitions()
+	c.startCheckCreateMetaPartitions()
 	return
 }
 
@@ -135,6 +139,39 @@ func (c *Cluster) startCheckDataPartitions() {
 			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
 		}
 	}()
+}
+
+func (c *Cluster) startCheckOfflineDataPartitions() {
+	go func() {
+		for {
+			if c.partition.IsLeader() {
+				c.checkOfflineDataPartitions()
+			}
+			time.Sleep(time.Second * time.Duration(c.cfg.CheckDataPartitionIntervalSeconds))
+		}
+	}()
+}
+
+func (c *Cluster) checkOfflineDataPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("checkOfflineDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"checkOfflineDataPartitions occurred panic")
+		}
+	}()
+	var badDp *BadDiskDataPartition
+	for {
+		if c.DisableAutoAlloc {
+			return
+		}
+		select {
+		case badDp = <-c.toBeOfflineDpChan:
+			c.dataPartitionOffline(badDp.diskErrAddr, "", badDp.dp.VolName, badDp.dp, HandleDataPartitionOfflineErr)
+		default:
+			return
+		}
+	}
 }
 
 func (c *Cluster) checkCreateDataPartitions() {
@@ -304,7 +341,8 @@ func (c *Cluster) checkMetaPartitions() {
 	}()
 	vols := c.getAllNormalVols()
 	for _, vol := range vols {
-		vol.checkMetaPartitions(c)
+		writableMpCount := vol.checkMetaPartitions(c)
+		vol.setWritableMpCount(writableMpCount)
 	}
 }
 
@@ -798,7 +836,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	tasks = append(tasks, task)
 	c.putDataNodeTasks(tasks)
 errDeal:
-	msg = fmt.Sprintf(errMsg + " clusterID[%v] partitionID:%v  on Node:%v  "+
+	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
@@ -806,6 +844,38 @@ errDeal:
 	}
 	log.LogWarn(msg)
 	return
+}
+
+func (c *Cluster) badDiskDataPartitionsAutoOffline() (badDpInfos []string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.LogWarnf("autoOfflineDataPartitions occurred panic,err[%v]", r)
+			WarnBySpecialUmpKey(fmt.Sprintf("%v_%v_scheduling_job_panic", c.Name, UmpModuleName),
+				"autoOfflineDataPartitions occurred panic")
+			err = errors.Errorf("autoOfflineDataPartitions occurred panic,err[%v]", r)
+		}
+	}()
+	var badDp *BadDiskDataPartition
+	badDpInfos = make([]string, 0)
+	for {
+		if c.DisableAutoAlloc {
+			return
+		}
+		select {
+		case badDp = <-c.toBeOfflineDpChan:
+			err = c.dataPartitionOffline(badDp.diskErrAddr, "", badDp.dp.VolName, badDp.dp, HandleDataPartitionOfflineErr)
+			if err != nil {
+				err = errors.Errorf("dataPartitionOffline diskErrAddr[%s],VolName[%s],PartitionID[%d],err[%v]",
+					badDp.diskErrAddr, badDp.dp.VolName, badDp.dp.PartitionID, err)
+				log.LogError(errors.ErrorStack(err))
+				return
+			}
+			msg := fmt.Sprintf("addr[%s],dp[%d]", badDp.diskErrAddr, badDp.dp.PartitionID)
+			badDpInfos = append(badDpInfos, msg)
+		default:
+			return
+		}
+	}
 }
 
 func (c *Cluster) putBadDataPartitionIDs(replica *DataReplica, dataNode *DataNode, partitionID uint64) {
@@ -852,7 +922,7 @@ func (c *Cluster) delMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) updateVol(name, authKey string, capacity uint64, enableToken bool) (err error) {
+func (c *Cluster) updateVol(name, authKey string, capacity, minWritableDPNum, minWritableMPNum uint64, enableToken bool) (err error) {
 	var (
 		vol            *Vol
 		serverAuthKey  string
@@ -876,6 +946,12 @@ func (c *Cluster) updateVol(name, authKey string, capacity uint64, enableToken b
 		}
 		vol.setCapacity(uint64(capacity))
 	}
+	if minWritableDPNum >= 0 {
+		vol.setMinWritableDPNum(minWritableDPNum)
+	}
+	if minWritableMPNum > 0 {
+		vol.setMinWritableMPNum(minWritableMPNum)
+	}
 	if enableToken == true && len(vol.tokens) == 0 {
 		if err = c.createToken(vol, proto.ReadOnlyToken); err != nil {
 			goto errDeal
@@ -898,7 +974,7 @@ errDeal:
 	return
 }
 
-func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity, mpCount int, enableToken bool) (err error) {
+func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum, minWritableMPNum, mpCount int, enableToken bool) (err error) {
 	var (
 		vol                     *Vol
 		readWriteDataPartitions int
@@ -907,7 +983,7 @@ func (c *Cluster) createVol(name, owner, volType string, replicaNum uint8, capac
 		err = fmt.Errorf("vol type must be extent")
 		goto errDeal
 	}
-	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity, enableToken); err != nil {
+	if vol, err = c.createVolInternal(name, owner, volType, replicaNum, capacity, minWritableDPNum, minWritableMPNum, enableToken); err != nil {
 		goto errDeal
 	}
 	if err = vol.batchCreateMetaPartition(c, mpCount); err != nil {
@@ -945,14 +1021,14 @@ func (c *Cluster) createToken(vol *Vol, tokenType int8) (err error) {
 	return
 }
 
-func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity int, enableToken bool) (vol *Vol, err error) {
+func (c *Cluster) createVolInternal(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum, minWritableMPNum int, enableToken bool) (vol *Vol, err error) {
 	c.createVolLock.Lock()
 	defer c.createVolLock.Unlock()
 	if _, err = c.getVol(name); err == nil {
 		err = hasExist(name)
 		goto errDeal
 	}
-	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity), enableToken)
+	vol = NewVol(name, owner, volType, replicaNum, uint64(capacity), uint64(minWritableDPNum), uint64(minWritableMPNum), enableToken)
 	if err = c.syncAddVol(vol); err != nil {
 		goto errDeal
 	}

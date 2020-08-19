@@ -31,6 +31,7 @@ type Vol struct {
 	VolType                    string
 	dpReplicaNum               uint8
 	mpReplicaNum               uint8
+	MinWritableDPNum           uint64
 	threshold                  float32
 	Status                     uint8
 	Capacity                   uint64 //GB
@@ -38,6 +39,8 @@ type Vol struct {
 	UsedSpace                  uint64 //GB
 	MetaPartitions             map[uint64]*MetaPartition
 	mpsLock                    sync.RWMutex
+	writableMpCount            int
+	MinWritableMPNum           uint64
 	dataPartitions             *DataPartitionMap
 	enableToken                bool
 	tokens                     map[string]*proto.Token
@@ -50,7 +53,7 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64, enableToken bool) (vol *Vol) {
+func NewVol(name, owner, volType string, replicaNum uint8, capacity, minWritableDPNum, minWritableMPNum uint64, enableToken bool) (vol *Vol) {
 	vol = &Vol{Name: name, VolType: volType, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
 	vol.Owner = owner
 	vol.dataPartitions = NewDataPartitionMap(name)
@@ -62,6 +65,8 @@ func NewVol(name, owner, volType string, replicaNum uint8, capacity uint64, enab
 		vol.mpReplicaNum = replicaNum
 	}
 	vol.Capacity = capacity
+	vol.MinWritableDPNum = minWritableDPNum
+	vol.MinWritableMPNum = minWritableMPNum
 	vol.viewCache = make([]byte, 0)
 	vol.enableToken = enableToken
 	vol.tokens = make(map[string]*proto.Token, 0)
@@ -114,6 +119,18 @@ func (vol *Vol) getMetaPartition(partitionID uint64) (mp *MetaPartition, err err
 	return
 }
 
+func (vol *Vol) setWritableMpCount(count int) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.writableMpCount = count
+}
+
+func (vol *Vol) getWritableMpCount() int {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.writableMpCount
+}
+
 func (vol *Vol) getMaxPartitionID() (maxPartitionID uint64) {
 	vol.mpsLock.RLock()
 	defer vol.mpsLock.RUnlock()
@@ -156,7 +173,17 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 		if dp.Status == proto.ReadWrite {
 			readWriteDataPartitions++
 		}
-		dp.checkDiskError(c.Name, c.leaderInfo.addr)
+		diskErrorAddrs := dp.checkDiskError(c.Name, c.leaderInfo.addr)
+		if len(diskErrorAddrs) != 0 {
+			for _, addr := range diskErrorAddrs {
+				badDp := &BadDiskDataPartition{dp: dp, diskErrAddr: addr}
+				select {
+				case c.toBeOfflineDpChan <- badDp:
+				default:
+					log.LogInfof("action[checkDataPartitions], arrived channel buffer capacity")
+				}
+			}
+		}
 		tasks := dp.checkReplicationTask(c.Name)
 		if len(tasks) != 0 {
 			c.putDataNodeTasks(tasks)
@@ -187,7 +214,7 @@ func (vol *Vol) ReleaseDataPartitions(releaseCount int, afterLoadSeconds int64) 
 	log.LogInfo(msg)
 }
 
-func (vol *Vol) checkMetaPartitions(c *Cluster) {
+func (vol *Vol) checkMetaPartitions(c *Cluster) (writableMpCount int) {
 	var tasks []*proto.AdminTask
 	maxPartitionID := vol.getMaxPartitionID()
 	mps := vol.cloneMetaPartitionMap()
@@ -207,9 +234,14 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) {
 		mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
 		mp.checkEnd(c, maxPartitionID)
 		mp.checkReplicaMiss(c.Name, c.leaderInfo.addr, DefaultMetaPartitionTimeOutSec, DefaultMetaPartitionWarnInterval)
+		if mp.Status == proto.ReadWrite {
+			writableMpCount++
+		}
+
 		tasks = append(tasks, mp.GenerateReplicaTask(c.Name, vol.Name)...)
 	}
 	c.putMetaNodeTasks(tasks)
+	return
 }
 
 func (vol *Vol) cloneMetaPartitionMap() (mps map[uint64]*MetaPartition) {
@@ -255,6 +287,28 @@ func (vol *Vol) getCapacity() uint64 {
 	defer vol.RUnlock()
 	return vol.Capacity
 }
+func (vol *Vol) setMinWritableDPNum(minWritableDPNum uint64) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.MinWritableDPNum = minWritableDPNum
+}
+
+func (vol *Vol) getMinWritableDPNum() uint64 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.MinWritableDPNum
+}
+func (vol *Vol) setMinWritableMPNum(minWritableMPNum uint64) {
+	vol.Lock()
+	defer vol.Unlock()
+	vol.MinWritableMPNum = minWritableMPNum
+}
+
+func (vol *Vol) getMinWritableMPNum() uint64 {
+	vol.RLock()
+	defer vol.RUnlock()
+	return vol.MinWritableMPNum
+}
 
 func (vol *Vol) checkNeedAutoCreateDataPartitions(c *Cluster) {
 	if vol.getStatus() == VolMarkDelete {
@@ -280,8 +334,13 @@ func (vol *Vol) autoCreateDataPartitions(c *Cluster) {
 	}
 	usedRatio := float64(vol.UsedSpace) / float64(vol.Capacity)
 	availRatio := float64(vol.AvailSpaceAllocated) / float64(vol.Capacity)
-	if (vol.Capacity > 200000 && vol.dataPartitions.readWriteDataPartitions < 200) || vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) {
+	lackCount := int(vol.MinWritableDPNum) - vol.dataPartitions.readWriteDataPartitions
+	if (vol.Capacity > 200000 && vol.dataPartitions.readWriteDataPartitions < 200) || vol.dataPartitions.readWriteDataPartitions < MinReadWriteDataPartitions || (usedRatio > VolWarningRatio && vol.isTooSmallAvailSpace(availRatio)) ||
+		(vol.MinWritableDPNum != 0 && lackCount > 0) {
 		count := vol.calculateExpandNum()
+		if lackCount > count {
+			count = lackCount
+		}
 		log.LogInfof("action[autoCreateDataPartitions] vol[%v] count[%v],usedRatio[%v],availRatio[%v]", vol.Name, count, usedRatio, availRatio)
 		for i := 0; i < count; i++ {
 			if c.DisableAutoAlloc {

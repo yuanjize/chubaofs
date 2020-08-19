@@ -165,7 +165,7 @@ func (d *Disk) updateSpaceInfo() (err error) {
 	if err = syscall.Statfs(d.Path, &statsInfo); err != nil {
 		d.addReadErr()
 	}
-	if d.Status == proto.Unavaliable {
+	if d.Status == proto.UnavaliableDisk {
 		umpKey := fmt.Sprintf("%s_datanode", ClusterID)
 		ump.Alarm(umpKey, fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
 		log.LogErrorf(fmt.Sprintf("cluster (%v) node (%v) disk(%v) error ", ClusterID, LocalIP, d.Path))
@@ -276,11 +276,11 @@ func (d *Disk) triggerDiskError(err error) {
 		return
 	}
 	if IsDiskErr(err.Error()) {
-		d.Status = proto.Unavaliable
+		d.Status = proto.UnavaliableDisk
 		d.Lock()
 		defer d.Unlock()
 		for _, dp := range d.partitionMap {
-			dp.partitionStatus = proto.Unavaliable
+			dp.partitionStatus = proto.UnavaliableDisk
 		}
 	}
 	return
