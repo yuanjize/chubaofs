@@ -315,7 +315,7 @@ func (s *DataNode) registerToMaster() {
 			params["addr"] = fmt.Sprintf("%s:%v", LocalIP, s.port)
 			data, err = MasterHelper.Request(http.MethodPost, master.AddDataNode, params, nil)
 			if err != nil {
-				log.LogErrorf("action[registerToMaster] cannot register this node to master[%] err[%v].",
+				log.LogErrorf("action[registerToMaster] cannot register this node to master[%v] err[%v].",
 					masterAddr, err)
 				continue
 			}

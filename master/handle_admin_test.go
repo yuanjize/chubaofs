@@ -362,6 +362,12 @@ func TestDataPartitionOffline(t *testing.T) {
 	partition.isRecover = false
 }
 
+func TestDataPartitionsAutoOffline(t *testing.T) {
+	reqUrl := fmt.Sprintf("%v%v", hostAddr, AdminDataPartitionAutoOffline)
+	fmt.Println(reqUrl)
+	process(reqUrl, t)
+}
+
 func TestTransferLeader(t *testing.T) {
 	reqUrl := fmt.Sprintf("%v%v?id=%v&addr=%v",
 		hostAddr, RaftTransferLeader, server.id, fmt.Sprintf("%v:%v", server.ip, server.port))
