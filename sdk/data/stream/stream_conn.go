@@ -39,8 +39,9 @@ type GetReplyFunc func(conn *net.TCPConn) (err error, again bool)
 
 // StreamConn defines the struct of the stream connection.
 type StreamConn struct {
-	dp       *wrapper.DataPartition
-	currAddr string
+	dp           *wrapper.DataPartition
+	currAddr     string
+	followerRead bool
 }
 
 var (
@@ -51,15 +52,17 @@ var (
 func NewStreamConn(dp *wrapper.DataPartition, follower bool) *StreamConn {
 	if !follower {
 		return &StreamConn{
-			dp:       dp,
-			currAddr: dp.LeaderAddr,
+			dp:           dp,
+			currAddr:     dp.LeaderAddr,
+			followerRead: false,
 		}
 	}
 
 	if dp.ClientWrapper.NearRead() {
 		return &StreamConn{
-			dp:       dp,
-			currAddr: getNearestHost(dp),
+			dp:           dp,
+			currAddr:     getNearestHost(dp),
+			followerRead: true,
 		}
 	}
 
@@ -73,8 +76,9 @@ func NewStreamConn(dp *wrapper.DataPartition, follower bool) *StreamConn {
 	}
 
 	return &StreamConn{
-		dp:       dp,
-		currAddr: currAddr,
+		dp:           dp,
+		currAddr:     currAddr,
+		followerRead: true,
 	}
 }
 
@@ -90,6 +94,9 @@ func (sc *StreamConn) Send(req *Packet, getReply GetReplyFunc) (err error) {
 		err = sc.sendToPartition(req, getReply)
 		if err == nil {
 			return
+		}
+		if sc.followerRead {
+			break
 		}
 		log.LogWarnf("StreamConn Send: err(%v)", err)
 		time.Sleep(StreamSendSleepInterval)
@@ -140,6 +147,7 @@ func (sc *StreamConn) sendToPartition(req *Packet, getReply GetReplyFunc) (err e
 }
 
 func (sc *StreamConn) sendToConn(conn *net.TCPConn, req *Packet, getReply GetReplyFunc) (err error) {
+	start := time.Now()
 	for i := 0; i < StreamSendMaxRetry; i++ {
 		log.LogDebugf("sendToConn: send to addr(%v), reqPacket(%v)", sc.currAddr, req)
 		err = req.WriteToConn(conn)
@@ -156,6 +164,14 @@ func (sc *StreamConn) sendToConn(conn *net.TCPConn, req *Packet, getReply GetRep
 				log.LogWarnf("sendToConn: getReply error and RETURN, addr(%v) reqPacket(%v) err(%v)", sc.currAddr, req, err)
 			}
 			break
+		}
+
+		if sc.followerRead {
+			cost := time.Since(start)
+			if cost > 20*time.Second {
+				log.LogWarnf("sendToConn: getReply error and overtime, sc(%v) err(%v), cost(%v)", sc, err, cost)
+				break
+			}
 		}
 
 		log.LogWarnf("sendToConn: getReply error and will RETRY, sc(%v) err(%v)", sc, err)
