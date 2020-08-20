@@ -178,7 +178,9 @@ func (partition *DataPartition) checkReplicationTask(clusterID string) (tasks []
 			" On :%v  Err:%v  rocksDBRecords:%v",
 			DeleteExcessReplicationErr, partition.PartitionID, excessAddr, excessErr.Error(), partition.PersistenceHosts)
 		Warn(clusterID, msg)
-
+		partition.Lock()
+		partition.offLineInMem(excessAddr)
+		partition.Unlock()
 	}
 	if partition.Status == proto.ReadWrite {
 		return
