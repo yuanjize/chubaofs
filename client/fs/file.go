@@ -167,7 +167,7 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	if err != nil && err != io.EOF {
 		msg := fmt.Sprintf("Read: ino(%v) req(%v) err(%v) size(%v)", f.info.Inode, req, err, size)
 		f.super.handleError("Read", msg)
-		return fuse.EIO
+		return fuse.EAGAIN
 	}
 
 	if size > req.Size {

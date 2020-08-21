@@ -342,6 +342,8 @@ const (
 	ERANGE  = Errno(syscall.ERANGE)
 	ENOTSUP = Errno(syscall.ENOTSUP)
 	EEXIST  = Errno(syscall.EEXIST)
+
+	EAGAIN = Errno(syscall.EAGAIN)
 )
 
 // DefaultErrno is the errno used when error returned does not
