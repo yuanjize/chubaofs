@@ -836,6 +836,9 @@ func (m *metaManager) opMetaBatchInodeGet(conn net.Conn, p *Packet) (err error) 
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
 		return
 	}
+	if !m.serveProxy(conn, mp, p) {
+		return
+	}
 	err = mp.InodeGetBatch(req, p)
 	m.respondToClient(conn, p)
 	log.LogDebugf("[opMetaBatchInodeGet] req[%v], resp[%v], body: %s", req,
