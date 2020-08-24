@@ -108,13 +108,11 @@ func (writer *ExtentWriter) waitFlushSignle() {
 		writer.updateSizeLock.Unlock()
 	}()
 
-	for {
-		select {
-		case <-writer.flushSignleCh:
-			return
-		case <-ticker.C:
-			return
-		}
+	select {
+	case <-writer.flushSignleCh:
+		return
+	case <-ticker.C:
+		return
 	}
 }
 
@@ -333,7 +331,7 @@ func (writer *ExtentWriter) processReply(e *list.Element, request, reply *Packet
 		writer.extentId = reply.FileID
 		writer.extentOffset = uint64(reply.Offset)
 	}
-	if atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng {
+	if (atomic.LoadInt32(&writer.isflushIng) == ExtentFlushIng) && (writer.getQueueListLen() == 0) {
 		select {
 		case writer.flushSignleCh <- true:
 			break
