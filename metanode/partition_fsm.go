@@ -120,6 +120,12 @@ func (mp *metaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		mp.storeChan <- msg
 	case opFSMInternalDeleteInode:
 		err = mp.internalDelete(msg.V)
+	case opFSMSyncCursor:
+		var cursor uint64
+		cursor = binary.BigEndian.Uint64(msg.V)
+		if cursor > mp.config.Cursor {
+			mp.config.Cursor = cursor
+		}
 	}
 	return
 }
@@ -182,7 +188,9 @@ func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer,
 			mp.applyID = appIndexID
 			mp.inodeTree = inodeTree
 			mp.dentryTree = dentryTree
-			mp.config.Cursor = cursor
+			if cursor != 0 {
+				mp.config.Cursor = cursor
+			}
 			err = nil
 			// store message
 			mp.storeChan <- &storeMsg{
@@ -191,7 +199,7 @@ func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer,
 				inodeTree:  mp.inodeTree,
 				dentryTree: mp.dentryTree,
 			}
-			log.LogDebugf("[ApplySnapshot] successful.")
+			log.LogDebugf("ApplySnapshot: finish with EOF: partitionID(%v) applyID(%v),cursor(%v)", mp.config.PartitionId, mp.applyID, mp.config.Cursor)
 			return
 		}
 		log.LogErrorf("[ApplySnapshot]: %s", err.Error())
