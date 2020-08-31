@@ -102,6 +102,7 @@ const (
 	opFSMCreateLinkInode
 	opFSMEvictInode
 	opFSMInternalDeleteInode
+	opFSMSyncCursor
 )
 
 var (
@@ -139,4 +140,5 @@ const (
 
 const (
 	storeTimeTicker = time.Minute * 5
+	intervalToSyncCursor  = time.Minute * 2
 )
