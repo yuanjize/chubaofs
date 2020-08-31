@@ -185,13 +185,15 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 		log.LogWarnf("action[checkEnd] vol[%v] not exist", mp.VolName)
 		return
 	}
-	mp.Lock()
-	defer mp.Unlock()
+	vol.createMpLock.Lock()
+	defer vol.createMpLock.Unlock()
 	curMaxPartitionID := vol.getMaxPartitionID()
 	if mp.PartitionID != curMaxPartitionID {
 		log.LogWarnf("action[checkEnd] partition[%v] not max partition[%v]", mp.PartitionID, curMaxPartitionID)
 		return
 	}
+	mp.Lock()
+	defer mp.Unlock()
 	if mp.End != defaultMaxMetaPartitionInodeID {
 		oldEnd := mp.End
 		mp.End = defaultMaxMetaPartitionInodeID

@@ -217,6 +217,12 @@ func (vol *Vol) autoCreateMetaPartitions(c *Cluster) {
 			log.LogErrorf("action[autoCreateMetaPartitions],cluster[%v],vol[%v],err[%v]", c.Name, vol.Name, err)
 			return
 		}
+		// wait for leader ready
+		_, err = mp.getLeaderMetaReplica()
+		if err != nil {
+			log.LogWarnf("action[autoCreateMetaPartitions],cluster[%v],vol[%v],err[%v], will create it later", c.Name, vol.Name, err)
+			return
+		}
 		nextStart := mp.Start + mp.MaxInodeID + defaultMetaPartitionInodeIDStep
 		if err = vol.splitMetaPartition(c, mp, nextStart); err != nil {
 			msg := fmt.Sprintf("cluster[%v],vol[%v],meta partition[%v] splits failed,err[%v]",
