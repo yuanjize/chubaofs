@@ -58,6 +58,7 @@ const (
 	descriptionKey          = "description"
 	dpRecoverPoolSizeKey    = "dpRecoverPool"
 	mpRecoverPoolSizeKey    = "mpRecoverPool"
+	autoKey                 = "auto"
 )
 
 const (
@@ -110,6 +111,7 @@ const (
 	defaultRecoverPoolSize                       = -1
 	maxDataPartitionsRecoverPoolSize             = 50
 	maxMetaPartitionsRecoverPoolSize             = 30
+	defaultLearnerPromThreshold                  = 90
 )
 
 const (
