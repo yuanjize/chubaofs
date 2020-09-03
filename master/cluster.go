@@ -755,94 +755,160 @@ func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 	go dataNode.clean()
 }
 
-func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) (err error) {
-	var (
-		newHosts []string
-		newAddr  string
-		msg      string
-		diskPath string
-		tasks    []*proto.AdminTask
-		task     *proto.AdminTask
-		dataNode *DataNode
-		rack     *Rack
-		vol      *Vol
-		replica  *DataReplica
-	)
+func (c *Cluster) validateDecommissionDataPartition(dp *DataPartition, offlineAddr string) (err error) {
 	dp.Lock()
 	defer dp.Unlock()
-	if ok := dp.isInPersistenceHosts(offlineAddr); !ok {
+	var vol *Vol
+	if vol, err = c.getVol(dp.VolName); err != nil {
 		return
-	}
-
-	if dp.isRecover == true && dp.isNotLatestAddr(offlineAddr) {
-		log.LogErrorf("clusterID[%v],dp[%v] is recovering,can't offline [%v]", c.Name, dp.PartitionID, offlineAddr)
-		return
-	}
-
-	if vol, err = c.getVol(volName); err != nil {
-		goto errDeal
 	}
 
 	if err = dp.hasMissOne(int(vol.dpReplicaNum)); err != nil {
-		goto errDeal
+		return
 	}
+
+	// if the partition can be offline or not
 	if err = dp.canOffLine(offlineAddr); err != nil {
-		goto errDeal
+		return
+	}
+
+	if dp.isRecover && dp.isNotLatestAddr(offlineAddr) {
+		err = fmt.Errorf("vol[%v],data partition[%v] is recovering,[%v] can't be decommissioned", vol.Name, dp.PartitionID, offlineAddr)
+		return
+	}
+	return
+}
+
+func (c *Cluster) deleteDataReplica(dp *DataPartition, dataNode *DataNode) (err error) {
+	dp.Lock()
+	// in case dataNode is unreachable,update meta first.
+	dp.offLineInMem(dataNode.Addr)
+	dp.checkAndRemoveMissReplica(dataNode.Addr)
+	if err = dp.update("deleteDataReplica", dp.VolName, dataNode.Addr, Update_RemoveMember, c); err != nil {
+		dp.Unlock()
+		return
+	}
+	task := dp.GenerateDeleteTask(dataNode.Addr)
+	dp.Unlock()
+	_, err = dataNode.Sender.syncSendAdminTask(task)
+	if err != nil {
+		log.LogErrorf("action[deleteDataReplica] vol[%v],data partition[%v],err[%v]", dp.VolName, dp.PartitionID, err)
+	}
+	return nil
+}
+
+func (c *Cluster) removeDataReplica(dp *DataPartition, addr string, validate bool) (err error) {
+	defer func() {
+		if err != nil {
+			log.LogErrorf("action[removeDataReplica],vol[%v],data partition[%v],err[%v]", dp.VolName, dp.PartitionID, err)
+		}
+	}()
+
+	if validate == true {
+		if err = c.validateDecommissionDataPartition(dp, addr); err != nil {
+			return
+		}
+	}
+
+	ok := c.isRecovering(dp, addr)
+	if ok {
+		err = fmt.Errorf("vol[%v],data partition[%v] can't decommision until it has recovered", dp.VolName, dp.PartitionID)
+		return
+	}
+
+	dataNode, err := c.getDataNode(addr)
+	if err != nil {
+		return
+	}
+	if err = c.deleteDataReplica(dp, dataNode); err != nil {
+		return
+	}
+
+	return
+}
+
+// Decommission a data partition.
+// 1. Check if we can decommission a data partition. In the following cases, we are not allowed to do so:
+// - (a) a replica is not in the latest host list;
+// - (b) there is already a replica been taken offline;
+// - (c) the remaining number of replicas is less than the majority
+// 2. Choose a new data node.
+// 3. synchronized decommission data partition
+// 4. synchronized create a new data partition
+// 5. Set the data partition as readOnly.
+// 6. persistent the new host list
+func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) (err error) {
+	var (
+		targetHosts     []string
+		newAddr         string
+		msg             string
+		dataNode        *DataNode
+		replica         *DataReplica
+		rack     *Rack
+	)
+
+	dp.RLock()
+	if ok := dp.isInPersistenceHosts(offlineAddr); !ok {
+		dp.RUnlock()
+		return
+	}
+
+	replica, _ = dp.getReplica(offlineAddr)
+	dp.RUnlock()
+
+	if err = c.validateDecommissionDataPartition(dp, offlineAddr); err != nil {
+		goto errHandler
 	}
 	dp.generatorOffLineLog(offlineAddr)
 
 	if dataNode, err = c.getDataNode(offlineAddr); err != nil {
-		goto errDeal
+		goto errHandler
 	}
-
 	if dataNode.RackName == "" {
 		return
 	}
 	if rack, err = c.t.getRack(dataNode.RackName); err != nil {
-		goto errDeal
+		goto errHandler
 	}
+
 	if destAddr != "" {
 		if contains(dp.PersistenceHosts, destAddr) {
 			err = errors.Errorf("destinationAddr[%v] must be a new data node addr,oldHosts[%v]", destAddr, dp.PersistenceHosts)
-			goto errDeal
+			goto errHandler
 		}
 		_, err = c.getDataNode(destAddr)
 		if err != nil {
-			goto errDeal
+			goto errHandler
 		}
-		newHosts = append(newHosts, destAddr)
-	} else if newHosts, err = rack.getAvailDataNodeHosts(dp.PersistenceHosts, 1); err != nil {
-		goto errDeal
+		targetHosts = append(targetHosts, destAddr)
+	} else if targetHosts, err = rack.getAvailDataNodeHosts(dp.PersistenceHosts, 1); err != nil {
+		goto errHandler
 	}
-	newAddr = newHosts[0]
-	if diskPath, err = c.syncCreateDataPartitionToDataNode(newAddr, dp); err != nil {
-		goto errDeal
+
+	if err = c.removeDataReplica(dp, offlineAddr, false); err != nil {
+		goto errHandler
 	}
-	if err = dp.afterCreation(newAddr, diskPath, c); err != nil {
-		goto errDeal
+
+	newAddr = targetHosts[0]
+	if err = c.addDataReplica(dp, newAddr); err != nil {
+		goto errHandler
 	}
-	if err = dp.updateForOffline(offlineAddr, newAddr, volName, c); err != nil {
-		goto errDeal
-	}
-	if replica, err = dp.getReplica(offlineAddr); err != nil {
-		goto errDeal
-	}
+
+	dp.Status = proto.ReadOnly
 	dp.isRecover = true
 	c.putBadDataPartitionIDs(replica, dataNode, dp.PartitionID)
-	dp.offLineInMem(offlineAddr)
-	dp.checkAndRemoveMissReplica(offlineAddr)
-	task = dp.GenerateDeleteTask(offlineAddr)
-	tasks = make([]*proto.AdminTask, 0)
-	tasks = append(tasks, task)
-	c.putDataNodeTasks(tasks)
-errDeal:
+	log.LogWarnf("clusterID[%v] partitionID:%v  on Node:%v offline success,newHost[%v],PersistenceHosts:[%v]",
+		c.Name, dp.PartitionID, offlineAddr, newAddr, dp.PersistenceHosts)
+	return
+
+errHandler:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",
 		c.Name, dp.PartitionID, offlineAddr, newAddr, err, dp.PersistenceHosts)
 	if err != nil {
 		Warn(c.Name, msg)
+		err = fmt.Errorf("vol[%v],partition[%v],err[%v]", dp.VolName, dp.PartitionID, err)
 	}
-	log.LogWarn(msg)
 	return
 }
 
@@ -1315,3 +1381,60 @@ func (c *Cluster) updateToken(vol *Vol, tokenType int8, token, authKey string) (
 	vol.putToken(tokenObj)
 	return
 }
+
+func (c *Cluster) addDataReplica(dp *DataPartition, addr string) (err error) {
+	defer func() {
+		if err != nil {
+			log.LogErrorf("action[addDataReplica],vol[%v],data partition[%v],err[%v]", dp.VolName, dp.PartitionID, err)
+		}
+	}()
+
+	if err = c.createDataReplica(dp, addr); err != nil {
+		return
+	}
+	return
+}
+
+func (c *Cluster) createDataReplica(dp *DataPartition,  host string) (err error) {
+	dp.RLock()
+	hosts := make([]string, len(dp.PersistenceHosts))
+	copy(hosts, dp.PersistenceHosts)
+	dp.RUnlock()
+	diskPath, err := c.syncCreateDataPartitionToDataNode(host, dp)
+	if err != nil {
+		return
+	}
+	dp.Lock()
+	defer dp.Unlock()
+	if err = dp.afterCreation(host, diskPath, c); err != nil {
+		return
+	}
+	if err = dp.update("createDataReplica", dp.VolName, host, Update_AddMember, c); err != nil {
+		return
+	}
+	return
+}
+
+func (c *Cluster) isRecovering(dp *DataPartition, addr string) (isRecover bool) {
+	var key string
+	dp.RLock()
+	defer dp.RUnlock()
+	replica, _ := dp.getReplica(addr)
+	if replica != nil {
+		key = fmt.Sprintf("%s:%s", addr, replica.DiskPath)
+	} else {
+		key = fmt.Sprintf("%s:%s", addr, "")
+	}
+	var badPartitionIDs []uint64
+	badPartitions, ok := c.BadDataPartitionIds.Load(key)
+	if ok {
+		badPartitionIDs = badPartitions.([]uint64)
+	}
+	for _, id := range badPartitionIDs {
+		if id == dp.PartitionID {
+			isRecover = true
+		}
+	}
+	return
+}
+

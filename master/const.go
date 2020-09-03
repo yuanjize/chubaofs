@@ -14,6 +14,8 @@
 
 package master
 
+import "time"
+
 const (
 	ParaHosts                 = "hosts"
 	ParaDestAddr              = "destAddr"
@@ -82,6 +84,7 @@ const (
 	DefaultVolMinWritableDPNum                    = 5
 	DefaultVolMinWritableMPNum                    = 1
 	defaultOfflineChannelBufferCapacity           = 1000
+	retrySendSyncTaskInternal                    = 3 * time.Second
 )
 
 const (

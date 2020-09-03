@@ -27,6 +27,12 @@ import (
 	"time"
 )
 
+type UpdateType int32
+const (
+	Update_AddMember UpdateType = 0
+	Update_RemoveMember UpdateType = 1
+)
+
 type BadDiskDataPartition struct {
 	dp          *DataPartition
 	diskErrAddr string
@@ -399,27 +405,35 @@ func (partition *DataPartition) getReplicaIndex(addr string) (index int, err err
 	return -1, errors.Annotatef(DataReplicaNotFound, "%v not found ", addr)
 }
 
-func (partition *DataPartition) updateForOffline(offlineAddr, newAddr, volName string, c *Cluster) (err error) {
+//func (partition *DataPartition) update(action, offlineAddr, newAddr, volName string, c *Cluster) (err error) {
+func (partition *DataPartition) update(action, volName, host string,  upType UpdateType, c *Cluster) (err error) {
 	orgHosts := make([]string, len(partition.PersistenceHosts))
 	copy(orgHosts, partition.PersistenceHosts)
-	newHosts := make([]string, 0)
-	for index, addr := range partition.PersistenceHosts {
-		if addr == offlineAddr {
-			after := partition.PersistenceHosts[index+1:]
-			newHosts = partition.PersistenceHosts[:index]
-			newHosts = append(newHosts, after...)
-			break
+
+	switch upType {
+	case Update_AddMember:
+		partition.PersistenceHosts = append(partition.PersistenceHosts, host)
+
+	case Update_RemoveMember:
+		newHosts := make([]string, 0)
+		for index, addr := range partition.PersistenceHosts {
+			if addr == host {
+				after := partition.PersistenceHosts[index+1:]
+				newHosts = partition.PersistenceHosts[:index]
+				newHosts = append(newHosts, after...)
+				break
+			}
 		}
+		partition.PersistenceHosts = newHosts
+	default:
 	}
-	newHosts = append(newHosts, newAddr)
-	partition.PersistenceHosts = newHosts
+
 	if err = c.syncUpdateDataPartition(volName, partition); err != nil {
 		partition.PersistenceHosts = orgHosts
 		return errors.Annotatef(err, "update partition[%v] failed", partition.PartitionID)
 	}
-	msg := fmt.Sprintf("action[updateForOffline]  partitionID:%v offlineAddr:%v newAddr:%v"+
-		"oldHosts:%v newHosts:%v",
-		partition.PartitionID, offlineAddr, newAddr, orgHosts, partition.PersistenceHosts)
+	msg := fmt.Sprintf("action[%v]  partitionID:%v hostAddr::%v oldHosts:%v newHosts:%v",
+		action, partition.PartitionID, host, orgHosts, partition.PersistenceHosts)
 	log.LogInfo(msg)
 	return
 }
@@ -541,3 +555,4 @@ func (partition *DataPartition) isLatestAddr(addr string) (ok bool) {
 func (partition *DataPartition) isNotLatestAddr(addr string) bool {
 	return !partition.isLatestAddr(addr)
 }
+
