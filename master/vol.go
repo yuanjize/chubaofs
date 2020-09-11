@@ -184,7 +184,10 @@ func (vol *Vol) checkDataPartitions(c *Cluster) (readWriteDataPartitions int) {
 				}
 			}
 		}
-		dp.checkReplicationTask(c)
+		tasks := dp.checkReplicationTask(c.Name)
+		if len(tasks) != 0 {
+			c.putDataNodeTasks(tasks)
+		}
 	}
 	return
 }
@@ -212,6 +215,7 @@ func (vol *Vol) ReleaseDataPartitions(releaseCount int, afterLoadSeconds int64) 
 }
 
 func (vol *Vol) checkMetaPartitions(c *Cluster) (writableMpCount int) {
+	var tasks []*proto.AdminTask
 	maxPartitionID := vol.getMaxPartitionID()
 	mps := vol.cloneMetaPartitionMap()
 	var (
@@ -233,8 +237,10 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) (writableMpCount int) {
 		if mp.Status == proto.ReadWrite {
 			writableMpCount++
 		}
-		mp.checkExcessRelications(c)
+
+		tasks = append(tasks, mp.GenerateReplicaTask(c.Name, vol.Name)...)
 	}
+	c.putMetaNodeTasks(tasks)
 	return
 }
 
@@ -669,4 +675,3 @@ func (vol *Vol) doCreateMetaPartition(c *Cluster, start, end uint64) (mp *MetaPa
 	log.LogInfof("action[CreateMetaPartition] success,volName[%v],partition[%v]", vol.Name, partitionID)
 	return
 }
-
