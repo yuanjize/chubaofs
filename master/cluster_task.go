@@ -601,6 +601,9 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		goto errHandler
 	}
 
+	mp.offlineMutex.Lock()
+	defer mp.offlineMutex.Unlock()
+
 	mp.RLock()
 	if !contains(mp.PersistenceHosts, nodeAddr) {
 		mp.RUnlock()
@@ -666,7 +669,7 @@ func (c *Cluster) validateDecommissionMetaPartition(mp *MetaPartition, nodeAddr 
 		return
 	}
 
-	if err = mp.hasMissingOneReplica(int(vol.mpReplicaNum)); err != nil {
+	if err = mp.hasMissingOneReplica(nodeAddr, int(vol.mpReplicaNum)); err != nil {
 		return
 	}
 
@@ -734,7 +737,8 @@ func (c *Cluster) removeMetaPartitionRaftMember(partition *MetaPartition, remove
 	defer func(){
 		e:= c.updateMetaPartitionOfflinePeerIDWithLock(partition, 0)
 		if e != nil {
-			log.LogErrorf("Failed to removeMetaPartitionRaftMember, the error is (%v)", e)
+			log.LogErrorf("Failed to updateMetaPartitionOfflinePeerIDWithLock by 0, the error is (%v)", e)
+			err = errors.Annotate(e, "Failed to updateMetaPartitionOfflinePeerIDWithLock")
 		}
 	}()
 	mr, err := partition.getLeaderMetaReplica()
@@ -753,6 +757,16 @@ func (c *Cluster) removeMetaPartitionRaftMember(partition *MetaPartition, remove
 			return
 		}
 	}
+
+	if err = c.updateMetaPartitionOfflinePeerIDWithLock(partition, removePeer.ID); err != nil {
+		return
+	}
+
+	if _, err = leaderMetaNode.Sender.syncSendAdminTask(t); err != nil {
+		return
+	}
+
+	partition.Lock()
 	newHosts := make([]string, 0, len(partition.PersistenceHosts)-1)
 	newPeers := make([]proto.Peer, 0, len(partition.PersistenceHosts)-1)
 	for _, host := range partition.PersistenceHosts {
@@ -767,16 +781,6 @@ func (c *Cluster) removeMetaPartitionRaftMember(partition *MetaPartition, remove
 		}
 		newPeers = append(newPeers, peer)
 	}
-
-	if err = c.updateMetaPartitionOfflinePeerIDWithLock(partition, removePeer.ID); err != nil {
-		return
-	}
-
-	if _, err = leaderMetaNode.Sender.syncSendAdminTask(t); err != nil {
-		return
-	}
-
-	partition.Lock()
 	if err = partition.persistToRocksDB("removeMetaPartitionRaftMember", partition.VolName, newHosts, newPeers, c); err != nil {
 		partition.Unlock()
 		return

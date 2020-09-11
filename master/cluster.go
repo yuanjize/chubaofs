@@ -400,6 +400,8 @@ func (c *Cluster) deleteDataPartition(partitionID uint64) (err error) {
 	if dp, err = c.getDataPartitionByID(partitionID); err != nil {
 		goto errDeal
 	}
+	dp.offlineMutex.Lock()
+	defer dp.offlineMutex.Unlock()
 	if vol, err = c.getVol(dp.VolName); err != nil {
 		goto errDeal
 	}
@@ -763,7 +765,7 @@ func (c *Cluster) validateDecommissionDataPartition(dp *DataPartition, offlineAd
 		return
 	}
 
-	if err = dp.hasMissOne(int(vol.dpReplicaNum)); err != nil {
+	if err = dp.hasMissOne(offlineAddr, int(vol.dpReplicaNum)); err != nil {
 		return
 	}
 
@@ -846,6 +848,8 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 		replica         *DataReplica
 		rack     *Rack
 	)
+	dp.offlineMutex.Lock()
+	defer dp.offlineMutex.Unlock()
 
 	dp.RLock()
 	if ok := dp.isInPersistenceHosts(offlineAddr); !ok {
