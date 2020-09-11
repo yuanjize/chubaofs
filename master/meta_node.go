@@ -146,20 +146,3 @@ func (metaNode *MetaNode) toJson() (body []byte, err error) {
 	defer metaNode.RUnlock()
 	return json.Marshal(metaNode)
 }
-
-func (mp *MetaPartition) tryToChangeLeader(c *Cluster, metaNode *MetaNode) (err error) {
-	task, err := mp.createTaskToTryToChangeLeader(metaNode.Addr)
-	if err != nil {
-		return
-	}
-	if _, err = metaNode.Sender.syncSendAdminTask(task); err != nil {
-		return
-	}
-	return
-}
-
-func (mp *MetaPartition) createTaskToTryToChangeLeader(addr string) (task *proto.AdminTask, err error) {
-	task = proto.NewAdminTask(proto.OpMetaPartitionTryToLeader, addr, nil)
-	resetMetaPartitionTaskID(task, mp.PartitionID)
-	return
-}

@@ -32,7 +32,6 @@ const (
 /*task struct to node*/
 type AdminTask struct {
 	ID           string
-	PartitionID  uint64
 	OpCode       uint8
 	OperatorAddr string
 	Status       int8
