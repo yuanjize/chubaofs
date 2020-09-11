@@ -55,7 +55,6 @@ type MetaPartition struct {
 	OfflinePeerID uint64
 	MissNodes        map[string]int64
 	LoadResponse     []*proto.LoadMetaPartitionMetricResponse
-	offlineMutex sync.RWMutex
 	sync.RWMutex
 }
 
@@ -302,36 +301,16 @@ func (mp *MetaPartition) checkReplicaNum(c *Cluster, volName string, replicaNum 
 	}
 }
 
-func (mp *MetaPartition) deleteExcessReplication(c *Cluster) () {
-	var mr *MetaReplica
-	isFound := false
-	mp.Lock()
-	for _, mr = range mp.Replicas {
+func (mp *MetaPartition) deleteExcessReplication() (excessAddr string, t *proto.AdminTask, err error) {
+	mp.RLock()
+	defer mp.RUnlock()
+	for _, mr := range mp.Replicas {
 		if !contains(mp.PersistenceHosts, mr.Addr) {
-			isFound = true
+			t = mr.generateDeleteReplicaTask(mp.PartitionID)
+			err = MetaReplicaExcessError
 			break
 		}
 	}
-	mp.Unlock()
-
-	if !isFound {
-		return
-	}
-	mp.offlineMutex.Lock()
-	defer mp.offlineMutex.Unlock()
-	var msg string
-	err := c.deleteMetaReplica(mp, mr.Addr, false)
-	if err != nil {
-		msg = fmt.Sprintf("action[%v],clusterID[%v] metaPartition:%v  excess replication"+
-			" on :%v  err:%v  persistenceHosts:%v",
-			DeleteExcessReplicationErr, c.Name, mp.PartitionID, mr.Addr, err.Error(), mp.PersistenceHosts)
-	} else {
-		msg = fmt.Sprintf("action[%v],clusterID[%v] metaPartition:%v  excess replication"+
-			" on :%v  persistenceHosts:%v",
-			DeleteExcessReplicationErr, c.Name, mp.PartitionID, mr.Addr, mp.PersistenceHosts)
-	}
-	log.LogWarn(msg)
-
 	return
 }
 
@@ -467,13 +446,21 @@ func (mp *MetaPartition) checkReplicaMiss(clusterID, leaderAddr string, partitio
 	}
 }
 
-func (mp *MetaPartition) checkExcessRelications(c *Cluster)  {
-	mp.deleteExcessReplication(c)
+func (mp *MetaPartition) GenerateReplicaTask(clusterID, volName string) (tasks []*proto.AdminTask) {
+	var msg string
+	tasks = make([]*proto.AdminTask, 0)
+	if excessAddr, task, excessErr := mp.deleteExcessReplication(); excessErr != nil {
+		msg = fmt.Sprintf("action[%v],clusterID[%v] metaPartition:%v  excess replication"+
+			" on :%v  err:%v  persistenceHosts:%v",
+			DeleteExcessReplicationErr, clusterID, mp.PartitionID, excessAddr, excessErr.Error(), mp.PersistenceHosts)
+		log.LogWarn(msg)
+		tasks = append(tasks, task)
+	}
 	if lackAddrs := mp.getLackReplication(); lackAddrs != nil {
-		msg := fmt.Sprintf("action[getLackReplication],clusterID[%v] metaPartition:%v  lack replication"+
+		msg = fmt.Sprintf("action[getLackReplication],clusterID[%v] metaPartition:%v  lack replication"+
 			" on :%v PersistenceHosts:%v",
-			c.Name, mp.PartitionID, lackAddrs, mp.PersistenceHosts)
-		Warn(c.Name, msg)
+			clusterID, mp.PartitionID, lackAddrs, mp.PersistenceHosts)
+		Warn(clusterID, msg)
 	}
 
 	return
@@ -639,24 +626,12 @@ func (mp *MetaPartition) addOrReplaceLoadResponse(response *proto.LoadMetaPartit
 }
 
 // Check if there is a replica missing or not.
-func (mp *MetaPartition) hasMissingOneReplica(offlineAddr string, replicaNum int) (err error) {
-	curHostCount := len(mp.PersistenceHosts)
-	for _, host := range mp.PersistenceHosts{
-		if host == offlineAddr {
-			curHostCount = curHostCount - 1
-		}
-	}
-
-	curReplicaCount := len(mp.Replicas)
-	for _, r := range mp.Replicas {
-		if r.Addr == offlineAddr {
-			curReplicaCount = curReplicaCount - 1
-		}
-	}
-	if curHostCount < replicaNum-1 || curReplicaCount < replicaNum - 1{
-		err = MetaReplicaHasMissOneError
+func (mp *MetaPartition) hasMissingOneReplica(replicaNum int) (err error) {
+	hostNum := len(mp.Replicas)
+	if hostNum <= replicaNum-1 {
 		log.LogError(fmt.Sprintf("action[%v],partitionID:%v,err:%v",
-			"hasMissingOneReplica", mp.PartitionID, err))
+			"hasMissingOneReplica", mp.PartitionID, MetaReplicaHasMissOneError))
+		err = MetaReplicaHasMissOneError
 	}
 	return
 }

@@ -488,12 +488,6 @@ func (m *Master) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	if name, authKey, err = parseDeleteVolPara(r); err != nil {
 		goto errDeal
 	}
-
-	if err == nil {
-		err = errors.New("Not support delete volume.")
-		goto errDeal
-	}
-
 	if err = m.cluster.markDeleteVol(name, authKey); err != nil {
 		goto errDeal
 	}
