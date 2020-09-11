@@ -169,27 +169,16 @@ func (partition *DataPartition) checkDiskError(clusterID, leaderAddr string) (di
 	return
 }
 
-func (partition *DataPartition) checkReplicationTask(clusterID string) (tasks []*proto.AdminTask) {
-	var msg string
-	tasks = make([]*proto.AdminTask, 0)
-	if excessAddr, task, excessErr := partition.deleteExcessReplication(); excessErr != nil {
-		tasks = append(tasks, task)
-		msg = fmt.Sprintf("action[%v], partitionID:%v  Excess Replication"+
-			" On :%v  Err:%v  rocksDBRecords:%v",
-			DeleteExcessReplicationErr, partition.PartitionID, excessAddr, excessErr.Error(), partition.PersistenceHosts)
-		Warn(clusterID, msg)
-		partition.Lock()
-		partition.offLineInMem(excessAddr)
-		partition.Unlock()
-	}
+func (partition *DataPartition) checkReplicationTask(c *Cluster) () {
+	partition.deleteExcessReplication(c)
 	if partition.Status == proto.ReadWrite {
 		return
 	}
 	if lackAddr, lackErr := partition.addLackReplication(); lackErr != nil {
-		msg = fmt.Sprintf("action[%v], partitionID:%v  Lack Replication"+
+    msg := fmt.Sprintf("action[%v], partitionID:%v  Lack Replication"+
 			" On :%v  Err:%v  PersistenceHosts:%v  new task to create DataReplica",
 			AddLackReplicationErr, partition.PartitionID, lackAddr, lackErr.Error(), partition.PersistenceHosts)
-		Warn(clusterID, msg)
+		Warn(c.Name, msg)
 	} else {
 		partition.setToNormal()
 	}
@@ -199,20 +188,36 @@ func (partition *DataPartition) checkReplicationTask(clusterID string) (tasks []
 
 /*delete data replica excess replication ,range all data replicas
 if data replica not in persistenceHosts then generator task to delete the replica*/
-func (partition *DataPartition) deleteExcessReplication() (excessAddr string, task *proto.AdminTask, err error) {
+func (partition *DataPartition) deleteExcessReplication(c *Cluster)  {
 	partition.Lock()
-	defer partition.Unlock()
+	var replica *DataReplica
+	var isFound bool
 	for i := 0; i < len(partition.Replicas); i++ {
-		replica := partition.Replicas[i]
-		if ok := partition.isInPersistenceHosts(replica.Addr); !ok {
-			excessAddr = replica.Addr
-			log.LogError(fmt.Sprintf("action[deleteExcessReplication],partitionID:%v,has excess replication:%v",
-				partition.PartitionID, excessAddr))
-			err = DataReplicaExcessError
-			task = partition.GenerateDeleteTask(excessAddr)
+		replica = partition.Replicas[i]
+		if isFound = partition.isInPersistenceHosts(replica.Addr); !isFound {
 			break
 		}
 	}
+	partition.Unlock()
+
+	if isFound {
+		return
+	}
+  
+  partition.offlineMutex.Lock()
+  defer partition.offlineMutex.Unlock()
+	var msg string
+	err := c.removeDataReplica(partition, replica.Addr, false)
+	if  err != nil {
+		msg = fmt.Sprintf("action[%v], partitionID:%v  Excess Replication"+
+			" On :%v  Err:%v  rocksDBRecords:%v",
+			DeleteExcessReplicationErr, partition.PartitionID, replica.Addr, err.Error(), partition.PersistenceHosts)
+	} else {
+		msg = fmt.Sprintf("action[%v], partitionID:%v  Excess Replication"+
+			" On :%v  rocksDBRecords:%v",
+			DeleteExcessReplicationErr, partition.PartitionID, replica.Addr, partition.PersistenceHosts)
+	}
+	Warn(c.Name, msg)
 
 	return
 }

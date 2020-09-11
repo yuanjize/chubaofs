@@ -48,6 +48,7 @@ type DataPartition struct {
 	Replicas         []*DataReplica
 	PartitionType    string
 	PersistenceHosts []string
+	offlineMutex   sync.RWMutex
 	sync.RWMutex
 	total           uint64
 	used            uint64
@@ -101,12 +102,23 @@ func (partition *DataPartition) resetTaskID(t *proto.AdminTask) {
 	t.ID = fmt.Sprintf("%v_DataPartitionID[%v]", t.ID, partition.PartitionID)
 }
 
-func (partition *DataPartition) hasMissOne(replicaNum int) (err error) {
-	availPersistenceHostLen := len(partition.PersistenceHosts)
-	if availPersistenceHostLen <= replicaNum-1 {
-		log.LogError(fmt.Sprintf("action[%v],partitionID:%v,err:%v",
-			"hasMissOne", partition.PartitionID, DataReplicaHasMissOneError))
+func (partition *DataPartition) hasMissOne(offlineAddr string, replicaNum int) (err error) {
+	curHostCount := len(partition.PersistenceHosts)
+	for _, host := range partition.PersistenceHosts {
+		if host == offlineAddr {
+			curHostCount = curHostCount - 1
+		}
+	}
+	curReplicaCount := len(partition.Replicas)
+	for _, r := range partition.Replicas {
+		if r.Addr == offlineAddr {
+			curReplicaCount = curReplicaCount - 1
+		}
+	}
+	if curReplicaCount < replicaNum-1 || curHostCount < replicaNum-1 {
 		err = DataReplicaHasMissOneError
+		log.LogError(fmt.Sprintf("action[%v],partitionID:%v,err:%v",
+			"hasMissingOneReplica", partition.PartitionID, err))
 	}
 	return
 }
