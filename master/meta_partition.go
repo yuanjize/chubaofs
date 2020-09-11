@@ -52,7 +52,6 @@ type MetaPartition struct {
 	VolName          string
 	PersistenceHosts []string
 	Peers            []proto.Peer
-	OfflinePeerID uint64
 	MissNodes        map[string]int64
 	LoadResponse     []*proto.LoadMetaPartitionMetricResponse
 	sync.RWMutex
@@ -382,6 +381,25 @@ func (mp *MetaPartition) getLiveReplica() (liveReplicas []*MetaReplica) {
 	return
 }
 
+func (mp *MetaPartition) updateInfoToStore(newHosts []string, newPeers []proto.Peer, volName string, c *Cluster) (err error) {
+	oldHosts := make([]string, len(mp.PersistenceHosts))
+	copy(oldHosts, mp.PersistenceHosts)
+	oldPeers := make([]proto.Peer, len(mp.Peers))
+	copy(oldPeers, mp.Peers)
+	mp.PersistenceHosts = newHosts
+	mp.Peers = newPeers
+	if err = c.syncUpdateMetaPartition(volName, mp); err != nil {
+		mp.PersistenceHosts = oldHosts
+		mp.Peers = oldPeers
+		log.LogWarnf("action[updateInfoToStore] failed,partitionID:%v  old hosts:%v new hosts:%v oldPeers:%v  newPeers:%v",
+			mp.PartitionID, mp.PersistenceHosts, newHosts, mp.Peers, newPeers)
+		return
+	}
+	log.LogWarnf("action[updateInfoToStore] success,partitionID:%v  old hosts:%v  new hosts:%v oldPeers:%v  newPeers:%v ",
+		mp.PartitionID, oldHosts, mp.PersistenceHosts, oldPeers, mp.Peers)
+	return
+}
+
 func (mp *MetaPartition) getLiveAddrs() (liveAddrs []string) {
 	liveAddrs = make([]string, 0)
 	for _, mr := range mp.Replicas {
@@ -507,7 +525,6 @@ func (mp *MetaPartition) generateOfflineTask(volName string, removePeer proto.Pe
 
 func resetMetaPartitionTaskID(t *proto.AdminTask, partitionID uint64) {
 	t.ID = fmt.Sprintf("%v_pid[%v]", t.ID, partitionID)
-	t.PartitionID = partitionID
 }
 
 func (mp *MetaPartition) generateUpdateMetaReplicaTask(clusterID string, partitionID uint64, end uint64) (t *proto.AdminTask) {
@@ -623,52 +640,4 @@ func (mp *MetaPartition) addOrReplaceLoadResponse(response *proto.LoadMetaPartit
 	}
 	loadResponse = append(loadResponse, response)
 	mp.LoadResponse = loadResponse
-}
-
-// Check if there is a replica missing or not.
-func (mp *MetaPartition) hasMissingOneReplica(replicaNum int) (err error) {
-	hostNum := len(mp.Replicas)
-	if hostNum <= replicaNum-1 {
-		log.LogError(fmt.Sprintf("action[%v],partitionID:%v,err:%v",
-			"hasMissingOneReplica", mp.PartitionID, MetaReplicaHasMissOneError))
-		err = MetaReplicaHasMissOneError
-	}
-	return
-}
-
-func (mp *MetaPartition) createTaskToRemoveRaftMember(removePeer proto.Peer) (t *proto.AdminTask, err error) {
-	mr, err := mp.getLeaderMetaReplica()
-	if err != nil {
-		return nil, err
-	}
-	req := &proto.RemoveMetaPartitionRaftMemberRequest{PartitionId: mp.PartitionID, RemovePeer: removePeer}
-	t = proto.NewAdminTask(proto.OpRemoveMetaPartitionRaftMember, mr.Addr, req)
-	resetMetaPartitionTaskID(t, mp.PartitionID)
-	return
-}
-
-func (mp *MetaPartition) persistToRocksDB(action, volName string, newHosts []string, newPeers []proto.Peer, c *Cluster) (err error) {
-	oldHosts := make([]string, len(mp.PersistenceHosts))
-	copy(oldHosts, mp.PersistenceHosts)
-	oldPeers := make([]proto.Peer, len(mp.Peers))
-	copy(oldPeers, mp.Peers)
-	mp.PersistenceHosts = newHosts
-	mp.Peers = newPeers
-	if err = c.syncUpdateMetaPartition(mp.VolName, mp); err != nil {
-		mp.PersistenceHosts = oldHosts
-		mp.Peers = oldPeers
-		log.LogWarnf("action[%v_persist] failed,vol[%v] partitionID:%v  old hosts:%v new hosts:%v oldPeers:%v  newPeers:%v",
-			action, volName, mp.PartitionID, mp.PersistenceHosts, newHosts, mp.Peers, newPeers)
-		return
-	}
-	log.LogWarnf("action[%v_persist] success,vol[%v] partitionID:%v  old hosts:%v  new hosts:%v oldPeers:%v  newPeers:%v ",
-		action, volName, mp.PartitionID, oldHosts, mp.PersistenceHosts, oldPeers, mp.Peers)
-	return
-}
-
-func (mp *MetaPartition) createTaskToAddRaftMember(addPeer proto.Peer, leaderAddr string) (t *proto.AdminTask, err error) {
-	req := &proto.AddMetaPartitionRaftMemberRequest{PartitionId: mp.PartitionID, AddPeer: addPeer}
-	t = proto.NewAdminTask(proto.OpAddMetaPartitionRaftMember, leaderAddr, req)
-	resetMetaPartitionTaskID(t, mp.PartitionID)
-	return
 }

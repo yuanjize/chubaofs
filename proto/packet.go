@@ -89,9 +89,6 @@ const (
 	OpUpdateMetaPartition  uint8 = 0x43
 	OpLoadMetaPartition    uint8 = 0x44
 	OpOfflineMetaPartition uint8 = 0x45
-	OpAddMetaPartitionRaftMember    uint8 = 0x46
-	OpRemoveMetaPartitionRaftMember uint8 = 0x47
-	OpMetaPartitionTryToLeader      uint8 = 0x48
 
 	// Operations: Master -> DataNode
 	OpCreateDataPartition uint8 = 0x60
@@ -242,12 +239,6 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "OpLoadMetaPartition"
 	case OpOfflineMetaPartition:
 		m = "OpOfflineMetaPartition"
-	case OpAddMetaPartitionRaftMember:
-		m = "OpAddMetaPartitionRaftMember"
-	case OpRemoveMetaPartitionRaftMember:
-		m = "OpRemoveMetaPartitionRaftMember"
-	case OpMetaPartitionTryToLeader:
-		m = "OpMetaPartitionTryToLeader"
 	case OpCreateDataPartition:
 		m = "OpCreateDataPartion"
 	case OpDeleteDataPartition:

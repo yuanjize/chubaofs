@@ -15,15 +15,12 @@
 package metanode
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/chubaofs/chubaofs/master"
-	"github.com/chubaofs/chubaofs/proto"
-	"github.com/chubaofs/chubaofs/util/log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 func (mp *metaPartition) initInode(ino *Inode) {
@@ -120,57 +117,8 @@ func (mp *metaPartition) confAddNode(req *proto.
 	return
 }
 
-func (m *metaPartition) getMetaPartitionFromMaster(id uint64) (partition *master.MetaPartition, err error) {
-	params := make(map[string]string)
-	params["id"] = fmt.Sprintf("%v", id)
-	var data interface{}
-	for i := 0; i < 3; i++ {
-		data, err = masterHelper.Request(http.MethodGet, GetMetaPartition, params, nil)
-		if err != nil {
-			log.LogErrorf("getMetaPartitionFromMaster error %v", err)
-			continue
-		}
-		break
-	}
-	partition = new(master.MetaPartition)
-	if err = json.Unmarshal(data.([]byte), partition); err != nil {
-		err = fmt.Errorf("getMetaPartitionFromMaster jsonUnmarsh failed %v", err)
-		log.LogErrorf(err.Error())
-		return
-	}
-	return
-}
-
-func (mp *metaPartition) canRemoveSelf() (canRemove bool, err error) {
-	var partition *master.MetaPartition
-	if partition, err = mp.getMetaPartitionFromMaster(mp.config.PartitionId); err != nil {
-		log.LogErrorf("action[canRemoveSelf] err[%v]", err)
-		return
-	}
-	canRemove = false
-	var existInPeers bool
-	for _, peer := range partition.Peers {
-		if mp.config.NodeId == peer.ID {
-			existInPeers = true
-		}
-	}
-	if !existInPeers {
-		canRemove = true
-		return
-	}
-	if mp.config.NodeId == partition.OfflinePeerID {
-		canRemove = true
-		return
-	}
-	return
-}
-
 func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 	index uint64) (updated bool, err error) {
-	var canRemoveSelf bool
-	if canRemoveSelf, err = mp.canRemoveSelf(); err != nil {
-		return
-	}
 	peerIndex := -1
 	for i, peer := range mp.config.Peers {
 		if peer.ID == req.RemovePeer.ID {
@@ -182,7 +130,7 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 	if !updated {
 		return
 	}
-	if req.RemovePeer.ID == mp.config.NodeId && canRemoveSelf {
+	if req.RemovePeer.ID == mp.config.NodeId {
 		go func(index uint64) {
 			for {
 				time.Sleep(time.Millisecond)
@@ -210,40 +158,4 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 func (mp *metaPartition) confUpdateNode(req *proto.MetaPartitionOfflineRequest,
 	index uint64) (updated bool, err error) {
 	return
-}
-
-
-func (mp *metaPartition) CanRemoveRaftMember(peer proto.Peer) error {
-	downReplicas := mp.config.RaftStore.RaftServer().GetDownReplicas(mp.config.PartitionId)
-	hasExsit := false
-	for _, p := range mp.config.Peers {
-		if p.ID == peer.ID {
-			hasExsit = true
-			break
-		}
-	}
-	if !hasExsit {
-		return nil
-	}
-
-	hasDownReplicasExcludePeer := make([]uint64, 0)
-	for _, nodeID := range downReplicas {
-		if nodeID.NodeID == peer.ID {
-			continue
-		}
-		hasDownReplicasExcludePeer = append(hasDownReplicasExcludePeer, nodeID.NodeID)
-	}
-
-	sumReplicas := len(mp.config.Peers)
-	if sumReplicas%2 == 1 {
-		if sumReplicas-len(hasDownReplicasExcludePeer) > (sumReplicas/2 + 1) {
-			return nil
-		}
-	} else {
-		if sumReplicas-len(hasDownReplicasExcludePeer) >= (sumReplicas/2 + 1) {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("downReplicas(%v) too much,so donnot offline (%v), the peers are (%v)", downReplicas, peer, mp.config.Peers)
 }

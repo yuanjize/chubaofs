@@ -136,6 +136,105 @@ errDeal:
 	return
 }
 
+func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string, partitionID uint64) (err error) {
+	var (
+		vol          *Vol
+		mp           *MetaPartition
+		t            *proto.AdminTask
+		tasks        []*proto.AdminTask
+		newHosts     []string
+		onlineAddrs  []string
+		newPeers     []proto.Peer
+		removePeer   proto.Peer
+		metaNode     *MetaNode
+		destMetaNode *MetaNode
+	)
+	log.LogWarnf("action[metaPartitionOffline],volName[%v],nodeAddr[%v],partitionID[%v]", volName, nodeAddr, partitionID)
+	if vol, err = c.getVol(volName); err != nil {
+		goto errDeal
+	}
+	if metaNode, err = c.getMetaNode(nodeAddr); err != nil {
+		goto errDeal
+	}
+	if mp, err = vol.getMetaPartition(partitionID); err != nil {
+		goto errDeal
+	}
+	mp.Lock()
+	defer mp.Unlock()
+	if !contains(mp.PersistenceHosts, nodeAddr) {
+		return
+	}
+
+	if mp.IsRecover && mp.isNotLatestAddr(nodeAddr) {
+		err = fmt.Errorf("vol[%v],meta partition[%v] is recovering,[%v] can't be decommissioned", vol.Name, mp.PartitionID, nodeAddr)
+		return
+	}
+
+	if err = mp.canOffline(nodeAddr, int(vol.mpReplicaNum)); err != nil {
+		goto errDeal
+	}
+	if destinationAddr != "" {
+		if contains(mp.PersistenceHosts, destinationAddr) {
+			err = errors.Errorf("destinationAddr[%v] must be a new meta node addr,oldHosts[%v]", destinationAddr, mp.PersistenceHosts)
+			goto errDeal
+		}
+		destMetaNode, err = c.getMetaNode(destinationAddr)
+		if err != nil {
+			goto errDeal
+		}
+		newHosts = append(newHosts, destinationAddr)
+		newPeers = append(newPeers, proto.Peer{ID: destMetaNode.ID, Addr: destinationAddr})
+	} else {
+		if newHosts, newPeers, err = c.getAvailMetaNodeHosts(mp.PersistenceHosts, 1); err != nil {
+			goto errDeal
+		}
+	}
+	onlineAddrs = make([]string, len(newHosts))
+	copy(onlineAddrs, newHosts)
+	for _, host := range mp.PersistenceHosts {
+		if host == nodeAddr {
+			removePeer = proto.Peer{ID: metaNode.ID, Addr: nodeAddr}
+		} else {
+			var mn *MetaNode
+			if mn, err = c.getMetaNode(host); err != nil {
+				goto errDeal
+			}
+			newPeers = append(newPeers, proto.Peer{ID: mn.ID, Addr: host})
+			newHosts = append(newHosts, host)
+		}
+	}
+
+	tasks = mp.generateCreateMetaPartitionTasks(onlineAddrs, newPeers, volName)
+	if err = c.doSyncCreateMetaPartitionToMetaNode(onlineAddrs[0], tasks); err != nil {
+		goto errDeal
+	}
+	if err = mp.createPartitionSuccessTriggerOperator(onlineAddrs[0], c); err != nil {
+		goto errDeal
+	}
+	tasks = make([]*proto.AdminTask, 0)
+	if t, err = mp.generateOfflineTask(volName, removePeer, newPeers[0]); err != nil {
+		goto errDeal
+	}
+	tasks = append(tasks, t)
+	if err = mp.updateInfoToStore(newHosts, newPeers, volName, c); err != nil {
+		goto errDeal
+	}
+	mp.removeReplicaByAddr(nodeAddr)
+	mp.checkAndRemoveMissMetaReplica(nodeAddr)
+	c.putMetaNodeTasks(tasks)
+	mp.IsRecover = true
+	c.putBadMetaPartitions(nodeAddr, mp.PartitionID)
+	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] success",
+		c.Name, partitionID, nodeAddr))
+	return
+errDeal:
+	log.LogError(fmt.Sprintf("action[metaPartitionOffline],volName: %v,partitionID: %v,err: %v",
+		volName, partitionID, errors.ErrorStack(err)))
+	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] failed,err:%v",
+		c.Name, partitionID, nodeAddr, err))
+	return
+}
+
 func (c *Cluster) putBadMetaPartitions(offlineAddr string, partitionID uint64) {
 	newBadPartitionIDs := make([]uint64, 0)
 	badPartitionIDs, ok := c.BadMetaPartitionIds.Load(offlineAddr)
@@ -572,335 +671,4 @@ func (c *Cluster) updateEnd(mp *MetaPartition, mr *proto.MetaPartitionReport, ha
 	}
 	log.LogWarnf("mpid[%v],start[%v],end[%v],addr[%v],used[%v]", mp.PartitionID, mp.Start, mp.End, metaNode.Addr, metaNode.Used)
 	return vol.splitMetaPartition(c, mp, end)
-}
-
-// taking the given mata partition offline.
-// 1. checking if the meta partition can be offline.
-// There are two cases where the partition is not allowed to be offline:
-// (1) the replica is not in the latest host list
-// (2) there are too few replicas
-// 2. choosing a new available meta node
-// 3. synchronized decommission meta partition
-// 4. synchronized create a new meta partition
-// 5. persistent the new host list
-
-func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string, partitionID uint64) (err error) {
-	var (
-		vol          *Vol
-		mp           *MetaPartition
-		newPeers        []proto.Peer
-		destMetaNode *MetaNode
-		newHosts     []string
-		oldHosts []string
-	)
-
-	if vol, err = c.getVol(volName); err != nil {
-		goto errHandler
-	}
-	if mp, err = vol.getMetaPartition(partitionID); err != nil {
-		goto errHandler
-	}
-
-	mp.RLock()
-	if !contains(mp.PersistenceHosts, nodeAddr) {
-		mp.RUnlock()
-		return
-	}
-	oldHosts = mp.PersistenceHosts
-	mp.RUnlock()
-
-	log.LogWarnf("action[decommissionMetaPartition],volName[%v],nodeAddr[%v],partitionID[%v] begin", mp.VolName, nodeAddr, mp.PartitionID)
-	if err = c.validateDecommissionMetaPartition(mp, nodeAddr); err != nil {
-		goto errHandler
-	}
-
-	if destinationAddr != "" {
-		if contains(oldHosts, destinationAddr) {
-			err = errors.Errorf("destinationAddr[%v] must be a new meta node addr,oldHosts[%v]", destinationAddr, oldHosts)
-			goto errHandler
-		}
-		destMetaNode, err = c.getMetaNode(destinationAddr)
-		if err != nil {
-			goto errHandler
-		}
-		newHosts = append(newHosts, destinationAddr)
-		newPeers = append(newPeers, proto.Peer{ID: destMetaNode.ID, Addr: destinationAddr})
-	} else {
-		if newHosts, newPeers, err = c.getAvailMetaNodeHosts(oldHosts, 1); err != nil {
-			goto errHandler
-		}
-	}
-
-	if err = c.deleteMetaReplica(mp, nodeAddr, false); err != nil {
-		goto errHandler
-	}
-
-	if err = c.addMetaReplica(mp, newPeers[0].Addr); err != nil {
-		goto errHandler
-	}
-	mp.IsRecover = true
-	c.putBadMetaPartitions(nodeAddr, mp.PartitionID)
-	Warn(c.Name, fmt.Sprintf("action[decommissionMetaPartition] clusterID[%v] vol[%v] meta partition[%v] "+
-		"offline addr[%v] success,new addr[%v]", c.Name, mp.VolName, mp.PartitionID, nodeAddr, newPeers[0].Addr))
-	return
-
-errHandler:
-	//log.LogError(fmt.Sprintf("action[decommissionMetaPartition],volName: %v,partitionID: %v,err: %v",
-//		mp.VolName, mp.PartitionID, errors.Stack(err)))
-	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] failed,err:%v",
-		c.Name, partitionID, nodeAddr, err))
-	if err != nil {
-		err = fmt.Errorf("vol[%v],partition[%v],err[%v]", mp.VolName, mp.PartitionID, err)
-	}
-	return
-}
-
-func (c *Cluster) validateDecommissionMetaPartition(mp *MetaPartition, nodeAddr string) (err error) {
-	mp.RLock()
-	defer mp.RUnlock()
-	var vol *Vol
-	if vol, err = c.getVol(mp.VolName); err != nil {
-		return
-	}
-	if err = mp.canOffline(nodeAddr, int(vol.mpReplicaNum)); err != nil {
-		return
-	}
-
-	if err = mp.hasMissingOneReplica(int(vol.mpReplicaNum)); err != nil {
-		return
-	}
-
-	if mp.IsRecover && mp.isNotLatestAddr(nodeAddr) {
-		err = fmt.Errorf("vol[%v],meta partition[%v] is recovering,[%v] can't be decommissioned", vol.Name, mp.PartitionID, nodeAddr)
-		return
-	}
-	return
-}
-
-func (c *Cluster) deleteMetaReplica(partition *MetaPartition, addr string, validate bool) (err error) {
-	defer func() {
-		if err != nil {
-			log.LogErrorf("action[deleteMetaReplica],vol[%v],data partition[%v],err[%v]", partition.VolName, partition.PartitionID, err)
-		}
-	}()
-	if validate {
-		if err = c.validateDecommissionMetaPartition(partition, addr); err != nil {
-			return
-		}
-	}
-	metaNode, err := c.getMetaNode(addr)
-	if err != nil {
-		return
-	}
-	removePeer := proto.Peer{ID: metaNode.ID, Addr: addr}
-	if err = c.removeMetaPartitionRaftMember(partition, removePeer); err != nil {
-		return
-	}
-	if err = c.deleteMetaPartition(partition, metaNode); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) deleteMetaPartition(partition *MetaPartition, removeMetaNode *MetaNode) (err error) {
-	partition.Lock()
-	mr, err := partition.getMetaReplica(removeMetaNode.Addr)
-	if err != nil {
-		partition.Unlock()
-		return
-	}
-	task := mr.generateDeleteReplicaTask(partition.PartitionID)
-	partition.removeReplicaByAddr(removeMetaNode.Addr)
-	partition.checkAndRemoveMissMetaReplica(removeMetaNode.Addr)
-	partition.Unlock()
-	_, err = removeMetaNode.Sender.syncSendAdminTask(task)
-	if err != nil {
-		log.LogErrorf("action[deleteMetaPartition] vol[%v],data partition[%v],err[%v]", partition.VolName, partition.PartitionID, err)
-	}
-	return nil
-}
-
-func (c *Cluster) updateMetaPartitionOfflinePeerIDWithLock(mp *MetaPartition, peerID uint64) (err error){
-	mp.Lock()
-	defer mp.Unlock()
-	mp.OfflinePeerID = peerID
-	if err = mp.persistToRocksDB("updateMetaPartitionOfflinePeerIDWithLock", mp.VolName, mp.PersistenceHosts, mp.Peers, c); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) removeMetaPartitionRaftMember(partition *MetaPartition, removePeer proto.Peer) (err error) {
-	defer func(){
-		e:= c.updateMetaPartitionOfflinePeerIDWithLock(partition, 0)
-		if e != nil {
-			log.LogErrorf("Failed to removeMetaPartitionRaftMember, the error is (%v)", e)
-		}
-	}()
-	mr, err := partition.getLeaderMetaReplica()
-	if err != nil {
-		return
-	}
-	t, err := partition.createTaskToRemoveRaftMember(removePeer)
-	if err != nil {
-		return
-	}
-	var leaderMetaNode *MetaNode
-	leaderMetaNode = mr.metaNode
-	if leaderMetaNode == nil {
-		leaderMetaNode, err = c.getMetaNode(mr.Addr)
-		if err != nil {
-			return
-		}
-	}
-	newHosts := make([]string, 0, len(partition.PersistenceHosts)-1)
-	newPeers := make([]proto.Peer, 0, len(partition.PersistenceHosts)-1)
-	for _, host := range partition.PersistenceHosts {
-		if host == removePeer.Addr {
-			continue
-		}
-		newHosts = append(newHosts, host)
-	}
-	for _, peer := range partition.Peers {
-		if peer.Addr == removePeer.Addr && peer.ID == removePeer.ID {
-			continue
-		}
-		newPeers = append(newPeers, peer)
-	}
-
-	if err = c.updateMetaPartitionOfflinePeerIDWithLock(partition, removePeer.ID); err != nil {
-		return
-	}
-
-	if _, err = leaderMetaNode.Sender.syncSendAdminTask(t); err != nil {
-		return
-	}
-
-	partition.Lock()
-	if err = partition.persistToRocksDB("removeMetaPartitionRaftMember", partition.VolName, newHosts, newPeers, c); err != nil {
-		partition.Unlock()
-		return
-	}
-	partition.Unlock()
-	if mr.Addr != removePeer.Addr {
-		return
-	}
-	metaNode, err := c.getMetaNode(partition.PersistenceHosts[0])
-	if err != nil {
-		return
-	}
-	if err = partition.tryToChangeLeader(c, metaNode); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) addMetaReplica(partition *MetaPartition, addr string) (err error) {
-	defer func() {
-		if err != nil {
-			log.LogErrorf("action[addMetaReplica],vol[%v],data partition[%v],err[%v]", partition.VolName, partition.PartitionID, err)
-		}
-	}()
-	partition.Lock()
-	defer partition.Unlock()
-	if contains(partition.PersistenceHosts, addr) {
-		err = fmt.Errorf("vol[%v],mp[%v] has contains host[%v]", partition.VolName, partition.PartitionID, addr)
-		return
-	}
-	metaNode, err := c.getMetaNode(addr)
-	if err != nil {
-		return
-	}
-	addPeer := proto.Peer{ID: metaNode.ID, Addr: addr}
-	if err = c.addMetaPartitionRaftMember(partition, addPeer); err != nil {
-		return
-	}
-	newHosts := make([]string, 0, len(partition.PersistenceHosts)+1)
-	newPeers := make([]proto.Peer, 0, len(partition.PersistenceHosts)+1)
-	newHosts = append(partition.PersistenceHosts, addPeer.Addr)
-	newPeers = append(partition.Peers, addPeer)
-	if err = partition.persistToRocksDB("addMetaReplica", partition.VolName, newHosts, newPeers, c); err != nil {
-		return
-	}
-	if err = c.createMetaReplica(partition, addPeer, newPeers); err != nil {
-		return
-	}
-	if err = partition.createPartitionSuccessTriggerOperator(addPeer.Addr, c); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) createMetaReplica(partition *MetaPartition, addPeer proto.Peer, peers []proto.Peer) (err error) {
-	hosts := make([]string, 1)
-	hosts[0] = addPeer.Addr
-	tasks := partition.generateCreateMetaPartitionTasks(hosts, peers, partition.VolName)
-	metaNode, err := c.getMetaNode(addPeer.Addr)
-	if err != nil {
-		return
-	}
-	if _, err = metaNode.Sender.syncSendAdminTask(tasks[0]); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) buildAddMetaPartitionRaftMemberTaskAndSyncSend(mp *MetaPartition, addPeer proto.Peer, leaderAddr string) (err error) {
-	defer func() {
-		if err == nil {
-			return
-		}
-		log.LogErrorf("action[addMetaRaftMemberAndSend],vol[%v],meta partition[%v],err[%v]", mp.VolName, mp.PartitionID, err)
-	}()
-	t, err := mp.createTaskToAddRaftMember(addPeer, leaderAddr)
-	if err != nil {
-		return
-	}
-	leaderMetaNode, err := c.getMetaNode(leaderAddr)
-	if err != nil {
-		return
-	}
-	if _, err = leaderMetaNode.Sender.syncSendAdminTask(t); err != nil {
-		return
-	}
-	return
-}
-
-func (c *Cluster) addMetaPartitionRaftMember(partition *MetaPartition, addPeer proto.Peer) (err error) {
-
-	var (
-		candidateAddrs []string
-		leaderAddr     string
-	)
-	candidateAddrs = make([]string, 0, len(partition.PersistenceHosts))
-	leaderMr, err := partition.getLeaderMetaReplica()
-	if err == nil {
-		leaderAddr = leaderMr.Addr
-		if contains(partition.PersistenceHosts, leaderAddr) {
-			candidateAddrs = append(candidateAddrs, leaderAddr)
-		} else {
-			leaderAddr = ""
-		}
-	}
-	for _, host := range partition.PersistenceHosts {
-		if host == leaderAddr {
-			continue
-		}
-		candidateAddrs = append(candidateAddrs, host)
-	}
-	//send task to leader addr first,if need to retry,then send to other addr
-	for index, host := range candidateAddrs {
-		//wait for a new leader
-		if leaderAddr == "" && len(candidateAddrs) < int(partition.ReplicaNum) {
-			time.Sleep(retrySendSyncTaskInternal)
-		}
-		err = c.buildAddMetaPartitionRaftMemberTaskAndSyncSend(partition, addPeer, host)
-		if err == nil {
-			break
-		}
-		if index < len(candidateAddrs)-1 {
-			time.Sleep(retrySendSyncTaskInternal)
-		}
-	}
-	return
 }

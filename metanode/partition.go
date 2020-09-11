@@ -40,10 +40,6 @@ var (
 	ErrInodeOutOfRange = errors.New("inode ID out of range")
 )
 
-const (
-	GetMetaPartition = "/metaPartition/get"
-)
-
 type sortPeers []proto.Peer
 
 func (sp sortPeers) Len() int {
@@ -156,9 +152,6 @@ type OpPartition interface {
 	DeletePartition() (err error)
 	UpdatePartition(req *UpdatePartitionReq, resp *UpdatePartitionResp) (err error)
 	DeleteRaft() error
-	IsExsitPeer(peer proto.Peer) bool
-	CanRemoveRaftMember(peer proto.Peer) error
-	TryToLeader(groupID uint64) error
 	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
 }
 
@@ -491,17 +484,4 @@ func (mp *metaPartition) ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadM
 	resp.DentryCount = uint64(mp.dentryTree.Len())
 	resp.ApplyID = mp.applyID
 	return
-}
-
-func (mp *metaPartition) IsExsitPeer(peer proto.Peer) bool {
-	for _, hasExsitPeer := range mp.config.Peers {
-		if hasExsitPeer.Addr == peer.Addr && hasExsitPeer.ID == peer.ID {
-			return true
-		}
-	}
-	return false
-}
-
-func (mp *metaPartition) TryToLeader(groupID uint64) error {
-	return mp.raftPartition.TryToLeader(groupID)
 }

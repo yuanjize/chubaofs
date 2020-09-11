@@ -231,44 +231,14 @@ func (s *DataNode) asyncResponseHeartBeat(pkg *Packet, task *proto.AdminTask) {
 
 // Handle OpDeleteDataPartition packet.
 func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
-	var (
-		data []byte
-		err error
-	)
 	task := &proto.AdminTask{}
+	json.Unmarshal(pkg.Data, task)
+	pkg.PackOkReply()
 	request := &proto.DeleteDataPartitionRequest{}
 	response := &proto.DeleteDataPartitionResponse{}
-	err = json.Unmarshal(pkg.Data, task)
-
-	defer func() {
-		if err == nil {
-			pkg.PackOkReply()
-			return
-		}
-		pkg.PackErrorWithBody(proto.OpErr, data)
-	}()
-
-	if err != nil {
-		response.Status = proto.TaskFail
-		response.Result = err.Error()
-		task.Response = response
-		data, _ = json.Marshal(task)
-		return
-	}
-
 	if task.OpCode == proto.OpDeleteDataPartition {
-		var bytes []byte
-		bytes, err = json.Marshal(task.Request)
-		if err != nil {
-			response.PartitionId = uint64(request.PartitionId)
-			response.Status = proto.TaskFail
-			response.Result = err.Error()
-			task.Response = response
-			data, _ = json.Marshal(task)
-			return
-		}
-
-		err = json.Unmarshal(bytes, request)
+		bytes, _ := json.Marshal(task.Request)
+		err := json.Unmarshal(bytes, request)
 		if err != nil {
 			response.PartitionId = uint64(request.PartitionId)
 			response.Status = proto.TaskFail
@@ -286,7 +256,12 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 		log.LogErrorf("action[handleDeleteDataPartition] from master Task[%v] failed, err[%v].", task.ToString(), response.Result)
 	}
 	task.Response = response
-	data, _ = json.Marshal(task)
+	data, _ := json.Marshal(task)
+	_, err := MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
+	if err != nil {
+		err = errors.Annotatef(err, "delete DataPartition failed,partitionId[%v]", request.PartitionId)
+		log.LogErrorf("action[handleDeleteDataPartition] err[%v].", err)
+	}
 	log.LogInfof(fmt.Sprintf("action[handleDeleteDataPartition] %v error(%v)", request.PartitionId, string(data)))
 }
 
