@@ -133,7 +133,7 @@ func (p *partition) Expired() (err error) {
 	var currentPath = path.Clean(p.walPath)
 	var newPath = path.Join(path.Dir(currentPath),
 		ExpiredPartitionPrefix+path.Base(currentPath)+"_"+strconv.FormatInt(time.Now().Unix(), 10))
-	if err := os.Rename(currentPath, newPath); err != nil {
+	if err = os.Rename(currentPath, newPath); err != nil {
 		log.LogErrorf("Expired: mark expired partition fail: partitionID(%v) path(%v) newPath(%v) err(%v)",
 			p.id, p.walPath, newPath, err)
 		return
