@@ -16,11 +16,14 @@ package datanode
 
 import (
 	"fmt"
-	"github.com/chubaofs/chubaofs/proto"
-	"github.com/chubaofs/chubaofs/util/log"
 	"os"
+	"path"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
 type SpaceManager struct {
@@ -270,6 +273,31 @@ func (space *SpaceManager) DeletePartition(dpId uint32) {
 	dp.Stop()
 	dp.Disk().DetachDataPartition(dp)
 	os.RemoveAll(dp.Path())
+}
+
+// ExpiredPartition marks specified partition as expired.
+// It renames data path to a new name which add 'expired_' as prefix and operation timestamp as suffix.
+// (e.g. '/disk0/datapartition_1_128849018880' to '/disk0/deleted_datapartition_1_128849018880_1600054521')
+func (space *SpaceManager) ExpiredPartition(partitionID uint32) {
+	dp := space.GetPartition(partitionID)
+	if dp == nil {
+		return
+	}
+	space.partitionMu.Lock()
+	delete(space.partitions, partitionID)
+	space.partitionMu.Unlock()
+	dp.Stop()
+	dp.Disk().DetachDataPartition(dp)
+	var currentPath = path.Clean(dp.Path())
+	var newPath = path.Join(path.Dir(currentPath),
+		ExpiredPartitionPrefix+path.Base(currentPath)+"_"+strconv.FormatInt(time.Now().Unix(), 10))
+	if err := os.Rename(currentPath, newPath); err != nil {
+		log.LogErrorf("ExpiredPartition: mark expired partition fail: volume(%v) partitionID(%v) path(%v) newPath(%v) err(%v)",
+			dp.volumeId, dp.partitionId, dp.path, newPath, err)
+		return
+	}
+	log.LogInfof("ExpiredPartition: mark expired partition: volume(%v) partitionID(%v) path(%v) newPath(%v)",
+		dp.volumeId, dp.partitionId, dp.path, newPath)
 }
 
 func (s *DataNode) fillHeartBeatResponse(response *proto.DataNodeHeartBeatResponse) {

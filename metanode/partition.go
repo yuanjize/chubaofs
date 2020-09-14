@@ -21,13 +21,14 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"os"
+
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/third_party/pool"
 	"github.com/chubaofs/chubaofs/util/log"
 	raftproto "github.com/tiglabs/raft/proto"
-	"os"
 )
 
 var (
@@ -399,7 +400,7 @@ func (mp *metaPartition) UpdatePeers(peers []proto.Peer) {
 }
 
 func (mp *metaPartition) DeleteRaft() (err error) {
-	err = mp.raftPartition.Delete()
+	err = mp.raftPartition.Expired()
 	return
 }
 

@@ -26,11 +26,16 @@ import (
 	"syscall"
 	"time"
 
+	"os"
+
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
-	"os"
+)
+
+const (
+	ExpiredPartitionPrefix = "expired_"
 )
 
 var (
@@ -285,10 +290,6 @@ func (d *Disk) triggerDiskError(err error) {
 	}
 	return
 }
-
-const (
-	ExpiredPartitionPrefix = "expired_"
-)
 
 func (d *Disk) RestorePartition(persistenceDataPartitions []uint64, visitor PartitionVisitor) {
 	var (
