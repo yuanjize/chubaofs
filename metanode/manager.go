@@ -104,7 +104,6 @@ func (m *metaManager) HandleMetaOperation(conn net.Conn, p *Packet) (err error) 
 	case proto.OpMetaLookup:
 		err = m.opMetaLookup(conn, p)
 	case proto.OpDeleteMetaPartition:
-		//err = m.opDeleteMetaPartition(conn, p)
 		err = m.opExpiredMetaPartition(conn, p)
 	case proto.OpUpdateMetaPartition:
 		err = m.opUpdateMetaPartition(conn, p)
