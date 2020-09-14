@@ -16,10 +16,12 @@ package metanode
 
 import (
 	"encoding/json"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"os"
 
@@ -153,12 +155,14 @@ type OpPartition interface {
 	DeletePartition() (err error)
 	UpdatePartition(req *UpdatePartitionReq, resp *UpdatePartitionResp) (err error)
 	DeleteRaft() error
+	ExpiredRaft() error
 	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
 }
 
 type MetaPartition interface {
 	Start() error
 	Stop()
+	Expired()
 	OpMeta
 }
 
@@ -223,6 +227,21 @@ func (mp *metaPartition) Stop() {
 	}
 }
 
+func (mp *metaPartition) Expired() {
+	if atomic.CompareAndSwapUint32(&mp.state, StateRunning, StateShutdown) {
+		defer atomic.StoreUint32(&mp.state, StateStopped)
+		if mp.config.BeforeStop != nil {
+			mp.config.BeforeStop()
+		}
+		mp.onExpired()
+		if mp.config.AfterStop != nil {
+			mp.config.AfterStop()
+			log.LogDebugf("[AfterStop]: partition id=%d execute ok.",
+				mp.config.PartitionId)
+		}
+	}
+}
+
 func (mp *metaPartition) onStart() (err error) {
 	defer func() {
 		if err == nil {
@@ -258,6 +277,25 @@ func (mp *metaPartition) onStop() {
 	if mp.deleteFp != nil {
 		mp.deleteFp.Sync()
 		mp.deleteFp.Close()
+	}
+}
+
+func (mp *metaPartition) onExpired() {
+	mp.stopRaft()
+	mp.stop()
+
+	if mp.deleteFp != nil {
+		mp.deleteFp.Sync()
+		mp.deleteFp.Close()
+	}
+
+	currentPath := path.Clean(mp.config.RootDir)
+
+	var newPath = path.Join(path.Dir(currentPath),
+		ExpiredPartitionPrefix+path.Base(currentPath)+"_"+strconv.FormatInt(time.Now().Unix(), 10))
+
+	if err := os.Rename(currentPath, newPath); err != nil {
+		log.LogErrorf("ExpiredPartition: mark expired partition fail: partitionID(%v) path(%v) newPath(%v) err(%v)", mp.config.PartitionId, currentPath, newPath, err)
 	}
 }
 
@@ -400,6 +438,11 @@ func (mp *metaPartition) UpdatePeers(peers []proto.Peer) {
 }
 
 func (mp *metaPartition) DeleteRaft() (err error) {
+	err = mp.raftPartition.Delete()
+	return
+}
+
+func (mp *metaPartition) ExpiredRaft() (err error) {
 	err = mp.raftPartition.Expired()
 	return
 }

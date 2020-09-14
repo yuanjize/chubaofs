@@ -588,7 +588,60 @@ func (m *metaManager) opMetaExtentsTruncate(conn net.Conn, p *Packet) (err error
 	return
 }
 
-func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error) {
+//func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error) {
+//	adminTask := &proto.AdminTask{}
+//	decode := json.NewDecoder(bytes.NewBuffer(p.Data))
+//	decode.UseNumber()
+//	if err = decode.Decode(adminTask); err != nil {
+//		p.PackErrorWithBody(proto.OpErr, nil)
+//		m.respondToClient(conn, p)
+//		return
+//	}
+//
+//	req := &proto.DeleteMetaPartitionRequest{}
+//	reqData, err := json.Marshal(adminTask.Request)
+//	if err != nil {
+//		p.PackErrorWithBody(proto.OpErr, nil)
+//		m.respondToClient(conn, p)
+//		return
+//	}
+//	if err = json.Unmarshal(reqData, req); err != nil {
+//		p.PackErrorWithBody(proto.OpErr, nil)
+//		m.respondToClient(conn, p)
+//		return
+//	}
+//	defer func() {
+//		if err != nil {
+//			log.LogErrorf(fmt.Sprintf("opDeleteMetaPartition request(%v) failed (%v)", req, err))
+//		}
+//	}()
+//	mp, err := m.getPartition(req.PartitionID)
+//	if err != nil {
+//		p.PackErrorWithBody(proto.OpNotExistErr, nil)
+//		m.respondToClient(conn, p)
+//		return
+//	}
+//	resp := &proto.DeleteMetaPartitionResponse{
+//		PartitionID: req.PartitionID,
+//		Status:      proto.TaskSuccess,
+//	}
+//	// Ack Master Request
+//	m.responseAckOKToMaster(conn, p)
+//	conf := mp.GetBaseConfig()
+//	mp.Stop()
+//	err = mp.DeleteRaft()
+//	os.RemoveAll(conf.RootDir)
+//	if err != nil {
+//		resp.Status = proto.TaskFail
+//	}
+//	adminTask.Response = resp
+//	adminTask.Request = nil
+//	err = m.respondToMaster(adminTask)
+//	log.LogWarnf("[opDeleteMetaPartition] req: %v, resp: %v", req, adminTask)
+//	return
+//}
+
+func (m *metaManager) opExpiredMetaPartition(conn net.Conn, p *Packet) (err error) {
 	adminTask := &proto.AdminTask{}
 	decode := json.NewDecoder(bytes.NewBuffer(p.Data))
 	decode.UseNumber()
@@ -627,10 +680,8 @@ func (m *metaManager) opDeleteMetaPartition(conn net.Conn, p *Packet) (err error
 	}
 	// Ack Master Request
 	m.responseAckOKToMaster(conn, p)
-	conf := mp.GetBaseConfig()
-	mp.Stop()
-	err = mp.DeleteRaft()
-	os.RemoveAll(conf.RootDir)
+	mp.Expired()
+	err = mp.ExpiredRaft()
 	if err != nil {
 		resp.Status = proto.TaskFail
 	}

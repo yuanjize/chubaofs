@@ -91,7 +91,7 @@ func (mp *metaPartition) deletePartition() (status uint8) {
 }
 
 func (mp *metaPartition) confAddNode(req *proto.
-	MetaPartitionOfflineRequest, index uint64) (updated bool, err error) {
+MetaPartitionOfflineRequest, index uint64) (updated bool, err error) {
 	var (
 		heartbeatPort int
 		replicatePort int
@@ -140,8 +140,8 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 					}
 					mp.raftPartition.Expired()
 				}
-				mp.Stop()
-				os.RemoveAll(mp.config.RootDir)
+				mp.Expired()
+				//os.RemoveAll(mp.config.RootDir)
 				log.LogDebugf("[confRemoveNode]: remove self end.")
 				return
 			}
