@@ -138,7 +138,7 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 					if mp.raftPartition.AppliedIndex() < index {
 						continue
 					}
-					mp.raftPartition.Delete()
+					mp.raftPartition.Expired()
 				}
 				mp.Stop()
 				os.RemoveAll(mp.config.RootDir)
