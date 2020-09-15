@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"time"
 
+	"hash/crc32"
+
 	"github.com/chubaofs/chubaofs/master"
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/storage"
@@ -29,7 +31,6 @@ import (
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/chubaofs/chubaofs/util/ump"
-	"hash/crc32"
 )
 
 var (
@@ -245,7 +246,7 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 			response.Result = err.Error()
 			log.LogErrorf("action[handleDeleteDataPartition] from master Task[%v] failed, err[%v]", task.ToString(), err)
 		} else {
-			s.space.DeletePartition(uint32(request.PartitionId))
+			s.space.ExpiredPartition(uint32(request.PartitionId))
 			response.PartitionId = uint64(request.PartitionId)
 			response.Status = proto.TaskSuccess
 		}
