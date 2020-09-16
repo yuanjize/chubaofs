@@ -16,13 +16,14 @@ package master
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/raftstore"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/log"
-	"sync"
-	"time"
 )
 
 type Cluster struct {
@@ -757,16 +758,15 @@ func (c *Cluster) delDataNodeFromCache(dataNode *DataNode) {
 
 func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp *DataPartition, errMsg string) (err error) {
 	var (
-		newHosts []string
-		newAddr  string
-		msg      string
-		diskPath string
-		tasks    []*proto.AdminTask
-		task     *proto.AdminTask
-		dataNode *DataNode
-		rack     *Rack
-		vol      *Vol
-		replica  *DataReplica
+		newHosts    []string
+		newAddr     string
+		msg         string
+		diskPath    string
+		offlineTask *proto.AdminTask
+		dataNode    *DataNode
+		rack        *Rack
+		vol         *Vol
+		replica     *DataReplica
 	)
 	dp.Lock()
 	defer dp.Unlock()
@@ -827,14 +827,19 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	if replica, err = dp.getReplica(offlineAddr); err != nil {
 		goto errDeal
 	}
+	offlineTask = dp.GenerateDeleteTask(offlineAddr)
+	dataNode, err = c.getDataNode(offlineAddr)
+	if err != nil {
+		goto errDeal
+	}
+	_, err = dataNode.Sender.syncSendAdminTask(offlineTask)
+	if err != nil {
+		goto errDeal
+	}
 	dp.isRecover = true
 	c.putBadDataPartitionIDs(replica, dataNode, dp.PartitionID)
 	dp.offLineInMem(offlineAddr)
 	dp.checkAndRemoveMissReplica(offlineAddr)
-	task = dp.GenerateDeleteTask(offlineAddr)
-	tasks = make([]*proto.AdminTask, 0)
-	tasks = append(tasks, task)
-	c.putDataNodeTasks(tasks)
 errDeal:
 	msg = fmt.Sprintf(errMsg+" clusterID[%v] partitionID:%v  on Node:%v  "+
 		"Then Fix It on newHost:%v   Err:%v , PersistenceHosts:%v  ",

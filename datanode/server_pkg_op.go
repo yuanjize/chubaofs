@@ -35,6 +35,7 @@ import (
 
 var (
 	ErrorUnknownOp = errors.New("unknown opcode")
+	ErrorIllegalOp = errors.New("illegal opcode")
 )
 
 func (s *DataNode) operatePacket(pkg *Packet, c *net.TCPConn) {
@@ -232,38 +233,44 @@ func (s *DataNode) asyncResponseHeartBeat(pkg *Packet, task *proto.AdminTask) {
 
 // Handle OpDeleteDataPartition packet.
 func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
-	task := &proto.AdminTask{}
-	json.Unmarshal(pkg.Data, task)
-	pkg.PackOkReply()
-	request := &proto.DeleteDataPartitionRequest{}
-	response := &proto.DeleteDataPartitionResponse{}
-	if task.OpCode == proto.OpDeleteDataPartition {
-		bytes, _ := json.Marshal(task.Request)
-		err := json.Unmarshal(bytes, request)
+	var err error
+	var task proto.AdminTask
+	var request proto.DeleteDataPartitionRequest
+	var response proto.DeleteDataPartitionResponse
+	defer func() {
 		if err != nil {
-			response.PartitionId = uint64(request.PartitionId)
+			pkg.PackErrorBody(ActionDeleteDataPartition, err.Error())
+			response.PartitionId = request.PartitionId
 			response.Status = proto.TaskFail
 			response.Result = err.Error()
-			log.LogErrorf("action[handleDeleteDataPartition] from master Task[%v] failed, err[%v]", task.ToString(), err)
+			log.LogErrorf("action[handleDeleteDataPartition] execute task[%v] failed: %v", task.ToString(), err)
 		} else {
-			s.space.ExpiredPartition(uint32(request.PartitionId))
-			response.PartitionId = uint64(request.PartitionId)
+			response.PartitionId = request.PartitionId
 			response.Status = proto.TaskSuccess
+			pkg.PackOkReply()
+			log.LogInfof("action[handleDeleteDataPartition] executed task[%v] partitionID[%v]", task.ToString(), request.PartitionId)
 		}
-	} else {
-		response.PartitionId = uint64(request.PartitionId)
-		response.Status = proto.TaskFail
-		response.Result = "illegal opcode "
-		log.LogErrorf("action[handleDeleteDataPartition] from master Task[%v] failed, err[%v].", task.ToString(), response.Result)
+		task.Response = &response
+		data, _ := json.Marshal(task)
+		if _, replyErr := MasterHelper.Request("POST", master.DataNodeResponse, nil, data); replyErr != nil {
+			log.LogErrorf("action[handleDeleteDataPartition] response task[%v] to master failed: %v", task, replyErr)
+		}
+	}()
+	if err = json.Unmarshal(pkg.Data, &task); err != nil {
+		return
 	}
-	task.Response = response
-	data, _ := json.Marshal(task)
-	_, err := MasterHelper.Request("POST", master.DataNodeResponse, nil, data)
-	if err != nil {
-		err = errors.Annotatef(err, "delete DataPartition failed,partitionId[%v]", request.PartitionId)
-		log.LogErrorf("action[handleDeleteDataPartition] err[%v].", err)
+	if task.OpCode != proto.OpDeleteDataPartition {
+		err = ErrorIllegalOp
+		return
 	}
-	log.LogInfof(fmt.Sprintf("action[handleDeleteDataPartition] %v error(%v)", request.PartitionId, string(data)))
+	var bytes []byte
+	if bytes, err = json.Marshal(request); err != nil {
+		return
+	}
+	if err = json.Unmarshal(bytes, request); err != nil {
+		return
+	}
+	s.space.ExpiredPartition(uint32(request.PartitionId))
 }
 
 func (s *DataNode) asyncLoadDataPartition(task *proto.AdminTask) {
