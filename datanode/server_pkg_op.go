@@ -254,9 +254,12 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 		}
 		task.Response = response
 		data, _ := json.Marshal(task)
-		if _, replyErr := MasterHelper.Request("POST", master.DataNodeResponse, nil, data); replyErr != nil {
-			log.LogErrorf("action[handleDeleteDataPartition] response task[%v] to master failed: %v", task, replyErr)
-		}
+		go func() {
+			if _, replyErr := MasterHelper.Request("POST", master.DataNodeResponse, nil, data); replyErr != nil {
+				log.LogErrorf("action[handleDeleteDataPartition] response task[%v] to master failed: %v", task, replyErr)
+			}
+		}()
+
 	}()
 	if err = json.Unmarshal(pkg.Data, task); err != nil {
 		return
