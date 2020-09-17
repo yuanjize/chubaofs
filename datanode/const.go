@@ -36,6 +36,7 @@ const (
 	ActionNotifyFollowerRepair    = "ActionNotifyFollowerRepair"
 	ActionCheckReplyAvail         = "ActionCheckReplyAvail"
 	ActionCreateDataPartition     = "ActionCreateDataPartition"
+	ActionDeleteDataPartition     = "ActionDeleteDataPartition"
 )
 
 const (

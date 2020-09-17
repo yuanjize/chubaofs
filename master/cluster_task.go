@@ -140,8 +140,8 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 	var (
 		vol          *Vol
 		mp           *MetaPartition
-		t            *proto.AdminTask
-		tasks        []*proto.AdminTask
+		createTasks  []*proto.AdminTask
+		offlineTask  *proto.AdminTask
 		newHosts     []string
 		onlineAddrs  []string
 		newPeers     []proto.Peer
@@ -204,25 +204,30 @@ func (c *Cluster) metaPartitionOffline(volName, nodeAddr, destinationAddr string
 		}
 	}
 
-	tasks = mp.generateCreateMetaPartitionTasks(onlineAddrs, newPeers, volName)
-	if err = c.doSyncCreateMetaPartitionToMetaNode(onlineAddrs[0], tasks); err != nil {
+	createTasks = mp.generateCreateMetaPartitionTasks(onlineAddrs, newPeers, volName)
+	if err = c.doSyncCreateMetaPartitionToMetaNode(onlineAddrs[0], createTasks); err != nil {
 		goto errDeal
 	}
 	if err = mp.createPartitionSuccessTriggerOperator(onlineAddrs[0], c); err != nil {
 		goto errDeal
 	}
-	tasks = make([]*proto.AdminTask, 0)
-	if t, err = mp.generateOfflineTask(volName, removePeer, newPeers[0]); err != nil {
+	if offlineTask, err = mp.generateOfflineTask(volName, removePeer, newPeers[0]); err != nil {
 		goto errDeal
 	}
-	tasks = append(tasks, t)
 	if err = mp.updateInfoToStore(newHosts, newPeers, volName, c); err != nil {
 		goto errDeal
 	}
+	metaNode, err = c.getMetaNode(nodeAddr)
+	if err != nil {
+		goto errDeal
+	}
+	_, err = metaNode.Sender.syncSendAdminTask(offlineTask)
+	if err != nil {
+		goto errDeal
+	}
+	mp.IsRecover = true
 	mp.removeReplicaByAddr(nodeAddr)
 	mp.checkAndRemoveMissMetaReplica(nodeAddr)
-	c.putMetaNodeTasks(tasks)
-	mp.IsRecover = true
 	c.putBadMetaPartitions(nodeAddr, mp.PartitionID)
 	Warn(c.Name, fmt.Sprintf("clusterID[%v] meta partition[%v] offline addr[%v] success",
 		c.Name, partitionID, nodeAddr))

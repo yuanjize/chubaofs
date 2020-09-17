@@ -679,7 +679,6 @@ func (m *metaManager) opExpiredMetaPartition(conn net.Conn, p *Packet) (err erro
 		Status:      proto.TaskSuccess,
 	}
 	// Ack Master Request
-	m.responseAckOKToMaster(conn, p)
 	mp.Expired()
 	err = mp.ExpiredRaft()
 	if err != nil {
@@ -687,6 +686,7 @@ func (m *metaManager) opExpiredMetaPartition(conn net.Conn, p *Packet) (err erro
 	}
 	adminTask.Response = resp
 	adminTask.Request = nil
+	m.responseAckOKToMaster(conn, p)
 	err = m.respondToMaster(adminTask)
 	log.LogWarnf("[opDeleteMetaPartition] req: %v, resp: %v", req, adminTask)
 	return
@@ -732,7 +732,6 @@ func (m *metaManager) opUpdateMetaPartition(conn net.Conn, p *Packet) (err error
 	if !m.serveProxy(conn, mp, p) {
 		return
 	}
-	m.responseAckOKToMaster(conn, p)
 	resp := &UpdatePartitionResp{
 		VolName:     req.VolName,
 		PartitionID: req.PartitionID,
@@ -741,6 +740,7 @@ func (m *metaManager) opUpdateMetaPartition(conn net.Conn, p *Packet) (err error
 	err = mp.UpdatePartition(req, resp)
 	adminTask.Response = resp
 	adminTask.Request = nil
+	m.responseAckOKToMaster(conn, p)
 	m.respondToMaster(adminTask)
 	log.LogDebugf("[opUpdateMetaPartition] req[%v], response[%v].", req, adminTask)
 	return
@@ -839,12 +839,12 @@ func (m *metaManager) opOfflineMetaPartition(conn net.Conn, p *Packet) (err erro
 	if !m.serveProxy(conn, mp, p) {
 		return
 	}
-	m.responseAckOKToMaster(conn, p)
 	resp := proto.MetaPartitionOfflineResponse{
 		PartitionID: req.PartitionID,
 		VolName:     req.VolName,
 		Status:      proto.TaskFail,
 	}
+
 	if req.AddPeer.ID == req.RemovePeer.ID {
 		err = errors.Errorf("[opOfflineMetaPartition]: AddPeer[%v] same withRemovePeer[%v]", req.AddPeer, req.RemovePeer)
 		resp.Result = err.Error()
@@ -866,6 +866,7 @@ func (m *metaManager) opOfflineMetaPartition(conn net.Conn, p *Packet) (err erro
 end:
 	adminTask.Request = nil
 	adminTask.Response = resp
+	m.responseAckOKToMaster(conn, p)
 	m.respondToMaster(adminTask)
 	log.LogWarnf("[opOfflineMetaPartition]: the end %v", adminTask)
 	return
