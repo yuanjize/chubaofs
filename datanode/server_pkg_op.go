@@ -266,7 +266,7 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 		return
 	}
 	var bytes []byte
-	if bytes, err = json.Marshal(request); err != nil {
+	if bytes, err = json.Marshal(task.Request); err != nil {
 		return
 	}
 	if err = json.Unmarshal(bytes, request); err != nil {
