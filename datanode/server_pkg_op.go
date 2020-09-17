@@ -233,10 +233,12 @@ func (s *DataNode) asyncResponseHeartBeat(pkg *Packet, task *proto.AdminTask) {
 
 // Handle OpDeleteDataPartition packet.
 func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
-	var err error
-	var task proto.AdminTask
-	var request proto.DeleteDataPartitionRequest
-	var response proto.DeleteDataPartitionResponse
+	var (
+		err      error
+		task     = &proto.AdminTask{}
+		request  = &proto.DeleteDataPartitionRequest{}
+		response = &proto.DeleteDataPartitionResponse{}
+	)
 	defer func() {
 		if err != nil {
 			pkg.PackErrorBody(ActionDeleteDataPartition, err.Error())
@@ -250,13 +252,13 @@ func (s *DataNode) handleDeleteDataPartition(pkg *Packet) {
 			pkg.PackOkReply()
 			log.LogInfof("action[handleDeleteDataPartition] executed task[%v] partitionID[%v]", task.ToString(), request.PartitionId)
 		}
-		task.Response = &response
+		task.Response = response
 		data, _ := json.Marshal(task)
 		if _, replyErr := MasterHelper.Request("POST", master.DataNodeResponse, nil, data); replyErr != nil {
 			log.LogErrorf("action[handleDeleteDataPartition] response task[%v] to master failed: %v", task, replyErr)
 		}
 	}()
-	if err = json.Unmarshal(pkg.Data, &task); err != nil {
+	if err = json.Unmarshal(pkg.Data, task); err != nil {
 		return
 	}
 	if task.OpCode != proto.OpDeleteDataPartition {
