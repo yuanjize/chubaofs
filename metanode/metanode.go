@@ -56,6 +56,7 @@ type MetaNode struct {
 	raftStore         raftstore.RaftStore
 	raftHeartbeatPort string
 	raftReplicatePort string
+	raftTickInterval  int
 	httpStopC         chan uint8
 	state             uint32
 	wg                sync.WaitGroup
@@ -209,6 +210,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicatePort)
+	m.raftTickInterval = int(cfg.GetInt(cfgRaftTickInterval))
 	configTotalMem, _ = strconv.ParseInt(cfg.GetString(cfgTotalMem), 10, 64)
 
 	log.LogDebugf("action[parseConfig] load listen[%v].", m.listen)
