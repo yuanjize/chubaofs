@@ -28,15 +28,17 @@ import (
 )
 
 type MetaReplica struct {
-	Addr       string
-	start      uint64
-	end        uint64
-	nodeId     uint64
-	MaxInodeID uint64
-	ReportTime int64
-	Status     int8
-	IsLeader   bool
-	metaNode   *MetaNode
+	Addr        string
+	start       uint64
+	end         uint64
+	nodeId      uint64
+	MaxInodeID  uint64
+	InodeCount  uint64
+	DentryCount uint64
+	ReportTime  int64
+	Status      int8
+	IsLeader    bool
+	metaNode    *MetaNode
 }
 
 type MetaPartition struct {
@@ -44,6 +46,8 @@ type MetaPartition struct {
 	Start            uint64
 	End              uint64
 	MaxInodeID       uint64
+	InodeCount       uint64
+	DentryCount      uint64
 	IsManual         bool
 	Replicas         []*MetaReplica
 	ReplicaNum       uint8
@@ -349,6 +353,8 @@ func (mp *MetaPartition) UpdateMetaPartition(mgr *proto.MetaPartitionReport, met
 	}
 	mr.updateMetric(mgr)
 	mp.setMaxInodeID()
+	mp.setInodeCount()
+	mp.setDentryCount()
 	mp.checkAndRemoveMissMetaReplica(metaNode.Addr)
 }
 
@@ -585,6 +591,8 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.Status = (int8)(mgr.Status)
 	mr.IsLeader = mgr.IsLeader
 	mr.MaxInodeID = mgr.MaxInodeID
+	mr.InodeCount = mgr.InodeCount
+	mr.DentryCount = mgr.DentryCount
 	mr.setLastReportTime()
 }
 
@@ -627,6 +635,26 @@ func (mp *MetaPartition) setMaxInodeID() {
 		}
 	}
 	mp.MaxInodeID = maxUsed
+}
+
+func (mp *MetaPartition) setInodeCount() {
+	var inodeCount uint64
+	for _, r := range mp.Replicas {
+		if r.InodeCount > inodeCount {
+			inodeCount = r.InodeCount
+		}
+	}
+	mp.InodeCount = inodeCount
+}
+
+func (mp *MetaPartition) setDentryCount() {
+	var dentryCount uint64
+	for _, r := range mp.Replicas {
+		if r.DentryCount > dentryCount {
+			dentryCount = r.DentryCount
+		}
+	}
+	mp.DentryCount = dentryCount
 }
 
 func (mp *MetaPartition) isLatestAddr(addr string) (ok bool) {

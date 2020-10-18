@@ -86,6 +86,8 @@ type SimpleVolView struct {
 	RwDpCnt             int
 	MpCnt               int
 	DpCnt               int
+	DentryCount         uint64
+	InodeCount          uint64
 	AvailSpaceAllocated uint64 //GB
 	EnableToken         bool
 	Tokens              map[string]*proto.Token
@@ -590,6 +592,14 @@ errDeal:
 }
 
 func newSimpleView(vol *Vol) *SimpleVolView {
+	var (
+		volInodeCount  uint64
+		volDentryCount uint64
+	)
+	for _, mp := range vol.MetaPartitions {
+		volDentryCount = volDentryCount + mp.DentryCount
+		volInodeCount = volInodeCount + mp.InodeCount
+	}
 	return &SimpleVolView{
 		Name:                vol.Name,
 		Owner:               vol.Owner,
@@ -603,6 +613,8 @@ func newSimpleView(vol *Vol) *SimpleVolView {
 		RwDpCnt:             vol.dataPartitions.readWriteDataPartitions,
 		MpCnt:               len(vol.MetaPartitions),
 		DpCnt:               len(vol.dataPartitions.dataPartitionMap),
+		InodeCount:          volInodeCount,
+		DentryCount:         volDentryCount,
 		AvailSpaceAllocated: vol.AvailSpaceAllocated,
 		EnableToken:         vol.enableToken,
 		Tokens:              vol.tokens,
