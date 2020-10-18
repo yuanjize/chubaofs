@@ -157,6 +157,8 @@ type OpPartition interface {
 	DeleteRaft() error
 	ExpiredRaft() error
 	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
+	GetInodeCount() uint64
+	GetDentryCount() uint64
 }
 
 type MetaPartition interface {
@@ -210,6 +212,14 @@ func (mp *metaPartition) Start() (err error) {
 		}
 	}
 	return
+}
+
+func (mp *metaPartition)GetInodeCount() uint64{
+	return uint64(mp.inodeTree.Len())
+}
+
+func (mp *metaPartition)GetDentryCount() uint64{
+	return uint64(mp.dentryTree.Len())
 }
 
 func (mp *metaPartition) Stop() {
