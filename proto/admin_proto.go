@@ -204,6 +204,18 @@ type MetaPartitionOfflineResponse struct {
 	Result      string
 }
 
+// AddMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
+type AddMetaPartitionRaftMemberRequest struct {
+	PartitionId uint64
+	AddPeer     Peer
+}
+
+// RemoveMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
+type RemoveMetaPartitionRaftMemberRequest struct {
+	PartitionId uint64
+	RemovePeer  Peer
+}
+
 type Token struct {
 	TokenType int8
 	Value     string
