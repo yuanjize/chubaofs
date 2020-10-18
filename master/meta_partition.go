@@ -54,6 +54,7 @@ type MetaPartition struct {
 	Peers            []proto.Peer
 	MissNodes        map[string]int64
 	LoadResponse     []*proto.LoadMetaPartitionMetricResponse
+	offlineMutex     sync.RWMutex
 	sync.RWMutex
 }
 
@@ -194,6 +195,9 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 	}
 	mp.Lock()
 	defer mp.Unlock()
+	if mp.End == defaultMaxMetaPartitionInodeID {
+		return
+	}
 	if mp.End != defaultMaxMetaPartitionInodeID {
 		oldEnd := mp.End
 		mp.End = defaultMaxMetaPartitionInodeID
@@ -213,7 +217,7 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 		tasks = append(tasks, t)
 		c.putMetaNodeTasks(tasks)
 	}
-	log.LogWarnf("action[checkEnd] partitionID[%v] end[%v]", mp.PartitionID, mp.End)
+	log.LogDebugf("action[checkEnd] partitionID[%v] end[%v]", mp.PartitionID, mp.End)
 }
 
 func (mp *MetaPartition) getMetaReplica(addr string) (mr *MetaReplica, err error) {
@@ -257,7 +261,9 @@ func (mp *MetaPartition) checkStatus(writeLog bool, replicaNum int, maxPartition
 		if err != nil {
 			mp.Status = proto.NoLeader
 		}
-		mp.Status = mr.Status
+		if mr != nil {
+			mp.Status = mr.Status
+		}
 		for _, mr := range mp.Replicas {
 			if mr.metaNode == nil {
 				continue
@@ -381,22 +387,28 @@ func (mp *MetaPartition) getLiveReplica() (liveReplicas []*MetaReplica) {
 	return
 }
 
-func (mp *MetaPartition) updateInfoToStore(newHosts []string, newPeers []proto.Peer, volName string, c *Cluster) (err error) {
+func (mp *MetaPartition) updateInfoToStore(actionName string, newHosts []string, newPeers []proto.Peer, volName string, c *Cluster) (err error) {
 	oldHosts := make([]string, len(mp.PersistenceHosts))
 	copy(oldHosts, mp.PersistenceHosts)
 	oldPeers := make([]proto.Peer, len(mp.Peers))
 	copy(oldPeers, mp.Peers)
 	mp.PersistenceHosts = newHosts
 	mp.Peers = newPeers
+	if len(mp.PersistenceHosts) < 1 || len(mp.Peers) < 1 {
+		mp.PersistenceHosts = oldHosts
+		mp.Peers = oldPeers
+		return fmt.Errorf("action[%v] failed,partition[%v],hosts[%v],peers[%v]", actionName, mp.PartitionID, mp.PersistenceHosts, mp.Peers)
+
+	}
 	if err = c.syncUpdateMetaPartition(volName, mp); err != nil {
 		mp.PersistenceHosts = oldHosts
 		mp.Peers = oldPeers
-		log.LogWarnf("action[updateInfoToStore] failed,partitionID:%v  old hosts:%v new hosts:%v oldPeers:%v  newPeers:%v",
-			mp.PartitionID, mp.PersistenceHosts, newHosts, mp.Peers, newPeers)
+		log.LogWarnf("action[%v] failed,partitionID:%v  old hosts:%v new hosts:%v oldPeers:%v  newPeers:%v",
+			actionName, mp.PartitionID, mp.PersistenceHosts, newHosts, mp.Peers, newPeers)
 		return
 	}
-	log.LogWarnf("action[updateInfoToStore] success,partitionID:%v  old hosts:%v  new hosts:%v oldPeers:%v  newPeers:%v ",
-		mp.PartitionID, oldHosts, mp.PersistenceHosts, oldPeers, mp.Peers)
+	log.LogWarnf("action[%v] success,partitionID:%v  old hosts:%v  new hosts:%v oldPeers:%v  newPeers:%v ",
+		actionName, mp.PartitionID, oldHosts, mp.PersistenceHosts, oldPeers, mp.Peers)
 	return
 }
 
@@ -640,4 +652,74 @@ func (mp *MetaPartition) addOrReplaceLoadResponse(response *proto.LoadMetaPartit
 	}
 	loadResponse = append(loadResponse, response)
 	mp.LoadResponse = loadResponse
+}
+
+// Check if there is a replica missing or not.
+func (mp *MetaPartition) hasMissingOneReplica(offlineAddr string, replicaNum int) (err error) {
+	curHostCount := len(mp.PersistenceHosts)
+	for _, host := range mp.PersistenceHosts {
+		if host == offlineAddr {
+			curHostCount = curHostCount - 1
+		}
+	}
+	curReplicaCount := len(mp.Replicas)
+	for _, r := range mp.Replicas {
+		if r.Addr == offlineAddr {
+			curReplicaCount = curReplicaCount - 1
+		}
+	}
+	if curHostCount < replicaNum-1 || curReplicaCount < replicaNum-1 {
+		log.LogError(fmt.Sprintf("action[%v],partitionID:%v,err:%v",
+			"hasMissingOneReplica", mp.PartitionID, MetaReplicaHasMissOneError))
+		err = MetaReplicaHasMissOneError
+	}
+	return
+}
+
+func (mp *MetaPartition) createTaskToRemoveRaftMember(removePeer proto.Peer) (t *proto.AdminTask, err error) {
+	mr, err := mp.getLeaderMetaReplica()
+	if err != nil {
+		return nil, err
+	}
+	req := &proto.RemoveMetaPartitionRaftMemberRequest{PartitionId: mp.PartitionID, RemovePeer: removePeer}
+	t = proto.NewAdminTask(proto.OpRemoveMetaPartitionRaftMember, mr.Addr, req)
+	resetMetaPartitionTaskID(t, mp.PartitionID)
+	return
+}
+
+func (mp *MetaPartition) tryToChangeLeader(c *Cluster, metaNode *MetaNode) (err error) {
+	task, err := mp.createTaskToTryToChangeLeader(metaNode.Addr)
+	if err != nil {
+		return
+	}
+	if _, err = metaNode.Sender.syncSendAdminTask(task); err != nil {
+		return
+	}
+	return
+}
+
+func (mp *MetaPartition) createTaskToTryToChangeLeader(addr string) (task *proto.AdminTask, err error) {
+	task = proto.NewAdminTask(proto.OpMetaPartitionTryToLeader, addr, nil)
+	resetMetaPartitionTaskID(task, mp.PartitionID)
+	return
+}
+
+func (mp *MetaPartition) createTaskToCreateReplica(host string) (t *proto.AdminTask, err error) {
+	req := &proto.CreateMetaPartitionRequest{
+		Start:       mp.Start,
+		End:         mp.End,
+		PartitionID: mp.PartitionID,
+		Members:     mp.Peers,
+		VolName:     mp.VolName,
+	}
+	t = proto.NewAdminTask(proto.OpCreateMetaPartition, host, req)
+	resetMetaPartitionTaskID(t, mp.PartitionID)
+	return
+}
+
+func (mp *MetaPartition) createTaskToAddRaftMember(addPeer proto.Peer, leaderAddr string) (t *proto.AdminTask, err error) {
+	req := &proto.AddMetaPartitionRaftMemberRequest{PartitionId: mp.PartitionID, AddPeer: addPeer}
+	t = proto.NewAdminTask(proto.OpAddMetaPartitionRaftMember, leaderAddr, req)
+	resetMetaPartitionTaskID(t, mp.PartitionID)
+	return
 }

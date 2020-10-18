@@ -92,6 +92,7 @@ const (
 	OpOfflineMetaPartition          uint8 = 0x45
 	OpAddMetaPartitionRaftMember    uint8 = 0x46
 	OpRemoveMetaPartitionRaftMember uint8 = 0x47
+	OpMetaPartitionTryToLeader      uint8 = 0x48
 
 	// Operations: Master -> DataNode
 	OpCreateDataPartition uint8 = 0x60
