@@ -1023,3 +1023,20 @@ func (m *metaManager) opMetaBatchInodeGet(conn net.Conn, p *Packet) (err error) 
 		p.GetResultMesg(), p.Data)
 	return
 }
+
+func (m *metaManager) opMetaPartitionTryToLeader(conn net.Conn, p *Packet) (err error) {
+	mp, err := m.getPartition(uint64(p.PartitionID))
+	if err != nil {
+		goto errDeal
+	}
+	if err = mp.TryToLeader(uint64(p.PartitionID)); err != nil {
+		goto errDeal
+	}
+	p.PackOkReply()
+	m.respondToClient(conn, p)
+	return
+errDeal:
+	p.PackErrorWithBody(proto.OpErr, ([]byte)(err.Error()))
+	m.respondToClient(conn, p)
+	return
+}

@@ -157,6 +157,7 @@ type OpPartition interface {
 	UpdatePartition(req *UpdatePartitionReq, resp *UpdatePartitionResp) (err error)
 	DeleteRaft() error
 	IsExistPeer(peer proto.Peer) bool
+	TryToLeader(groupID uint64) error
 	CanRemoveRaftMember(peer proto.Peer) error
 	ExpiredRaft() error
 	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
@@ -539,6 +540,10 @@ func (mp *metaPartition) IsExistPeer(peer proto.Peer) bool {
 		}
 	}
 	return false
+}
+
+func (mp *metaPartition) TryToLeader(groupID uint64) error {
+	return mp.raftPartition.TryToLeader(groupID)
 }
 
 func (mp *metaPartition) CanRemoveRaftMember(peer proto.Peer) error {
