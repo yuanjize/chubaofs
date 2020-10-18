@@ -25,24 +25,24 @@ import (
 
 const (
 	// Admin APIs
-	AdminGetCluster           = "/admin/getCluster"
-	AdminGetDataPartition     = "/dataPartition/get"
-	AdminLoadDataPartition    = "/dataPartition/load"
-	AdminCreateDataPartition  = "/dataPartition/create"
-	AdminDataPartitionOffline = "/dataPartition/offline"
-	AdminDataPartitionDelete  = "/dataPartition/delete"
-	AdminDataPartitionUpdate  = "/dataPartition/update"
-	AdminDeleteVol            = "/vol/delete"
-	AdminUpdateVol            = "/vol/update"
-	AdminCreateVol            = "/admin/createVol"
-	AdminGetVol               = "/admin/getVol"
-	AdminClusterFreeze        = "/cluster/freeze"
-	AdminGetIp                = "/admin/getIp"
-	AdminCreateMP             = "/metaPartition/create"
-	AdminSetCompactStatus     = "/compactStatus/set"
-	AdminGetCompactStatus     = "/compactStatus/get"
-	AdminSetMetaNodeThreshold = "/threshold/set"
-	AdminDataPartitionAutoOffline  = "/dataPartition/autoOffline"
+	AdminGetCluster               = "/admin/getCluster"
+	AdminGetDataPartition         = "/dataPartition/get"
+	AdminLoadDataPartition        = "/dataPartition/load"
+	AdminCreateDataPartition      = "/dataPartition/create"
+	AdminDataPartitionOffline     = "/dataPartition/offline"
+	AdminDataPartitionDelete      = "/dataPartition/delete"
+	AdminDataPartitionUpdate      = "/dataPartition/update"
+	AdminDeleteVol                = "/vol/delete"
+	AdminUpdateVol                = "/vol/update"
+	AdminCreateVol                = "/admin/createVol"
+	AdminGetVol                   = "/admin/getVol"
+	AdminClusterFreeze            = "/cluster/freeze"
+	AdminGetIp                    = "/admin/getIp"
+	AdminCreateMP                 = "/metaPartition/create"
+	AdminSetCompactStatus         = "/compactStatus/set"
+	AdminGetCompactStatus         = "/compactStatus/get"
+	AdminSetMetaNodeThreshold     = "/threshold/set"
+	AdminDataPartitionAutoOffline = "/dataPartition/autoOffline"
 
 	// Client APIs
 	ClientDataPartitions = "/client/dataPartitions"
@@ -69,6 +69,8 @@ const (
 	AdminMetaPartitionOffline = "/metaPartition/offline"
 	AdminMetaPartitionUpdate  = "/metaPartition/update"
 	AdminMetaPartitionGet     = "/metaPartition/get"
+	AdminAddMetaReplica       = "/metaReplica/add"
+	AdminDeleteMetaReplica    = "/metaReplica/delete"
 
 	// Operation response
 	MetaNodeResponse = "/metaNode/response" // Method: 'POST', ContentType: 'application/json'
@@ -115,6 +117,8 @@ func (m *Master) handleFunctions() {
 	http.Handle(AdminMetaPartitionOffline, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionUpdate, m.handlerWithInterceptor())
 	http.Handle(AdminMetaPartitionGet, m.handlerWithInterceptor())
+	http.Handle(AdminAddMetaReplica, m.handlerWithInterceptor())
+	http.Handle(AdminDeleteMetaReplica, m.handlerWithInterceptor())
 	http.Handle(ClientDataPartitions, m.handlerWithInterceptor())
 	http.Handle(ClientVol, m.handlerWithInterceptor())
 	http.Handle(GetALLVols, m.handlerWithInterceptor())
@@ -240,6 +244,10 @@ func (m *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.updateMetaPartition(w, r)
 	case AdminMetaPartitionGet:
 		m.getMetaPartition(w, r)
+	case AdminAddMetaReplica:
+		m.addMetaReplica(w, r)
+	case AdminDeleteMetaReplica:
+		m.deleteMetaReplica(w, r)
 	case AdminCreateMP:
 		m.createMetaPartition(w, r)
 	case RaftNodeAdd:

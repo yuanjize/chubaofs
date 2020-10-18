@@ -888,6 +888,71 @@ errDeal:
 	return
 }
 
+func (m *Master) addMetaReplica(w http.ResponseWriter, r *http.Request) {
+	var (
+		msg         string
+		addr        string
+		mp          *MetaPartition
+		partitionID uint64
+		err         error
+	)
+
+	if partitionID, addr, err = parseRequestToAddMetaReplica(r); err != nil {
+		goto errDeal
+	}
+
+	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
+		goto errDeal
+	}
+
+	if err = m.cluster.addMetaReplica(mp, addr); err != nil {
+		goto errDeal
+	}
+	mp.IsRecover = true
+	m.cluster.putBadMetaPartitions(addr, mp.PartitionID)
+	msg = fmt.Sprintf("meta partitionID :%v  add replica [%v] successfully", partitionID, addr)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("addMetaReplica", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
+func (m *Master) deleteMetaReplica(w http.ResponseWriter, r *http.Request) {
+	var (
+		msg         string
+		addr        string
+		mp          *MetaPartition
+		partitionID uint64
+		metaNode    *MetaNode
+		err         error
+	)
+
+	if partitionID, addr, err = parseRequestToRemoveMetaReplica(r); err != nil {
+		goto errDeal
+	}
+
+	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
+		goto errDeal
+	}
+	if metaNode, err = m.cluster.getMetaNode(addr); err != nil {
+		goto errDeal
+	}
+	mp.offlineMutex.Lock()
+	defer mp.offlineMutex.Unlock()
+	if err = m.cluster.deleteMetaReplica(mp, metaNode); err != nil {
+		goto errDeal
+	}
+	msg = fmt.Sprintf("meta partitionID :%v  delete replica [%v] successfully", partitionID, addr)
+	io.WriteString(w, msg)
+	return
+errDeal:
+	logMsg := getReturnMessage("deleteMetaReplica", r.RemoteAddr, err.Error(), http.StatusBadRequest)
+	HandleError(logMsg, err, http.StatusBadRequest, w)
+	return
+}
+
 func (m *Master) metaNodeOffline(w http.ResponseWriter, r *http.Request) {
 	var (
 		metaNode              *MetaNode
@@ -1442,6 +1507,27 @@ func parsePartitionIDAndVol(r *http.Request) (partitionID uint64, volName string
 		return
 	}
 	if volName, err = checkVolPara(r); err != nil {
+		return
+	}
+	return
+}
+
+func parseRequestToAddMetaReplica(r *http.Request) (ID uint64, addr string, err error) {
+	return extractMetaPartitionIDAndAddr(r)
+}
+
+func parseRequestToRemoveMetaReplica(r *http.Request) (ID uint64, addr string, err error) {
+	return extractMetaPartitionIDAndAddr(r)
+}
+
+func extractMetaPartitionIDAndAddr(r *http.Request) (ID uint64, addr string, err error) {
+	if err = r.ParseForm(); err != nil {
+		return
+	}
+	if ID, err = checkMetaPartitionID(r); err != nil {
+		return
+	}
+	if addr, err = checkNodeAddr(r); err != nil {
 		return
 	}
 	return
