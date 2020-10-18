@@ -537,6 +537,7 @@ func (mp *MetaPartition) generateOfflineTask(volName string, removePeer proto.Pe
 
 func resetMetaPartitionTaskID(t *proto.AdminTask, partitionID uint64) {
 	t.ID = fmt.Sprintf("%v_pid[%v]", t.ID, partitionID)
+	t.PartitionID = partitionID
 }
 
 func (mp *MetaPartition) generateUpdateMetaReplicaTask(clusterID string, partitionID uint64, end uint64) (t *proto.AdminTask) {

@@ -158,11 +158,7 @@ func (c *Cluster) metaPartitionOffline(volName, offlineAddr, destinationAddr str
 	}
 	mp.offlineMutex.Lock()
 	defer mp.offlineMutex.Unlock()
-	if err = c.validateDecommissionMetaPartition(mp, offlineAddr, vol.Name, int(vol.mpReplicaNum)); err != nil {
-		goto errDeal
-	}
-
-	if err = c.deleteMetaReplica(mp, metaNode); err != nil {
+	if err = c.deleteMetaReplica(mp, metaNode, vol, true); err != nil {
 		goto errDeal
 	}
 
@@ -310,12 +306,18 @@ func (c *Cluster) addMetaPartitionRaftMember(partition *MetaPartition, addPeer p
 	return
 }
 
-func (c *Cluster) deleteMetaReplica(partition *MetaPartition, offlineNode *MetaNode) (err error) {
+func (c *Cluster) deleteMetaReplica(partition *MetaPartition, offlineNode *MetaNode, vol *Vol, validate bool) (err error) {
 	defer func() {
 		if err != nil {
 			log.LogErrorf("action[deleteMetaReplica],vol[%v],data partition[%v],err[%v]", partition.VolName, partition.PartitionID, err)
 		}
 	}()
+
+	if validate {
+		if err = c.validateDecommissionMetaPartition(partition, offlineNode.Addr, vol.Name, int(vol.mpReplicaNum)); err != nil {
+			return
+		}
+	}
 	removePeer := proto.Peer{ID: offlineNode.ID, Addr: offlineNode.Addr}
 	if err = c.removeMetaPartitionRaftMember(partition, removePeer); err != nil {
 		return

@@ -926,6 +926,7 @@ func (m *Master) deleteMetaReplica(w http.ResponseWriter, r *http.Request) {
 		mp          *MetaPartition
 		partitionID uint64
 		metaNode    *MetaNode
+		vol         *Vol
 		err         error
 	)
 
@@ -939,9 +940,13 @@ func (m *Master) deleteMetaReplica(w http.ResponseWriter, r *http.Request) {
 	if metaNode, err = m.cluster.getMetaNode(addr); err != nil {
 		goto errDeal
 	}
+
+	if vol, err = m.cluster.getVol(mp.VolName); err != nil {
+		goto errDeal
+	}
 	mp.offlineMutex.Lock()
 	defer mp.offlineMutex.Unlock()
-	if err = m.cluster.deleteMetaReplica(mp, metaNode); err != nil {
+	if err = m.cluster.deleteMetaReplica(mp, metaNode, vol, true); err != nil {
 		goto errDeal
 	}
 	msg = fmt.Sprintf("meta partitionID :%v  delete replica [%v] successfully", partitionID, addr)

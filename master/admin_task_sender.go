@@ -159,6 +159,7 @@ func (sender *AdminTaskSender) buildPacket(task *proto.AdminTask) (packet *proto
 	packet = proto.NewPacket()
 	packet.Opcode = task.OpCode
 	packet.ReqID = proto.GetReqID()
+	packet.PartitionID = uint32(task.PartitionID)
 	body, err := json.Marshal(task)
 	if err != nil {
 		return nil, err
