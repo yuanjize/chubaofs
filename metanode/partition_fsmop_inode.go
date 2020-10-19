@@ -148,6 +148,8 @@ func (mp *MetaPartition) fsmUnlinkInode(ino *Inode) (resp *InodeResponse) {
 
 	inode.DecNLink()
 
+	log.LogIfNotNil(mp.inodeTree.Put(inode)) //FIX ME update inode
+
 	//Fix#760: when nlink == 0, push into freeList and delay delete inode after 7 days
 	if inode.IsTempFile() {
 		inode.DoWriteFunc(func() {
