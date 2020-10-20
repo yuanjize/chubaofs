@@ -169,6 +169,7 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.LogDebugf("start iter.......")
 	ro := gorocksdb.NewDefaultReadOptions()
 	ro.SetVerifyChecksums(false)
 	ro.SetFillCache(false)
@@ -180,6 +181,7 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		log.LogInfof("key:[%v]  value:[%v]", key, data)
 	}
 	it.Close()
+	log.LogDebugf("end iter.......")
 
 	f := func(v []byte) (bool, error) {
 
