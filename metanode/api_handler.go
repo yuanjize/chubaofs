@@ -168,7 +168,7 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.LogDebug("count %d %d ", mp.inodeTree.Count(), mp.inodeTree.RealCount())
+	log.LogDebugf("count %d %d ", mp.inodeTree.Count(), mp.inodeTree.RealCount())
 
 	f := func(v []byte) (bool, error) {
 
@@ -185,7 +185,7 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.LogDebug("=====range %v ", inode)
-		
+
 		data, e := inode.MarshalToJSON()
 		if e != nil {
 			log.LogErrorf("[getAllInodesHandler] failed to marshal to json: %v", e)

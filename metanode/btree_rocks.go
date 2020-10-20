@@ -168,6 +168,7 @@ func (r *RocksTree) IteratorCount(tp TreeType) uint64 {
 }
 
 func (r *RocksTree) RangeWithSnap(snapshot *gorocksdb.Snapshot, start, end []byte, cb func(v []byte) (bool, error)) error {
+	log.LogDebugf("===========================6")
 	it := r.Iterator(snapshot)
 	defer func() {
 		it.Close()
@@ -177,12 +178,16 @@ func (r *RocksTree) RangeWithSnap(snapshot *gorocksdb.Snapshot, start, end []byt
 
 func (r *RocksTree) RangeWithIter(it *gorocksdb.Iterator, start []byte, end []byte, cb func(v []byte) (bool, error)) error {
 	it.Seek(start)
+	log.LogDebugf("===========================start:%v ", start)
 	for ; it.ValidForPrefix(start); it.Next() {
+		log.LogDebugf("===========================7")
 		key := it.Key().Data()
 		value := it.Value().Data()
 		if bytes.Compare(end, key) < 0 {
+			log.LogDebugf("===========================over: %v , %v ", end, key)
 			break
 		}
+		log.LogDebugf("===========================33")
 		if hasNext, err := cb(value); err != nil {
 			log.LogErrorf("[RocksTree] RangeWithIter key: %v value: %v err: %v", key, value, err)
 			return err
@@ -190,10 +195,12 @@ func (r *RocksTree) RangeWithIter(it *gorocksdb.Iterator, start []byte, end []by
 			return nil
 		}
 	}
+	log.LogDebugf("===========================vvv")
 	return nil
 }
 
 func (r *RocksTree) Range(start, end []byte, cb func(v []byte) (bool, error)) error {
+	log.LogDebugf("===========================5")
 	snapshot := r.db.NewSnapshot()
 	defer func() {
 		r.db.ReleaseSnapshot(snapshot)
@@ -773,12 +780,15 @@ func (b *InodeRocks) Range(start, end *Inode, cb func(v []byte) (bool, error)) e
 		startByte []byte
 		endByte   []byte
 	)
+	log.LogDebugf("===========================1")
 	startByte = inodeEncodingKey(start.Inode)
+	log.LogDebugf("===========================2")
 	if end == nil {
 		endByte = []byte{byte(InodeType) + 1}
 	} else {
 		endByte = inodeEncodingKey(end.Inode)
 	}
+	log.LogDebugf("===========================%v", endByte)
 	return b.RocksTree.Range(startByte, endByte, cb)
 }
 
