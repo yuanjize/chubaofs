@@ -168,7 +168,11 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.LogDebug("count %d %d ", mp.inodeTree.Count(), mp.inodeTree.RealCount())
+
 	f := func(v []byte) (bool, error) {
+
+		log.LogDebug("=====range %v ", v)
 		if _, e := w.Write([]byte("\n")); e != nil {
 			log.LogErrorf("[getAllInodesHandler] failed to write response: %v", e)
 			return false, e
@@ -180,6 +184,8 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 			return false, e
 		}
 
+		log.LogDebug("=====range %v ", inode)
+		
 		data, e := inode.MarshalToJSON()
 		if e != nil {
 			log.LogErrorf("[getAllInodesHandler] failed to marshal to json: %v", e)
@@ -370,11 +376,7 @@ func (m *MetaNode) getAllDentriesHandler(w http.ResponseWriter, r *http.Request)
 		isFirst   = true
 	)
 
-	log.LogDebugf("count==================== %d  %d", mp.dentryTree.Count(), mp.dentryTree.RealCount())
-
 	err = mp.dentryTree.Range(&Dentry{}, nil, func(v []byte) (bool, error) {
-
-		log.LogDebugf("[getAllDentriesHandler] response %v", v)
 
 		if !isFirst {
 			if _, err = w.Write(delimiter); err != nil {
@@ -388,8 +390,6 @@ func (m *MetaNode) getAllDentriesHandler(w http.ResponseWriter, r *http.Request)
 		if err := d.Unmarshal(v); err != nil {
 			return false, err
 		}
-
-		log.LogDebugf("[getAllDentriesHandler] response %v", d)
 
 		data, err := json.Marshal(d)
 		if err != nil {
