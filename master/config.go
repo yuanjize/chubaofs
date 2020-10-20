@@ -44,7 +44,7 @@ const (
 	defaultTobeFreedDataPartitionCount         = 1000
 	defaultSecondsToFreeDataPartitionAfterLoad = 5 * 60                               // a data partition can only be freed after loading 5 mins
 	defaultIntervalToFreeDataPartition         = 10                                   // in terms of seconds
-	defaultIntervalToCheckHeartbeat            = 10                                   //FIXME： TODO ANSJ
+	defaultIntervalToCheckHeartbeat            = 60
 	defaultIntervalToCheckDataPartition        = 60
 	defaultIntervalToCheckCrc                  = 20 * defaultIntervalToCheckHeartbeat // in terms of seconds
 	noHeartBeatTimes                           = 3                                    // number of times that no heartbeat reported
