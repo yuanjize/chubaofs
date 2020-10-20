@@ -17,6 +17,7 @@ package metanode
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/tecbot/gorocksdb"
 	"net/http"
 	"strconv"
 
@@ -168,7 +169,17 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.LogDebugf("count %d %d ", mp.inodeTree.Count(), mp.inodeTree.RealCount())
+	ro := gorocksdb.NewDefaultReadOptions()
+	ro.SetVerifyChecksums(false)
+	ro.SetFillCache(false)
+	it := mp.inodeTree.(*InodeRocks).db.NewIterator(ro)
+	it.SeekToFirst()
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		data := key.Data()
+		log.LogInfof("key:[%v]  value:[%v]", key, data)
+	}
+	it.Close()
 
 	f := func(v []byte) (bool, error) {
 
