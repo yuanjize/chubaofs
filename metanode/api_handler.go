@@ -182,7 +182,7 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		if data[0] == byte(InodeType) {
 			i := Inode{}
 			i.Unmarshal(data)
-			log.LogDebugf("inode:[%v]  extents:[%v]", i, i.Extents)
+			log.LogDebugf("inode:[%v]  extents:[%v] size:[%v]", i, i.Extents, i.Size)
 		}
 	}
 	it.Close()
