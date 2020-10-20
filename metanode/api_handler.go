@@ -17,7 +17,6 @@ package metanode
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tecbot/gorocksdb"
 	"net/http"
 	"strconv"
 
@@ -138,6 +137,8 @@ func (m *MetaNode) getPartitionByIDHandler(w http.ResponseWriter, r *http.Reques
 			"count":     mp.multipartTree.Count(),
 			"realCount": mp.multipartTree.RealCount(),
 		}
+
+		msg["extDelCh"] = len(mp.extDelCh)
 	}
 
 	resp.Data = msg
@@ -169,28 +170,8 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.LogDebugf("start iter.......")
-	ro := gorocksdb.NewDefaultReadOptions()
-	ro.SetVerifyChecksums(false)
-	ro.SetFillCache(false)
-	it := mp.inodeTree.(*InodeRocks).db.NewIterator(ro)
-	it.SeekToFirst()
-	for ; it.Valid(); it.Next() {
-		key := it.Key()
-		data := key.Data()
-		log.LogDebugf("key:[%v]  value:[%v]", key.Data(), data)
-		if data[0] == byte(InodeType) {
-			i := Inode{}
-			i.Unmarshal(data)
-			log.LogDebugf("inode:[%v]  extents:[%v] size:[%v]", i, i.Extents, i.Size)
-		}
-	}
-	it.Close()
-	log.LogDebugf("end iter.......")
-
 	f := func(v []byte) (bool, error) {
 
-		log.LogDebug("=====range %v ", v)
 		if _, e := w.Write([]byte("\n")); e != nil {
 			log.LogErrorf("[getAllInodesHandler] failed to write response: %v", e)
 			return false, e
@@ -201,8 +182,6 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 			log.LogErrorf("unmarshal inode has err:[%s]", e.Error())
 			return false, e
 		}
-
-		log.LogDebug("=====range %v ", inode)
 
 		data, e := inode.MarshalToJSON()
 		if e != nil {
