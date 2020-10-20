@@ -370,7 +370,12 @@ func (m *MetaNode) getAllDentriesHandler(w http.ResponseWriter, r *http.Request)
 		isFirst   = true
 	)
 
+	log.LogDebugf("count==================== %d  %d", mp.dentryTree.Count(), mp.dentryTree.RealCount())
+
 	err = mp.dentryTree.Range(&Dentry{}, nil, func(v []byte) (bool, error) {
+
+		log.LogDebugf("[getAllDentriesHandler] response %v", v)
+
 		if !isFirst {
 			if _, err = w.Write(delimiter); err != nil {
 				return false, err
@@ -383,6 +388,8 @@ func (m *MetaNode) getAllDentriesHandler(w http.ResponseWriter, r *http.Request)
 		if err := d.Unmarshal(v); err != nil {
 			return false, err
 		}
+
+		log.LogDebugf("[getAllDentriesHandler] response %v", d)
 
 		data, err := json.Marshal(d)
 		if err != nil {
