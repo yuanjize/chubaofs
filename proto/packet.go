@@ -19,13 +19,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/chubaofs/chubaofs/util"
-	"github.com/chubaofs/chubaofs/util/buf"
 	"io"
 	"net"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/chubaofs/chubaofs/util"
+	"github.com/chubaofs/chubaofs/util/buf"
 )
 
 var (
@@ -83,12 +84,15 @@ const (
 	OpMetaEvictInode    uint8 = 0x2F
 
 	// Operations: Master -> MetaNode
-	OpCreateMetaPartition  uint8 = 0x40
-	OpMetaNodeHeartbeat    uint8 = 0x41
-	OpDeleteMetaPartition  uint8 = 0x42
-	OpUpdateMetaPartition  uint8 = 0x43
-	OpLoadMetaPartition    uint8 = 0x44
-	OpOfflineMetaPartition uint8 = 0x45
+	OpCreateMetaPartition           uint8 = 0x40
+	OpMetaNodeHeartbeat             uint8 = 0x41
+	OpDeleteMetaPartition           uint8 = 0x42
+	OpUpdateMetaPartition           uint8 = 0x43
+	OpLoadMetaPartition             uint8 = 0x44
+	OpOfflineMetaPartition          uint8 = 0x45
+	OpAddMetaPartitionRaftMember    uint8 = 0x46
+	OpRemoveMetaPartitionRaftMember uint8 = 0x47
+	OpMetaPartitionTryToLeader      uint8 = 0x48
 
 	// Operations: Master -> DataNode
 	OpCreateDataPartition uint8 = 0x60

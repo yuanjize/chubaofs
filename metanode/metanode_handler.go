@@ -19,14 +19,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chubaofs/chubaofs/proto"
 	"strings"
+
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 func (m *MetaNode) registerHandler() (err error) {
 	// Register http handler
 	http.HandleFunc("/getAllPartitions", m.allPartitionsHandle)
-	http.HandleFunc("/getInodeInfo", m.inodeInfoHandle)
+	http.HandleFunc("/getPartitionById", m.getPartitionByIDHandler)
 	http.HandleFunc("/getInodeRange", m.rangeHandle)
 	http.HandleFunc("/getExtents", m.getExtents)
 	http.HandleFunc("/getDentry", m.getDentryHandle)
@@ -42,15 +43,15 @@ func (m *MetaNode) allPartitionsHandle(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (m *MetaNode) inodeInfoHandle(w http.ResponseWriter, r *http.Request) {
+func (m *MetaNode) getPartitionByIDHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	id, err := strconv.ParseUint(r.FormValue("id"), 10, 64)
+	pid, err := strconv.ParseUint(r.FormValue("pid"), 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	mp, err := m.metaManager.GetPartition(id)
+	mp, err := m.metaManager.GetPartition(pid)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(err.Error()))

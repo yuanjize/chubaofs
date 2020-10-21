@@ -14,6 +14,8 @@
 
 package master
 
+import "time"
+
 const (
 	ParaHosts                 = "hosts"
 	ParaDestAddr              = "destAddr"
@@ -45,7 +47,6 @@ const (
 	CheckDataPartitionDiskErrorErr = "CheckDataPartitionDiskErrorErr  "
 	GetAvailDataNodeHostsErr       = "GetAvailDataNodeHostsErr "
 	GetAvailMetaNodeHostsErr       = "GetAvailMetaNodeHostsErr "
-	GetDataReplicaFileCountInfo    = "GetDataReplicaFileCountInfo "
 	DataNodeOfflineInfo            = "dataNodeOfflineInfo"
 	DiskOfflineInfo                = "DiskOfflineInfo"
 	HandleDataPartitionOfflineErr  = "HandleDataPartitionOffLineErr "
@@ -75,13 +76,13 @@ const (
 	VolMaxExpandDataPartitionCount                = 100
 	VolWarningRatio                               = 0.7
 	VolMinAvailSpaceRatio                         = 0.1
-	VolReadWriteDataPartitionRatio                = 0.1
 	DefaultRackName                               = "default"
 	defaultMinusOfMaxInodeID                      = 1000
 	defaultRangeOfCountDifferencesAllowed         = 50
 	DefaultVolMinWritableDPNum                    = 5
 	DefaultVolMinWritableMPNum                    = 1
 	defaultOfflineChannelBufferCapacity           = 1000
+	retrySendSyncTaskInternal                     = 3 * time.Second
 )
 
 const (

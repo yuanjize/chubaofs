@@ -140,6 +140,8 @@ type MetaPartitionReport struct {
 	MaxInodeID  uint64
 	IsLeader    bool
 	VolName     string
+	InodeCount  uint64
+	DentryCount uint64
 }
 
 type MetaNodeHeartbeatResponse struct {
@@ -200,6 +202,18 @@ type MetaPartitionOfflineResponse struct {
 	VolName     string
 	Status      uint8
 	Result      string
+}
+
+// AddMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
+type AddMetaPartitionRaftMemberRequest struct {
+	PartitionId uint64
+	AddPeer     Peer
+}
+
+// RemoveMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
+type RemoveMetaPartitionRaftMemberRequest struct {
+	PartitionId uint64
+	RemovePeer  Peer
 }
 
 type Token struct {

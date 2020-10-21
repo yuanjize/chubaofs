@@ -15,9 +15,10 @@
 package metanode
 
 import (
+	"time"
+
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/third_party/juju/errors"
-	"time"
 )
 
 const (
@@ -135,10 +136,11 @@ const (
 	cfgMasterAddrs       = "masterAddrs"
 	cfgRaftHeartbeatPort = "raftHeartbeatPort"
 	cfgRaftReplicatePort = "raftReplicatePort"
+	cfgRaftTickInterval  = "raftTickInterval" // tick interval for raft, type: int, unit: millisecond.
 	cfgTotalMem          = "totalMem"
 )
 
 const (
-	storeTimeTicker = time.Minute * 5
-	intervalToSyncCursor  = time.Minute * 2
+	storeTimeTicker      = time.Minute * 5
+	intervalToSyncCursor = time.Minute * 2
 )

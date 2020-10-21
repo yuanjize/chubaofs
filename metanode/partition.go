@@ -16,6 +16,7 @@ package metanode
 
 import (
 	"encoding/json"
+	"fmt"
 	"path"
 	"sort"
 	"strconv"
@@ -155,8 +156,13 @@ type OpPartition interface {
 	DeletePartition() (err error)
 	UpdatePartition(req *UpdatePartitionReq, resp *UpdatePartitionResp) (err error)
 	DeleteRaft() error
+	IsExistPeer(peer proto.Peer) bool
+	TryToLeader(groupID uint64) error
+	CanRemoveRaftMember(peer proto.Peer) error
 	ExpiredRaft() error
 	ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse)
+	GetInodeCount() uint64
+	GetDentryCount() uint64
 }
 
 type MetaPartition interface {
@@ -210,6 +216,14 @@ func (mp *metaPartition) Start() (err error) {
 		}
 	}
 	return
+}
+
+func (mp *metaPartition)GetInodeCount() uint64{
+	return uint64(mp.inodeTree.Len())
+}
+
+func (mp *metaPartition)GetDentryCount() uint64{
+	return uint64(mp.dentryTree.Len())
 }
 
 func (mp *metaPartition) Stop() {
@@ -517,6 +531,54 @@ func (mp *metaPartition) Reset() (err error) {
 	mp.deleteDentryFile()
 	mp.deleteInodeFile()
 	return
+}
+
+func (mp *metaPartition) IsExistPeer(peer proto.Peer) bool {
+	for _, hasExsitPeer := range mp.config.Peers {
+		if hasExsitPeer.Addr == peer.Addr && hasExsitPeer.ID == peer.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (mp *metaPartition) TryToLeader(groupID uint64) error {
+	return mp.raftPartition.TryToLeader(groupID)
+}
+
+func (mp *metaPartition) CanRemoveRaftMember(peer proto.Peer) error {
+	downReplicas := mp.config.RaftStore.RaftServer().GetDownReplicas(mp.config.PartitionId)
+	hasExsit := false
+	for _, p := range mp.config.Peers {
+		if p.ID == peer.ID {
+			hasExsit = true
+			break
+		}
+	}
+	if !hasExsit {
+		return nil
+	}
+
+	hasDownReplicasExcludePeer := make([]uint64, 0)
+	for _, nodeID := range downReplicas {
+		if nodeID.NodeID == peer.ID {
+			continue
+		}
+		hasDownReplicasExcludePeer = append(hasDownReplicasExcludePeer, nodeID.NodeID)
+	}
+
+	sumReplicas := len(mp.config.Peers)
+	if sumReplicas%2 == 1 {
+		if sumReplicas-len(hasDownReplicasExcludePeer) > (sumReplicas/2 + 1) {
+			return nil
+		}
+	} else {
+		if sumReplicas-len(hasDownReplicasExcludePeer) >= (sumReplicas/2 + 1) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("downReplicas(%v) too much,so donnot offline (%v)", downReplicas, peer)
 }
 
 func (mp *metaPartition) ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadMetaPartitionMetricResponse) {
