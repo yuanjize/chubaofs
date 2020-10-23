@@ -58,7 +58,6 @@ type MetaNode struct {
 	raftReplicatePort string
 	tickInterval      int
 	zoneName          string
-	idleInodeMultiple uint64
 	httpStopC         chan uint8
 
 	control common.Control
@@ -190,15 +189,6 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 		}
 	} else {
 		m.storeType = proto.MetaTypeMemory //default memory
-	}
-
-	if idleInodeMultipleStr := cfg.GetString(cfgIdleInodeMultiple); idleInodeMultipleStr == "" {
-		m.idleInodeMultiple = 10
-	} else {
-		m.idleInodeMultiple, err = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
-		if err != nil {
-			return fmt.Errorf("bad idleInodeMultiple config,Recommended to be configured as 10 if set 1 means no id reuse")
-		}
 	}
 
 	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)

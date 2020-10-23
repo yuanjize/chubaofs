@@ -52,7 +52,6 @@ type metadataManager struct {
 	raftStore          raftstore.RaftStore
 	connPool           *util.ConnectPool
 	state              uint32
-	idleInodeMultiple  uint64
 	mu                 sync.RWMutex
 	partitions         map[uint64]*MetaPartition // Key: metaRangeId, Val: metaPartition
 	metaNode           *MetaNode
@@ -296,13 +295,12 @@ func (m *metadataManager) loadPartitions() (err error) {
 				}
 
 				partitionConfig := &MetaPartitionConfig{
-					PartitionId:       id,
-					NodeId:            m.nodeId,
-					RaftStore:         m.raftStore,
-					StoreType:         m.metaNode.storeType,
-					RootDir:           path.Join(m.rootDir, fileName),
-					ConnPool:          m.connPool,
-					IdleInodeMultiple: m.idleInodeMultiple,
+					PartitionId: id,
+					NodeId:      m.nodeId,
+					RaftStore:   m.raftStore,
+					StoreType:   m.metaNode.storeType,
+					RootDir:     path.Join(m.rootDir, fileName),
+					ConnPool:    m.connPool,
 				}
 
 				//if sotreType is rocksdb , so find rocksdir in path
@@ -401,18 +399,17 @@ func (m *metadataManager) createPartition(request *proto.CreateMetaPartitionRequ
 	partitionId := fmt.Sprintf("%d", request.PartitionID)
 
 	mpc := &MetaPartitionConfig{
-		PartitionId:       request.PartitionID,
-		VolName:           request.VolName,
-		Start:             request.Start,
-		End:               request.End,
-		Cursor:            request.Start,
-		MaxInode:          request.Start,
-		Peers:             request.Members,
-		StoreType:         request.StoreType,
-		RaftStore:         m.raftStore,
-		NodeId:            m.nodeId,
-		IdleInodeMultiple: m.idleInodeMultiple,
-		RootDir:           path.Join(m.rootDir, partitionPrefix+partitionId),
+		PartitionId: request.PartitionID,
+		VolName:     request.VolName,
+		Start:       request.Start,
+		End:         request.End,
+		Cursor:      request.Start,
+		MaxInode:    request.Start,
+		Peers:       request.Members,
+		StoreType:   request.StoreType,
+		RaftStore:   m.raftStore,
+		NodeId:      m.nodeId,
+		RootDir:     path.Join(m.rootDir, partitionPrefix+partitionId),
 
 		ConnPool: m.connPool,
 	}
@@ -500,14 +497,13 @@ func (m *metadataManager) MarshalJSON() (data []byte, err error) {
 // NewMetadataManager returns a new metadata manager.
 func NewMetadataManager(metaNode *MetaNode) *metadataManager {
 	return &metadataManager{
-		nodeId:            metaNode.nodeId,
-		zoneName:          metaNode.zoneName,
-		rootDir:           metaNode.metadataDir,
-		rocksDirs:         metaNode.rocksDirs,
-		raftStore:         metaNode.raftStore,
-		idleInodeMultiple: metaNode.idleInodeMultiple,
-		partitions:        make(map[uint64]*MetaPartition),
-		metaNode:          metaNode,
+		nodeId:     metaNode.nodeId,
+		zoneName:   metaNode.zoneName,
+		rootDir:    metaNode.metadataDir,
+		rocksDirs:  metaNode.rocksDirs,
+		raftStore:  metaNode.raftStore,
+		partitions: make(map[uint64]*MetaPartition),
+		metaNode:   metaNode,
 	}
 }
 
