@@ -367,6 +367,8 @@ func (p *Packet) IsMasterCommand() bool {
 		proto.OpDecommissionDataPartition,
 		proto.OpAddDataPartitionRaftMember,
 		proto.OpRemoveDataPartitionRaftMember,
+		proto.OpAddDataPartitionRaftLearner,
+		proto.OpPromoteDataPartitionRaftLearner,
 		proto.OpDataPartitionTryToLeader:
 		return true
 	}

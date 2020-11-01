@@ -54,6 +54,29 @@ func (dp *DataPartition) ApplyMemberChange(confChange *raftproto.ConfChange, ind
 		isUpdated bool
 	)
 	switch confChange.Type {
+	case raftproto.ConfAddLearner:
+		req := &proto.AddDataPartitionRaftLearnerRequest{}
+		if err = json.Unmarshal(confChange.Context, req); err != nil {
+			return
+		}
+		isUpdated, err = dp.addRaftLearner(req, index)
+		if isUpdated && err == nil {
+			// Perform the update replicas operation asynchronously after the execution of the member change applying
+			// related process.
+			updateWG := sync.WaitGroup{}
+			updateWG.Add(1)
+			defer updateWG.Done()
+			go func() {
+				updateWG.Wait()
+				if err = dp.updateReplicas(true); err != nil {
+					log.LogErrorf("ApplyMemberChange: update partition %v replicas failed: %v", dp.partitionID, err)
+					return
+				}
+				if dp.isLeader {
+					dp.ExtentStore().MoveAllToBrokenTinyExtentC(storage.TinyExtentCount)
+				}
+			}()
+		}
 	case raftproto.ConfAddNode:
 		req := &proto.AddDataPartitionRaftMemberRequest{}
 		if err = json.Unmarshal(confChange.Context, req); err != nil {
@@ -83,6 +106,12 @@ func (dp *DataPartition) ApplyMemberChange(confChange *raftproto.ConfChange, ind
 			return
 		}
 		isUpdated, err = dp.removeRaftNode(req, index)
+	case raftproto.ConfPromoteLearner:
+		req := &proto.PromoteDataPartitionRaftLearnerRequest{}
+		if err = json.Unmarshal(confChange.Context, req); err != nil {
+			return
+		}
+		isUpdated, err = dp.promoteRaftLearner(req, index)
 	case raftproto.ConfUpdateNode:
 		log.LogDebugf("[updateRaftNode]: not support.")
 	}
