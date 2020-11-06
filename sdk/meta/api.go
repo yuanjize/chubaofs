@@ -83,16 +83,16 @@ func (mw *MetaWrapper) Create_ll(parentID uint64, name string, mode uint32, targ
 
 create_dentry:
 	status, err = mw.dcreate(parentMP, parentID, name, info.Inode, mode)
-	if err != nil {
-		return nil, statusToErrno(status)
-	} else if status != statusOK {
-		if status != statusExist {
-			mw.idelete(mp, info.Inode)
-			mw.ievict(mp, info.Inode)
-		}
-		return nil, statusToErrno(status)
+	if (err == nil) && ((status == statusOK) || (status == statusExist)) {
+		return info, nil
 	}
-	return info, nil
+
+	// Unable to determin create dentry status, rollback may cause unexcepted result.
+	// So we return EAGAIN error, user should check opration result manually or retry.
+	log.LogWarnf("Create_ll: create_dentry failed, can't determin dentry status, err(%v), status(%v), parentMP(%v),"+
+		" parentID(%v), name(%v), info.Inode(%v), mode(%v)",
+		err, status, parentMP, parentID, name, info.Inode, mode)
+	return nil, statusToErrno(status)
 }
 
 func (mw *MetaWrapper) Lookup_ll(parentID uint64, name string) (inode uint64, mode uint32, err error) {
@@ -248,12 +248,11 @@ func (mw *MetaWrapper) Rename_ll(srcParentID uint64, srcName string, dstParentID
 
 	// delete dentry from src parent
 	status, _, err = mw.ddelete(srcParentMP, srcParentID, srcName)
+	// Unable to determin delete dentry status, rollback may cause unexcepted result.
+	// So we return error, user should check opration result manually or retry.
 	if err != nil || (status != statusOK && status != statusNoent) {
-		if oldInode == 0 {
-			mw.ddelete(dstParentMP, dstParentID, dstName)
-		} else {
-			mw.dupdate(dstParentMP, dstParentID, dstName, oldInode)
-		}
+		log.LogWarnf("Rename_ll: delete_dentry failed, can't determin dentry status, err(%v), status(%v), srcparentMP(%v),"+
+			" srcParentID(%v), srcName(%v)", err, status, srcParentMP, srcParentID, srcName)
 		return statusToErrno(status)
 	}
 
