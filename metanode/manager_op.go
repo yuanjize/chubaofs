@@ -98,8 +98,8 @@ func (m *metaManager) opMasterHeartbeat(conn net.Conn, p *Packet) (err error) {
 		if mConf.Cursor >= mConf.End {
 			mpr.Status = proto.ReadOnly
 		}
-		mpr.InodeCount=partition.GetInodeCount()
-		mpr.DentryCount=partition.GetDentryCount()
+		mpr.InodeCount = partition.GetInodeCount()
+		mpr.DentryCount = partition.GetDentryCount()
 		resp.MetaPartitionInfo = append(resp.MetaPartitionInfo, mpr)
 		return true
 	})
@@ -567,16 +567,16 @@ func (m *metaManager) opMetaExtentsDel(conn net.Conn, p *Packet) (err error) {
 
 func (m *metaManager) opMetaExtentsTruncate(conn net.Conn, p *Packet) (err error) {
 	req := &ExtentsTruncateReq{}
-	if err = json.Unmarshal(p.Data, req); err != nil {
-		p.PackErrorWithBody(proto.OpErr, nil)
-		m.respondToClient(conn, p)
-		return
-	}
 	defer func() {
 		if err != nil {
 			log.LogErrorf(fmt.Sprintf("opMetaExtentsTruncate request(%v) failed (%v)", req, err))
 		}
 	}()
+	if err = json.Unmarshal(p.Data, req); err != nil {
+		p.PackErrorWithBody(proto.OpErr, nil)
+		m.respondToClient(conn, p)
+		return
+	}
 	mp, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		p.PackErrorWithBody(proto.OpNotExistErr, nil)
@@ -586,7 +586,7 @@ func (m *metaManager) opMetaExtentsTruncate(conn net.Conn, p *Packet) (err error
 	if !m.serveProxy(conn, mp, p) {
 		return
 	}
-	mp.ExtentsTruncate(req, p)
+	err = mp.ExtentsTruncate(req, p)
 	m.respondToClient(conn, p)
 	return
 }
