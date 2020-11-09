@@ -832,10 +832,7 @@ func (c *Cluster) dataPartitionOffline(offlineAddr, destAddr, volName string, dp
 	if err != nil {
 		goto errDeal
 	}
-	_, err = dataNode.Sender.syncSendAdminTask(offlineTask)
-	if err != nil {
-		goto errDeal
-	}
+	dataNode.Sender.syncSendAdminTask(offlineTask)
 	dp.isRecover = true
 	c.putBadDataPartitionIDs(replica, dataNode, dp.PartitionID)
 	dp.offLineInMem(offlineAddr)
