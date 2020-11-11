@@ -17,7 +17,6 @@ package metanode
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tecbot/gorocksdb"
 	"net/http"
 	"strconv"
 
@@ -172,31 +171,6 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-
-	log.LogDebugf("start iter.......")
-	ro := gorocksdb.NewDefaultReadOptions()
-	ro.SetVerifyChecksums(false)
-	ro.SetFillCache(false)
-	it := mp.inodeTree.(*InodeRocks).db.NewIterator(ro)
-	it.SeekToFirst()
-	for ; it.Valid(); it.Next() {
-		key := it.Key()
-		data := key.Data()
-		log.LogDebugf("key:[%v]  value:[%v]", key.Data(), data)
-		if data[0] == byte(InodeType) {
-			i := Inode{}
-			i.Unmarshal(data)
-			log.LogDebugf("inode:[%v]  extents:[%v] size:[%v]", i, i.Extents, i.Size)
-		}
-
-		if data[0] == byte(DentryType) {
-			i := Dentry{}
-			i.Unmarshal(data)
-			log.LogDebugf("dentry:[%v]  inode:[%v] name:[%v]", i, i.Inode, i.Name)
-		}
-	}
-	it.Close()
-	log.LogDebugf("end iter.......")
 
 	f := func(v []byte) (bool, error) {
 
