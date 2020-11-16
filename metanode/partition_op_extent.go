@@ -75,10 +75,15 @@ func (mp *metaPartition) ExtentsTruncate(req *ExtentsTruncateReq,
 	}
 	var nextIno uint64
 	for {
-		nextIno = mp.config.Cursor + uint64(time.Now().UnixNano())
+		cursor := mp.config.Cursor
+		if cursor == 0 {
+			cursor = mp.config.Start
+		}
+		nextIno = cursor + uint64(time.Now().UnixNano())
 		if !mp.inodeTree.Has(NewInode(nextIno, proto.ModeRegular)) {
 			break
 		}
+		time.Sleep(time.Millisecond)
 		log.LogWarn("Creating the next id conflict %d", nextIno)
 	}
 	ino.LinkTarget = make([]byte, 8)
