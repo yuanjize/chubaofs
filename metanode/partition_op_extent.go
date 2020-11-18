@@ -16,6 +16,8 @@ package metanode
 
 import (
 	"encoding/json"
+	"github.com/chubaofs/chubaofs/util/log"
+	"time"
 
 	"encoding/binary"
 	"github.com/chubaofs/chubaofs/proto"
@@ -71,10 +73,18 @@ func (mp *metaPartition) ExtentsTruncate(req *ExtentsTruncateReq,
 	} else {
 		ino.Generation = resp.Msg.Generation
 	}
-	nextIno, err := mp.nextInodeID()
-	if err != nil {
-		p.PackErrorWithBody(proto.OpErr, nil)
-		return
+	var nextIno uint64
+	for {
+		cursor := mp.config.Cursor
+		if cursor == 0 {
+			cursor = mp.config.Start
+		}
+		nextIno = cursor + uint64(time.Now().UnixNano())
+		if !mp.inodeTree.Has(NewInode(nextIno, proto.ModeRegular)) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+		log.LogWarn("Creating the next id conflict %d", nextIno)
 	}
 	ino.LinkTarget = make([]byte, 8)
 	binary.BigEndian.PutUint64(ino.LinkTarget, nextIno)
