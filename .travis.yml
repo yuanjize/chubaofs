@@ -9,4 +9,3 @@ before_install:
 script:
     - docker/run_docker.sh -t
     - docker/run_docker.sh -l
-

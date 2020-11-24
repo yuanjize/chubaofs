@@ -16,6 +16,8 @@ package metanode
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/chubaofs/chubaofs/util/log"
 	"strings"
 	"time"
 
@@ -24,13 +26,19 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 )
 
-func (mp *metaPartition) GetMultipart(req *proto.GetMultipartRequest, p *Packet) (err error) {
-	item := mp.multipartTree.Get(&Multipart{key: req.Path, id: req.MultipartId})
-	if item == nil {
+func (mp *MetaPartition) GetMultipart(req *proto.GetMultipartRequest, p *Packet) (err error) {
+	multipart, err := mp.multipartTree.RefGet(req.Path, req.MultipartId)
+	if err != nil {
+		log.LogErrorf(err.Error())
+		p.PacketErrorWithBody(proto.OpErr, nil)
+		return
+	}
+	if multipart == nil {
+		err = fmt.Errorf("not found mutipart by key:[%s] id:[%s]", req.Path, req.MultipartId)
+		log.LogErrorf(err.Error())
 		p.PacketErrorWithBody(proto.OpNotExistErr, nil)
 		return
 	}
-	multipart := item.(*Multipart)
 	resp := &proto.GetMultipartResponse{
 		Info: &proto.MultipartInfo{
 			ID:       multipart.id,
@@ -58,16 +66,24 @@ func (mp *metaPartition) GetMultipart(req *proto.GetMultipartRequest, p *Packet)
 	return
 }
 
-func (mp *metaPartition) AppendMultipart(req *proto.AddMultipartPartRequest, p *Packet) (err error) {
+func (mp *MetaPartition) AppendMultipart(req *proto.AddMultipartPartRequest, p *Packet) (err error) {
 	if req.Part == nil {
 		p.PacketOkReply()
 		return
 	}
-	item := mp.multipartTree.Get(&Multipart{key:req.Path, id: req.MultipartId})
-	if item == nil {
-		p.PacketErrorWithBody(proto.OpNotExistErr, nil)
-		return
+	temp, err := mp.multipartTree.RefGet(req.Path, req.MultipartId)
+	if err != nil {
+		log.LogErrorf(err.Error())
+		p.PacketErrorWithBody(proto.OpErr, nil)
+		return err
 	}
+	
+	if temp == nil {
+		err = fmt.Errorf("not found multipart by key:[%s] id:[%s]", req.Path, req.MultipartId)
+		p.PacketErrorWithBody(proto.OpNotExistErr, nil)
+		return err
+	}
+
 	multipart := &Multipart{
 		id:  req.MultipartId,
 		key: req.Path,
@@ -95,7 +111,7 @@ func (mp *metaPartition) AppendMultipart(req *proto.AddMultipartPartRequest, p *
 	return
 }
 
-func (mp *metaPartition) RemoveMultipart(req *proto.RemoveMultipartRequest, p *Packet) (err error) {
+func (mp *MetaPartition) RemoveMultipart(req *proto.RemoveMultipartRequest, p *Packet) (err error) {
 	multipart := &Multipart{
 		id:  req.MultipartId,
 		key: req.Path,
@@ -114,16 +130,17 @@ func (mp *metaPartition) RemoveMultipart(req *proto.RemoveMultipartRequest, p *P
 	return
 }
 
-func (mp *metaPartition) CreateMultipart(req *proto.CreateMultipartRequest, p *Packet) (err error) {
+func (mp *MetaPartition) CreateMultipart(req *proto.CreateMultipartRequest, p *Packet) (err error) {
 	var (
 		multipartId string
 	)
 	for {
 		multipartId = util.CreateMultipartID(mp.config.PartitionId).String()
-		storedItem := mp.multipartTree.Get(&Multipart{key: req.Path, id: multipartId})
-		if storedItem == nil {
-			break
-		}
+		//mu := mp.multipartTree.Get(&Multipart{id: multipartId})
+		//if storedItem == nil {
+		//	break
+		//}TODO FIX ME
+		break
 	}
 
 	multipart := &Multipart{
@@ -152,28 +169,29 @@ func (mp *metaPartition) CreateMultipart(req *proto.CreateMultipartRequest, p *P
 	return
 }
 
-func (mp *metaPartition) ListMultipart(req *proto.ListMultipartRequest, p *Packet) (err error) {
-
+func (mp *MetaPartition) ListMultipart(req *proto.ListMultipartRequest, p *Packet) (err error) {
 	max := int(req.Max)
-	keyMarker := req.Marker
-	multipartIdMarker := req.MultipartIdMarker
 	prefix := req.Prefix
 	var matches = make([]*Multipart, 0, max)
-	var walkTreeFunc = func(i BtreeItem) bool {
-		multipart := i.(*Multipart)
+
+	var walkTreeFunc = func(v []byte) (bool, error) {
+		multipart := MultipartFromBytes(v)
 		// prefix is enabled
 		if len(prefix) > 0 && !strings.HasPrefix(multipart.key, prefix) {
 			// skip and continue
-			return true
+			return true, nil
 		}
 		matches = append(matches, multipart)
-		return !(len(matches) >= max)
+		return !(len(matches) >= max), nil
 	}
-	if len(keyMarker) > 0 {
-		mp.multipartTree.AscendGreaterOrEqual(&Multipart{key: keyMarker, id: multipartIdMarker}, walkTreeFunc)
-	} else {
-		mp.multipartTree.Ascend(walkTreeFunc)
+
+	err = mp.multipartTree.Range(&Multipart{key: req.Marker, id: req.MultipartIdMarker}, nil, walkTreeFunc)
+
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		return
 	}
+
 	multipartInfos := make([]*proto.MultipartInfo, len(matches))
 
 	var convertPartFunc = func(part *Part) *proto.MultipartPartInfo {
@@ -217,7 +235,7 @@ func (mp *metaPartition) ListMultipart(req *proto.ListMultipartRequest, p *Packe
 }
 
 // SendMultipart replicate specified multipart operation to raft.
-func (mp *metaPartition) putMultipart(op uint32, multipart *Multipart) (resp interface{}, err error) {
+func (mp *MetaPartition) putMultipart(op uint32, multipart *Multipart) (resp interface{}, err error) {
 	var encoded []byte
 	if encoded, err = multipart.Bytes(); err != nil {
 		return

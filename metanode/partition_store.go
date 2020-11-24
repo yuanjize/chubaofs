@@ -48,14 +48,16 @@ const (
 	metadataFileTmp = ".meta"
 )
 
-func (mp *metaPartition) loadMetadata() (err error) {
+func (mp *MetaPartition) loadMetadata() (err error) {
 	metaFile := path.Join(mp.config.RootDir, metadataFile)
 	fp, err := os.OpenFile(metaFile, os.O_RDONLY, 0644)
 	if err != nil {
 		err = errors.NewErrorf("[loadMetadata]: OpenFile %s", err.Error())
 		return
 	}
-	defer fp.Close()
+	defer func() {
+		log.LogIfNotNil(fp.Close())
+	}()
 	data, err := ioutil.ReadAll(fp)
 	if err != nil || len(data) == 0 {
 		err = errors.NewErrorf("[loadMetadata]: ReadFile %s, data: %s", err.Error(),
@@ -79,13 +81,15 @@ func (mp *metaPartition) loadMetadata() (err error) {
 	mp.config.Peers = mConf.Peers
 	mp.config.Learners = mConf.Learners
 	mp.config.Cursor = mp.config.Start
+	mp.config.MaxInode = mp.config.MaxInode
+	mp.config.StoreType = mConf.StoreType
 
-	log.LogInfof("loadMetadata: load complete: partitionID(%v) volume(%v) range(%v,%v) cursor(%v)",
-		mp.config.PartitionId, mp.config.VolName, mp.config.Start, mp.config.End, mp.config.Cursor)
+	log.LogInfof("loadMetadata: load complete: partitionID(%v) volume(%v) range(%v,%v) cursor(%v) storeType(%v)",
+		mp.config.PartitionId, mp.config.VolName, mp.config.Start, mp.config.End, mp.config.Cursor, mp.config.StoreType)
 	return
 }
 
-func (mp *metaPartition) loadInode(rootDir string) (err error) {
+func (mp *MetaPartition) loadInode(rootDir string) (err error) {
 	var numInodes uint64
 	defer func() {
 		if err == nil {
@@ -141,12 +145,16 @@ func (mp *metaPartition) loadInode(rootDir string) (err error) {
 		if mp.config.Cursor < ino.Inode {
 			mp.config.Cursor = ino.Inode
 		}
+
+		if mp.config.MaxInode < ino.Inode {
+			mp.config.MaxInode = ino.Inode
+		}
 		numInodes += 1
 	}
 }
 
 // Load dentry from the dentry snapshot.
-func (mp *metaPartition) loadDentry(rootDir string) (err error) {
+func (mp *MetaPartition) loadDentry(rootDir string) (err error) {
 	var numDentries uint64
 	defer func() {
 		if err == nil {
@@ -161,7 +169,7 @@ func (mp *metaPartition) loadDentry(rootDir string) (err error) {
 	}
 	fp, err := os.OpenFile(filename, os.O_RDONLY, 0644)
 	if err != nil {
-		if err == os.ErrNotExist {
+		if os.IsNotExist(err) {
 			err = nil
 			return
 		}
@@ -211,7 +219,7 @@ func (mp *metaPartition) loadDentry(rootDir string) (err error) {
 	}
 }
 
-func (mp *metaPartition) loadExtend(rootDir string) error {
+func (mp *MetaPartition) loadExtend(rootDir string) error {
 	var err error
 	filename := path.Join(rootDir, extendFile)
 	if _, err = os.Stat(filename); err != nil {
@@ -255,7 +263,7 @@ func (mp *metaPartition) loadExtend(rootDir string) error {
 	return nil
 }
 
-func (mp *metaPartition) loadMultipart(rootDir string) error {
+func (mp *MetaPartition) loadMultipart(rootDir string) error {
 	var err error
 	filename := path.Join(rootDir, multipartFile)
 	if _, err = os.Stat(filename); err != nil {
@@ -296,7 +304,7 @@ func (mp *metaPartition) loadMultipart(rootDir string) error {
 	return nil
 }
 
-func (mp *metaPartition) loadApplyID(rootDir string) (err error) {
+func (mp *MetaPartition) loadApplyID(rootDir string) (err error) {
 	filename := path.Join(rootDir, applyIDFile)
 	if _, err = os.Stat(filename); err != nil {
 		err = nil
@@ -304,7 +312,7 @@ func (mp *metaPartition) loadApplyID(rootDir string) (err error) {
 	}
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		if err == os.ErrNotExist {
+		if os.IsNotExist(err) {
 			err = nil
 			return
 		}
@@ -334,7 +342,7 @@ func (mp *metaPartition) loadApplyID(rootDir string) (err error) {
 	return
 }
 
-func (mp *metaPartition) persistMetadata() (err error) {
+func (mp *MetaPartition) persistMetadata() (err error) {
 	if err = mp.config.checkMeta(); err != nil {
 		err = errors.NewErrorf("[persistMetadata]->%s", err.Error())
 		return
@@ -369,7 +377,7 @@ func (mp *metaPartition) persistMetadata() (err error) {
 	return
 }
 
-func (mp *metaPartition) storeApplyID(rootDir string, sm *storeMsg) (err error) {
+func (mp *MetaPartition) storeApplyID(rootDir string, sm *storeMsg) (err error) {
 	filename := path.Join(rootDir, applyIDFile)
 	fp, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_TRUNC|os.
 		O_CREATE, 0755)
@@ -388,8 +396,7 @@ func (mp *metaPartition) storeApplyID(rootDir string, sm *storeMsg) (err error) 
 	return
 }
 
-func (mp *metaPartition) storeInode(rootDir string,
-	sm *storeMsg) (crc uint32, err error) {
+func (mp *MetaPartition) storeInode(rootDir string, sm *storeMsg) (crc uint32, err error) {
 	filename := path.Join(rootDir, inodeFile)
 	fp, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.
 		O_CREATE, 0755)
@@ -401,42 +408,44 @@ func (mp *metaPartition) storeInode(rootDir string,
 		// TODO Unhandled errors
 		fp.Close()
 	}()
-	var data []byte
 	lenBuf := make([]byte, 4)
 	sign := crc32.NewIEEE()
-	sm.inodeTree.Ascend(func(i BtreeItem) bool {
-		ino := i.(*Inode)
-		if data, err = ino.Marshal(); err != nil {
-			return false
-		}
+	count := 0
+
+	err = sm.snapshot.Range(InodeType, func(data []byte) (b bool, err error) {
 		// set length
 		binary.BigEndian.PutUint32(lenBuf, uint32(len(data)))
 		if _, err = fp.Write(lenBuf); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = sign.Write(lenBuf); err != nil {
-			return false
+			return false, err
 		}
 		// set body
 		if _, err = fp.Write(data); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = sign.Write(data); err != nil {
-			return false
+			return false, err
 		}
-		return true
+		count += 1
+		return true, nil
 	})
+
+	if err != nil {
+		log.LogErrorf("range inode has err:[%s]", err.Error())
+		return
+	}
+
 	crc = sign.Sum32()
 	log.LogInfof("storeInode: store complete: partitoinID(%v) volume(%v) numInodes(%v) crc(%v)",
-		mp.config.PartitionId, mp.config.VolName, sm.inodeTree.Len(), crc)
+		mp.config.PartitionId, mp.config.VolName, count, crc)
 	return
 }
 
-func (mp *metaPartition) storeDentry(rootDir string,
-	sm *storeMsg) (crc uint32, err error) {
+func (mp *MetaPartition) storeDentry(rootDir string, sm *storeMsg) (crc uint32, err error) {
 	filename := path.Join(rootDir, dentryFile)
-	fp, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.
-		O_CREATE, 0755)
+	fp, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
 	if err != nil {
 		return
 	}
@@ -445,39 +454,40 @@ func (mp *metaPartition) storeDentry(rootDir string,
 		// TODO Unhandled errors
 		fp.Close()
 	}()
-	var data []byte
 	lenBuf := make([]byte, 4)
 	sign := crc32.NewIEEE()
-	sm.dentryTree.Ascend(func(i BtreeItem) bool {
-		dentry := i.(*Dentry)
-		data, err = dentry.Marshal()
-		if err != nil {
-			return false
-		}
+	count := 0
+	err = sm.snapshot.Range(DentryType, func(data []byte) (b bool, err error) {
 		// set length
 		binary.BigEndian.PutUint32(lenBuf, uint32(len(data)))
 		if _, err = fp.Write(lenBuf); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = sign.Write(lenBuf); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = fp.Write(data); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = sign.Write(data); err != nil {
-			return false
+			return false, err
 		}
-		return true
+		count += 1
+		return true, nil
 	})
+
+	if err != nil {
+		log.LogErrorf("range dentry has err:[%s]", err.Error())
+		return
+	}
+
 	crc = sign.Sum32()
 	log.LogInfof("storeDentry: store complete: partitoinID(%v) volume(%v) numDentries(%v) crc(%v)",
-		mp.config.PartitionId, mp.config.VolName, sm.dentryTree.Len(), crc)
+		mp.config.PartitionId, mp.config.VolName, count, crc)
 	return
 }
 
-func (mp *metaPartition) storeExtend(rootDir string, sm *storeMsg) (crc uint32, err error) {
-	var extendTree = sm.extendTree
+func (mp *MetaPartition) storeExtend(rootDir string, sm *storeMsg) (crc uint32, err error) {
 	var fp = path.Join(rootDir, extendFile)
 	var f *os.File
 	f, err = os.OpenFile(fp, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
@@ -494,37 +504,38 @@ func (mp *metaPartition) storeExtend(rootDir string, sm *storeMsg) (crc uint32, 
 	var crc32 = crc32.NewIEEE()
 	var varintTmp = make([]byte, binary.MaxVarintLen64)
 	var n int
+	count, err := sm.snapshot.Count(ExtendType)
+	if err != nil {
+		return 0, err
+	}
 	// write number of extends
-	n = binary.PutUvarint(varintTmp, uint64(extendTree.Len()))
+	n = binary.PutUvarint(varintTmp, count)
 	if _, err = writer.Write(varintTmp[:n]); err != nil {
 		return
 	}
 	if _, err = crc32.Write(varintTmp[:n]); err != nil {
 		return
 	}
-	extendTree.Ascend(func(i BtreeItem) bool {
-		e := i.(*Extend)
-		var raw []byte
-		if raw, err = e.Bytes(); err != nil {
-			return false
-		}
+
+	err = sm.snapshot.Range(ExtendType, func(data []byte) (b bool, err error) {
 		// write length
-		n = binary.PutUvarint(varintTmp, uint64(len(raw)))
+		n = binary.PutUvarint(varintTmp, uint64(len(data)))
 		if _, err = writer.Write(varintTmp[:n]); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = crc32.Write(varintTmp[:n]); err != nil {
-			return false
+			return false, err
 		}
 		// write raw
-		if _, err = writer.Write(raw); err != nil {
-			return false
+		if _, err = writer.Write(data); err != nil {
+			return false, err
 		}
-		if _, err = crc32.Write(raw); err != nil {
-			return false
+		if _, err = crc32.Write(data); err != nil {
+			return false, err
 		}
-		return true
+		return true, nil
 	})
+
 	if err != nil {
 		return
 	}
@@ -537,12 +548,11 @@ func (mp *metaPartition) storeExtend(rootDir string, sm *storeMsg) (crc uint32, 
 	}
 	crc = crc32.Sum32()
 	log.LogInfof("storeExtend: store complete: partitoinID(%v) volume(%v) numExtends(%v) crc(%v)",
-		mp.config.PartitionId, mp.config.VolName, extendTree.Len(), crc)
+		mp.config.PartitionId, mp.config.VolName, count, crc)
 	return
 }
 
-func (mp *metaPartition) storeMultipart(rootDir string, sm *storeMsg) (crc uint32, err error) {
-	var multipartTree = sm.multipartTree
+func (mp *MetaPartition) storeMultipart(rootDir string, sm *storeMsg) (crc uint32, err error) {
 	var fp = path.Join(rootDir, multipartFile)
 	var f *os.File
 	f, err = os.OpenFile(fp, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
@@ -560,36 +570,36 @@ func (mp *metaPartition) storeMultipart(rootDir string, sm *storeMsg) (crc uint3
 	var varintTmp = make([]byte, binary.MaxVarintLen64)
 	var n int
 	// write number of extends
-	n = binary.PutUvarint(varintTmp, uint64(multipartTree.Len()))
+	count, err := sm.snapshot.Count(ExtendType)
+	if err != nil {
+		return 0, err
+	}
+	n = binary.PutUvarint(varintTmp, count)
 	if _, err = writer.Write(varintTmp[:n]); err != nil {
 		return
 	}
 	if _, err = crc32.Write(varintTmp[:n]); err != nil {
 		return
 	}
-	multipartTree.Ascend(func(i BtreeItem) bool {
-		m := i.(*Multipart)
-		var raw []byte
-		if raw, err = m.Bytes(); err != nil {
-			return false
-		}
-		// write length
+
+	err = sm.snapshot.Range(MultipartType, func(raw []byte) (b bool, err error) {
 		n = binary.PutUvarint(varintTmp, uint64(len(raw)))
 		if _, err = writer.Write(varintTmp[:n]); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = crc32.Write(varintTmp[:n]); err != nil {
-			return false
+			return false, err
 		}
 		// write raw
 		if _, err = writer.Write(raw); err != nil {
-			return false
+			return false, err
 		}
 		if _, err = crc32.Write(raw); err != nil {
-			return false
+			return false, err
 		}
-		return true
+		return true, nil
 	})
+
 	if err != nil {
 		return
 	}
@@ -602,6 +612,6 @@ func (mp *metaPartition) storeMultipart(rootDir string, sm *storeMsg) (crc uint3
 	}
 	crc = crc32.Sum32()
 	log.LogInfof("storeMultipart: store complete: partitoinID(%v) volume(%v) numMultiparts(%v) crc(%v)",
-		mp.config.PartitionId, mp.config.VolName, multipartTree.Len(), crc)
+		mp.config.PartitionId, mp.config.VolName, count, crc)
 	return
 }

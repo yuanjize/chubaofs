@@ -1,9 +1,13 @@
 package cluster
 //auto generral by sdk/graphql general.go
 
-import "context"
-import "github.com/chubaofs/chubaofs/sdk/graphql/client"
-import "time"
+import (
+	"context"
+	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/sdk/graphql/client"
+)
 
 type ClusterClient struct {
 	*client.MasterGClient
@@ -110,13 +114,14 @@ type MasterInfo struct {
 }
 
 type MetaPartitionReport struct {
-	End	uint64
-	IsLeader	bool
-	MaxInodeID	uint64
-	PartitionID	uint64
-	Start	uint64
-	Status	int
-	VolName	string
+	End         uint64
+	IsLeader    bool
+	MaxInodeID  uint64
+	PartitionID uint64
+	Start       uint64
+	Status      int
+	VolName     string
+	StoreType   proto.StoreType
 }
 
 type NodeStatInfo struct {
@@ -251,6 +256,7 @@ func (c *ClusterClient) ClusterView (ctx context.Context) (*ClusterView, error){
 							start
 							status
 							volName
+							storeType
 						}
 						nodeSetID
 						persistenceMetaPartitions
@@ -326,6 +332,7 @@ func (c *ClusterClient) ClusterView (ctx context.Context) (*ClusterView, error){
 							start
 							status
 							volName
+							storeType
 						}
 						nodeSetID
 						persistenceMetaPartitions
@@ -711,6 +718,7 @@ func (c *ClusterClient) MetaNodeGet (ctx context.Context, addr string) (*metaNod
 					start
 					status
 					volName
+					storeType
 				}
 				nodeSetID
 				persistenceMetaPartitions
@@ -864,6 +872,7 @@ func (c *ClusterClient) MetaNodeList (ctx context.Context) ([]metaNode, error){
 					start
 					status
 					volName
+					storeType
 				}
 				nodeSetID
 				persistenceMetaPartitions

@@ -47,8 +47,9 @@ type MetaNode struct {
 	nodeId            uint64
 	listen            string
 	metadataDir       string // root dir of the metaNode
+	rocksDirs         []string
 	raftDir           string // root dir of the raftStore log
-	metadataManager   MetadataManager
+	metadataManager   *metadataManager
 	localAddr         string
 	clusterId         string
 	raftStore         raftstore.RaftStore
@@ -57,7 +58,6 @@ type MetaNode struct {
 	tickInterval      int
 	zoneName          string
 	httpStopC         chan uint8
-	disks             map[string]*Disk
 
 	control common.Control
 }
@@ -172,6 +172,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.listen = cfg.GetString(proto.ListenPort)
 	serverPort = m.listen
 	m.metadataDir = cfg.GetString(cfgMetadataDir)
+	m.rocksDirs = cfg.GetStringSlice(cfgRocksDirs)
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicaPort)
@@ -183,6 +184,8 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 		log.LogWarnf("get config [%s]:[%v] less than 300 so set it to 500 ", cfgTickIntervalMs, cfg.GetString(cfgTickIntervalMs))
 		m.tickInterval = 500
 	}
+
+	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
 
 	if configTotalMem == 0 {
 		return fmt.Errorf("bad totalMem config,Recommended to be configured as 80 percent of physical machine memory")
@@ -232,6 +235,7 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	log.LogInfof("[parseConfig] load raftHeartbeatPort[%v].", m.raftHeartbeatPort)
 	log.LogInfof("[parseConfig] load raftReplicatePort[%v].", m.raftReplicatePort)
 	log.LogInfof("[parseConfig] load zoneName[%v].", m.zoneName)
+	log.LogInfof("[parseConfig] load tickIntervalMs[%v].", m.tickInterval)
 
 	addrs := cfg.GetSlice(proto.MasterAddr)
 	masters := make([]string, 0, len(addrs))
@@ -267,14 +271,8 @@ func (m *MetaNode) startMetaManager() (err error) {
 			return
 		}
 	}
-	// load metadataManager
-	conf := MetadataManagerConfig{
-		NodeID:    m.nodeId,
-		RootDir:   m.metadataDir,
-		RaftStore: m.raftStore,
-		ZoneName:  m.zoneName,
-	}
-	m.metadataManager = NewMetadataManager(conf, m)
+
+	m.metadataManager = NewMetadataManager(m)
 	if err = m.metadataManager.Start(); err == nil {
 		log.LogInfof("[startMetaManager] manager start finish.")
 	}

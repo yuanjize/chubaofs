@@ -35,17 +35,19 @@ import (
 )
 
 // Apply applies the given operational commands.
-func (mp *metaPartition) Apply(command []byte, index uint64) (resp interface{}, err error) {
+func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	msg := &MetaItem{}
 	defer func() {
 		if err == nil {
-			mp.uploadApplyID(index)
+			mp.updateApplyID(index)
 		}
 	}()
+
+	mp.inodeTree.SetApplyID(index)
+
 	if err = msg.UnmarshalJson(command); err != nil {
 		return
 	}
-
 	switch msg.Op {
 	case opFSMCreateInode:
 		ino := NewInode(0, 0)
@@ -54,6 +56,9 @@ func (mp *metaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		}
 		if mp.config.Cursor < ino.Inode {
 			mp.config.Cursor = ino.Inode
+		}
+		if mp.config.MaxInode < ino.Inode {
+			mp.config.MaxInode = ino.Inode
 		}
 		resp = mp.fsmCreateInode(ino)
 	case opFSMUnlinkInode:
@@ -136,17 +141,10 @@ func (mp *metaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		}
 		resp = mp.fsmAppendExtents(ino)
 	case opFSMStoreTick:
-		inodeTree := mp.getInodeTree()
-		dentryTree := mp.getDentryTree()
-		extendTree := mp.extendTree.GetTree()
-		multipartTree := mp.multipartTree.GetTree()
 		msg := &storeMsg{
-			command:       opFSMStoreTick,
-			applyIndex:    index,
-			inodeTree:     inodeTree,
-			dentryTree:    dentryTree,
-			extendTree:    extendTree,
-			multipartTree: multipartTree,
+			command:    opFSMStoreTick,
+			applyIndex: index,
+			snapshot:   NewSnapshot(mp),
 		}
 		mp.storeChan <- msg
 	case opFSMInternalDeleteInode:
@@ -189,18 +187,27 @@ func (mp *metaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		if cursor > mp.config.Cursor {
 			mp.config.Cursor = cursor
 		}
+		if cursor > mp.config.MaxInode {
+			mp.config.MaxInode = cursor
+		}
 	}
 
 	return
 }
 
 // ApplyMemberChange  apply changes to the raft member.
-func (mp *metaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, index uint64) (resp interface{}, err error) {
+func (mp *MetaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, index uint64) (resp interface{}, err error) {
 	defer func() {
 		if err == nil {
-			mp.uploadApplyID(index)
+			mp.updateApplyID(index)
 		}
 	}()
+
+	req := &proto.MetaPartitionDecommissionRequest{}
+	if err = json.Unmarshal(confChange.Context, req); err != nil {
+		return
+	}
+
 	// change memory status
 	var (
 		updated bool
@@ -247,48 +254,85 @@ func (mp *metaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, ind
 }
 
 // Snapshot returns the snapshot of the current meta partition.
-func (mp *metaPartition) Snapshot() (snap raftproto.Snapshot, err error) {
+func (mp *MetaPartition) Snapshot() (snap raftproto.Snapshot, err error) {
 	snap, err = newMetaItemIterator(mp)
 	return
 }
 
 // ApplySnapshot applies the given snapshots.
-func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.SnapIterator) (err error) {
+func (mp *MetaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.SnapIterator) (err error) {
+	log.LogInfof("apply snapshot begin")
+
+	defer func() {
+		if err != nil {
+			log.LogErrorf("partition:[%d] apply snapshot has err:[%s]", mp.config.PartitionId, mp.applyID, err.Error())
+		}
+	}()
+
 	var (
 		data          []byte
 		index         int
 		appIndexID    uint64
 		cursor        uint64
-		inodeTree     = NewBtree()
-		dentryTree    = NewBtree()
-		extendTree    = NewBtree()
-		multipartTree = NewBtree()
+		inodeTree     InodeTree
+		dentryTree    DentryTree
+		extendTree    ExtendTree
+		multipartTree MultipartTree
 	)
+
+	start := time.Now()
+
+	switch mp.config.StoreType {
+	case proto.MetaTypeMemory:
+		inodeTree = &InodeBTree{NewBtree()}
+		dentryTree = &DentryBTree{NewBtree()}
+		extendTree = &ExtendBTree{NewBtree()}
+		multipartTree = &MultipartBTree{NewBtree()}
+	case proto.MetaTypeRocks:
+		log.LogInfof("clean rocksdb data to apply snapshot")
+		if err := mp.inodeTree.Clear(); err != nil {
+			return err
+		}
+		if err := mp.dentryTree.Clear(); err != nil {
+			return err
+		}
+		if err := mp.extendTree.Clear(); err != nil {
+			return err
+		}
+		if err := mp.multipartTree.Clear(); err != nil {
+			return err
+		}
+		mp.inodeTree.SetApplyID(0)
+	default:
+		log.LogWarnf("unsupport store type for %v", mp.config.StoreType)
+	}
+
 	defer func() {
 		if err == io.EOF {
 			mp.applyID = appIndexID
+			mp.inodeTree.SetApplyID(appIndexID)
 			mp.inodeTree = inodeTree
 			mp.dentryTree = dentryTree
 			mp.extendTree = extendTree
 			mp.multipartTree = multipartTree
-			if cursor != 0 {
-				mp.config.Cursor = cursor
-			}
+			mp.config.Cursor = cursor
+			mp.config.MaxInode = cursor
 			err = nil
 			// store message
 			mp.storeChan <- &storeMsg{
-				command:       opFSMStoreTick,
-				applyIndex:    mp.applyID,
-				inodeTree:     mp.inodeTree,
-				dentryTree:    mp.dentryTree,
-				extendTree:    mp.extendTree,
-				multipartTree: mp.multipartTree,
+				command:    opFSMStoreTick,
+				applyIndex: mp.applyID,
+				snapshot:   NewSnapshot(mp),
 			}
 			mp.extReset <- struct{}{}
-			log.LogDebugf("ApplySnapshot: finish with EOF: partitionID(%v) applyID(%v),cursor(%v)", mp.config.PartitionId, mp.applyID, mp.config.Cursor)
+			log.LogDebugf("ApplySnapshot: finish with EOF: partitionID(%v) applyID(%v)", mp.config.PartitionId, mp.applyID)
 			return
+		} else if err != nil {
+			log.LogErrorf("ApplySnapshot: stop with error: partitionID(%v) err(%v)", mp.config.PartitionId, err)
+		} else {
+			log.LogInfof("partition:[%d] ApplySnapshot success use time:[%v]", mp.config.PartitionId, time.Now().Sub(start))
 		}
-		log.LogErrorf("ApplySnapshot: stop with error: partitionID(%v) err(%v)", mp.config.PartitionId, err)
+
 	}()
 	for {
 		data, err = iter.Next()
@@ -305,39 +349,41 @@ func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.Sn
 			return
 		}
 		index++
+
 		switch snap.Op {
 		case opFSMCreateInode:
 			ino := NewInode(0, 0)
 
 			// TODO Unhandled errors
-			ino.UnmarshalKey(snap.K)
-			ino.UnmarshalValue(snap.V)
+			log.LogIfNotNil(ino.UnmarshalKey(snap.K))
+			log.LogIfNotNil(ino.UnmarshalValue(snap.V))
 			if cursor < ino.Inode {
 				cursor = ino.Inode
 			}
-			inodeTree.ReplaceOrInsert(ino, true)
+			log.LogIfNotNil(inodeTree.Put(ino))
 			log.LogDebugf("ApplySnapshot: create inode: partitonID(%v) inode(%v).", mp.config.PartitionId, ino)
 		case opFSMCreateDentry:
 			dentry := &Dentry{}
 			if err = dentry.UnmarshalKey(snap.K); err != nil {
+				log.LogErrorf("[ApplySnapshot] opFSMCreateDentry UnmarshalKey key: %v, err: %v", snap.K, err)
 				return
 			}
 			if err = dentry.UnmarshalValue(snap.V); err != nil {
+				log.LogErrorf("[ApplySnapshot] opFSMCreateDentry UnmarshalValue val: %v, err: %v", snap.V, err)
 				return
 			}
-			dentryTree.ReplaceOrInsert(dentry, true)
+			log.LogIfNotNil(dentryTree.Put(dentry))
 			log.LogDebugf("ApplySnapshot: create dentry: partitionID(%v) dentry(%v)", mp.config.PartitionId, dentry)
 		case opFSMSetXAttr:
 			var extend *Extend
 			if extend, err = NewExtendFromBytes(snap.V); err != nil {
 				return
 			}
-			extendTree.ReplaceOrInsert(extend, true)
-			log.LogDebugf("ApplySnapshot: set extend attributes: partitionID(%v) extend(%v)",
-				mp.config.PartitionId, extend)
+			log.LogIfNotNil(extendTree.Put(extend))
+			log.LogDebugf("ApplySnapshot: set extend attributes: partitionID(%v) extend(%v)", mp.config.PartitionId, extend)
 		case opFSMCreateMultipart:
 			var multipart = MultipartFromBytes(snap.V)
-			multipartTree.ReplaceOrInsert(multipart, true)
+			log.LogIfNotNil(multipartTree.Put(multipart))
 			log.LogDebugf("ApplySnapshot: create multipart: partitionID(%v) multipart(%v)", mp.config.PartitionId, multipart)
 		case opExtentFileSnapshot:
 			fileName := string(snap.K)
@@ -356,7 +402,7 @@ func (mp *metaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.Sn
 }
 
 // HandleFatalEvent handles the fatal errors.
-func (mp *metaPartition) HandleFatalEvent(err *raft.FatalError) {
+func (mp *MetaPartition) HandleFatalEvent(err *raft.FatalError) {
 	// Panic while fatal event happen.
 	exporter.Warning(fmt.Sprintf("action[HandleFatalEvent] err[%v].", err))
 	log.LogFatalf("action[HandleFatalEvent] err[%v].", err)
@@ -364,7 +410,7 @@ func (mp *metaPartition) HandleFatalEvent(err *raft.FatalError) {
 }
 
 // HandleLeaderChange handles the leader changes.
-func (mp *metaPartition) HandleLeaderChange(leader uint64) {
+func (mp *MetaPartition) HandleLeaderChange(leader uint64) {
 	exporter.Warning(fmt.Sprintf("metaPartition(%v) changeLeader to (%v)", mp.config.PartitionId, leader))
 	if mp.config.NodeId == leader {
 		conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", serverPort), time.Second)
@@ -373,10 +419,12 @@ func (mp *metaPartition) HandleLeaderChange(leader uint64) {
 			go mp.raftPartition.TryToLeader(mp.config.PartitionId)
 			return
 		}
+		log.LogDebugf("[metaPartition] HandleLeaderChange close conn %v, nodeId: %v, leader: %v", serverPort, mp.config.NodeId, leader)
 		conn.(*net.TCPConn).SetLinger(0)
 		conn.Close()
 	}
 	if mp.config.NodeId != leader {
+		log.LogDebugf("[metaPartition] pid: %v HandleLeaderChange become unleader nodeId: %v, leader: %v", mp.config.PartitionId, mp.config.NodeId, leader)
 		mp.storeChan <- &storeMsg{
 			command: stopStoreTick,
 		}
@@ -385,6 +433,7 @@ func (mp *metaPartition) HandleLeaderChange(leader uint64) {
 	mp.storeChan <- &storeMsg{
 		command: startStoreTick,
 	}
+	log.LogDebugf("[metaPartition] pid: %v HandleLeaderChange become leader conn %v, nodeId: %v, leader: %v", mp.config.PartitionId, serverPort, mp.config.NodeId, leader)
 	if mp.config.Start == 0 && mp.config.Cursor == 0 {
 		id, err := mp.nextInodeID()
 		if err != nil {
@@ -396,7 +445,7 @@ func (mp *metaPartition) HandleLeaderChange(leader uint64) {
 }
 
 // Put puts the given key-value pair (operation key and operation request) into the raft store.
-func (mp *metaPartition) submit(op uint32, data []byte) (resp interface{}, err error) {
+func (mp *MetaPartition) submit(op uint32, data []byte) (resp interface{}, err error) {
 	snap := NewMetaItem(0, nil, nil)
 	snap.Op = op
 	if data != nil {
@@ -412,6 +461,10 @@ func (mp *metaPartition) submit(op uint32, data []byte) (resp interface{}, err e
 	return
 }
 
-func (mp *metaPartition) uploadApplyID(applyId uint64) {
+func (mp *MetaPartition) updateApplyID(applyId uint64) {
 	atomic.StoreUint64(&mp.applyID, applyId)
+}
+
+func (mp *MetaPartition) updatePersistedApplyID(applyId uint64) {
+	atomic.StoreUint64(&mp.persistedApplyID, applyId)
 }

@@ -25,22 +25,60 @@ import (
 )
 
 type storeMsg struct {
-	command       uint32
-	applyIndex    uint64
-	inodeTree     *BTree
-	dentryTree    *BTree
-	extendTree    *BTree
-	multipartTree *BTree
+	command    uint32
+	applyIndex uint64
+	snapshot   Snapshot
 }
 
-func (mp *metaPartition) startSchedule(curIndex uint64) {
+//rocksdb schedule for index
+func (mp *MetaPartition) startScheduleByRocksDB() {
+	var keepLogNum uint64 = 20000
+
+	for mp.state != common.StateShutdown && mp.state != common.StateStopped {
+		defer func() {
+			if e := recover(); e != nil {
+				log.LogErrorf("has stoped in startScheduleByRocksDB log:[%v]", e)
+			}
+		}()
+
+		timer := time.NewTimer(time.Minute)
+		defer func() {
+			timer.Reset(1)
+		}()
+		for mp.state != common.StateShutdown && mp.state != common.StateStopped {
+			select {
+			case <-mp.stopC:
+				timer.Reset(0)
+				timer.Stop()
+				return
+			case <-timer.C:
+				if mp.raftPartition == nil {
+					log.LogWarnf("raft not start wait it to start ok")
+					continue
+				}
+				if id, err := mp.inodeTree.GetApplyID();
+					err != nil {
+					log.LogErrorf("get apply id by rocksdb has err:[%s]", err.Error())
+				} else {
+					if id < keepLogNum {
+						continue
+					}
+					mp.raftPartition.Truncate(id - keepLogNum)
+				}
+			case msg := <-mp.storeChan:
+				log.LogInfof("recive store chan info so skip it:[%v]", msg)
+			}
+		}
+	}
+}
+
+func (mp *MetaPartition) startSchedule(curIndex uint64) {
 	timer := time.NewTimer(time.Hour * 24 * 365)
 	timer.Stop()
 	timerCursor := time.NewTimer(intervalToSyncCursor)
 	scheduleState := common.StateStopped
 	dumpFunc := func(msg *storeMsg) {
-		log.LogDebugf("[startSchedule] partitionId=%d: nowAppID"+
-			"=%d, applyID=%d", mp.config.PartitionId, curIndex,
+		log.LogDebugf("[startSchedule] partitionId=%d: nowAppID=%d, applyID=%d", mp.config.PartitionId, curIndex,
 			msg.applyIndex)
 		if err := mp.store(msg); err == nil {
 			// truncate raft log
@@ -48,8 +86,7 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 				mp.raftPartition.Truncate(curIndex)
 			} else {
 				// maybe happen when start load dentry
-				log.LogWarnf("[startSchedule] raftPartition is nil so skip" +
-					" truncate raft log")
+				log.LogWarnf("[startSchedule] raftPartition is nil so skip truncate raft log")
 			}
 			curIndex = msg.applyIndex
 		} else {
@@ -135,7 +172,7 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 	}(mp.stopC)
 }
 
-func (mp *metaPartition) stop() {
+func (mp *MetaPartition) stop() {
 	if mp.stopC != nil {
 		close(mp.stopC)
 	}

@@ -16,11 +16,11 @@ package metanode
 
 import (
 	"encoding/json"
-
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
 )
 
-func (mp *metaPartition) SetXAttr(req *proto.SetXAttrRequest, p *Packet) (err error) {
+func (mp *MetaPartition) SetXAttr(req *proto.SetXAttrRequest, p *Packet) (err error) {
 	var extend = NewExtend(req.Inode)
 	extend.Put([]byte(req.Key), []byte(req.Value))
 	if _, err = mp.putExtend(opFSMSetXAttr, extend); err != nil {
@@ -31,20 +31,24 @@ func (mp *metaPartition) SetXAttr(req *proto.SetXAttrRequest, p *Packet) (err er
 	return
 }
 
-func (mp *metaPartition) GetXAttr(req *proto.GetXAttrRequest, p *Packet) (err error) {
+func (mp *MetaPartition) GetXAttr(req *proto.GetXAttrRequest, p *Packet) (err error) {
 	var response = &proto.GetXAttrResponse{
 		VolName:     req.VolName,
 		PartitionId: req.PartitionId,
 		Inode:       req.Inode,
 		Key:         req.Key,
 	}
-	treeItem := mp.extendTree.Get(NewExtend(req.Inode))
-	if treeItem != nil {
-		extend := treeItem.(*Extend)
+	extend, err := mp.extendTree.RefGet(req.Inode)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		return err
+	}
+	if extend != nil {
 		if value, exist := extend.Get([]byte(req.Key)); exist {
 			response.Value = string(value)
 		}
 	}
+
 	var encoded []byte
 	encoded, err = json.Marshal(response)
 	if err != nil {
@@ -55,27 +59,32 @@ func (mp *metaPartition) GetXAttr(req *proto.GetXAttrRequest, p *Packet) (err er
 	return
 }
 
-func (mp *metaPartition) BatchGetXAttr(req *proto.BatchGetXAttrRequest, p *Packet) (err error) {
+func (mp *MetaPartition) BatchGetXAttr(req *proto.BatchGetXAttrRequest, p *Packet) (err error) {
 	var response = &proto.BatchGetXAttrResponse{
 		VolName:     req.VolName,
 		PartitionId: req.PartitionId,
 		XAttrs:      make([]*proto.XAttrInfo, 0, len(req.Inodes)),
 	}
 	for _, inode := range req.Inodes {
-		treeItem := mp.extendTree.Get(NewExtend(inode))
-		if treeItem != nil {
-			extend := treeItem.(*Extend)
-			info := &proto.XAttrInfo{
-				Inode:  inode,
-				XAttrs: make(map[string]string),
-			}
-			for _, key := range req.Keys {
-				if val, exist := extend.Get([]byte(key)); exist {
-					info.XAttrs[key] = string(val)
-				}
-			}
-			response.XAttrs = append(response.XAttrs, info)
+		extend, err := mp.extendTree.RefGet(inode)
+		if err != nil {
+			log.LogErrorf("get extend tree has err:[%s]", err.Error())
+			continue
 		}
+		if extend == nil {
+			continue
+		}
+
+		info := &proto.XAttrInfo{
+			Inode:  inode,
+			XAttrs: make(map[string]string),
+		}
+		for _, key := range req.Keys {
+			if val, exist := extend.Get([]byte(key)); exist {
+				info.XAttrs[key] = string(val)
+			}
+		}
+		response.XAttrs = append(response.XAttrs, info)
 	}
 	var encoded []byte
 	if encoded, err = json.Marshal(response); err != nil {
@@ -86,7 +95,7 @@ func (mp *metaPartition) BatchGetXAttr(req *proto.BatchGetXAttrRequest, p *Packe
 	return
 }
 
-func (mp *metaPartition) RemoveXAttr(req *proto.RemoveXAttrRequest, p *Packet) (err error) {
+func (mp *MetaPartition) RemoveXAttr(req *proto.RemoveXAttrRequest, p *Packet) (err error) {
 	var extend = NewExtend(req.Inode)
 	extend.Put([]byte(req.Key), nil)
 	if _, err = mp.putExtend(opFSMRemoveXAttr, extend); err != nil {
@@ -97,21 +106,26 @@ func (mp *metaPartition) RemoveXAttr(req *proto.RemoveXAttrRequest, p *Packet) (
 	return
 }
 
-func (mp *metaPartition) ListXAttr(req *proto.ListXAttrRequest, p *Packet) (err error) {
+func (mp *MetaPartition) ListXAttr(req *proto.ListXAttrRequest, p *Packet) (err error) {
 	var response = &proto.ListXAttrResponse{
 		VolName:     req.VolName,
 		PartitionId: req.PartitionId,
 		Inode:       req.Inode,
 		XAttrs:      make([]string, 0),
 	}
-	treeItem := mp.extendTree.Get(NewExtend(req.Inode))
-	if treeItem != nil {
-		extend := treeItem.(*Extend)
+	extend, err := mp.extendTree.RefGet(req.Inode)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		return err
+	}
+
+	if extend != nil {
 		extend.Range(func(key, value []byte) bool {
 			response.XAttrs = append(response.XAttrs, string(key))
 			return true
 		})
 	}
+
 	var encoded []byte
 	encoded, err = json.Marshal(response)
 	if err != nil {
@@ -122,7 +136,7 @@ func (mp *metaPartition) ListXAttr(req *proto.ListXAttrRequest, p *Packet) (err 
 	return
 }
 
-func (mp *metaPartition) putExtend(op uint32, extend *Extend) (resp interface{}, err error) {
+func (mp *MetaPartition) putExtend(op uint32, extend *Extend) (resp interface{}, err error) {
 	var marshaled []byte
 	if marshaled, err = extend.Bytes(); err != nil {
 		return

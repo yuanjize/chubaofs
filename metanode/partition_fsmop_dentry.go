@@ -15,10 +15,9 @@
 package metanode
 
 import (
-	"github.com/chubaofs/chubaofs/util/btree"
-	"strings"
-
 	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
+	"strings"
 )
 
 type DentryResponse struct {
@@ -33,17 +32,21 @@ func NewDentryResponse() *DentryResponse {
 }
 
 // Insert a dentry into the dentry tree.
-func (mp *metaPartition) fsmCreateDentry(dentry *Dentry,
-	forceUpdate bool) (status uint8) {
+func (mp *MetaPartition) fsmCreateDentry(dentry *Dentry, forceUpdate bool) (status uint8) {
 	status = proto.OpOk
-	item := mp.inodeTree.CopyGet(NewInode(dentry.ParentId, 0))
+	item, err := mp.inodeTree.Get(dentry.ParentId)
+	if err != nil {
+		log.LogErrorf("[fsmCreateDentry] get dentry error: pid: %v, dentry: %v, error: %v", mp.config.PartitionId, dentry, err.Error())
+		status = proto.OpErr
+		return
+	}
 	var parIno *Inode
 	if !forceUpdate {
 		if item == nil {
 			status = proto.OpNotExistErr
 			return
 		}
-		parIno = item.(*Inode)
+		parIno = item
 		if parIno.ShouldDelete() {
 			status = proto.OpNotExistErr
 			return
@@ -53,10 +56,16 @@ func (mp *metaPartition) fsmCreateDentry(dentry *Dentry,
 			return
 		}
 	}
-	if item, ok := mp.dentryTree.ReplaceOrInsert(dentry, false); !ok {
+	err = mp.dentryTree.Create(dentry)
+	if err == existsError {
 		//do not allow directories and files to overwrite each
 		// other when renaming
-		d := item.(*Dentry)
+		d, err := mp.dentryTree.Get(dentry.ParentId, dentry.Name)
+		if err != nil || d == nil {
+			status = proto.OpErr
+			return
+		}
+
 		if proto.OsModeType(dentry.Type) != proto.OsModeType(d.Type) {
 			status = proto.OpArgMismatchErr
 			return
@@ -67,9 +76,12 @@ func (mp *metaPartition) fsmCreateDentry(dentry *Dentry,
 		}
 
 		status = proto.OpExistErr
+	} else if err != nil {
+		status = proto.OpErr
 	} else {
 		if !forceUpdate {
 			parIno.IncNLink()
+			log.LogIfNotNil(mp.inodeTree.Update(parIno))
 		}
 	}
 
@@ -77,102 +89,100 @@ func (mp *metaPartition) fsmCreateDentry(dentry *Dentry,
 }
 
 // Query a dentry from the dentry tree with specified dentry info.
-func (mp *metaPartition) getDentry(dentry *Dentry) (*Dentry, uint8) {
+func (mp *MetaPartition) getDentry(pid uint64, name string) (*Dentry, uint8) {
 	status := proto.OpOk
-	item := mp.dentryTree.Get(dentry)
-	if item == nil {
+	dentry, err := mp.dentryTree.RefGet(pid, name)
+	if err != nil {
+		log.LogErrorf("get dentry has err:[%s]", err.Error())
+		status = proto.OpErr
+		return nil, status
+	}
+	if dentry == nil {
+		log.LogDebugf("not found dentry: [%v]: %v", pid, name)
 		status = proto.OpNotExistErr
 		return nil, status
 	}
-	dentry = item.(*Dentry)
+
 	return dentry, status
 }
 
 // Delete dentry from the dentry tree.
-func (mp *metaPartition) fsmDeleteDentry(dentry *Dentry, checkInode bool) (
-	resp *DentryResponse) {
+func (mp *MetaPartition) fsmDeleteDentry(dentry *Dentry) (resp *DentryResponse) {
 	resp = NewDentryResponse()
 	resp.Status = proto.OpOk
 
-	var item interface{}
-	if checkInode {
-		item = mp.dentryTree.Execute(func(tree *btree.BTree) interface{} {
-			d := tree.CopyGet(dentry)
-			if d == nil {
-				return nil
-			}
-			if d.(*Dentry).Inode != dentry.Inode {
-				return nil
-			}
-			return mp.dentryTree.Delete(dentry)
-		})
-	} else {
-		item = mp.dentryTree.Delete(dentry)
+	var item *Dentry
+	old, _ := mp.dentryTree.Get(dentry.ParentId, dentry.Name)
+	if old != nil {
+		if dentry.Inode > 0 && old.Inode != dentry.Inode {
+			log.LogDebugf("[MetaPartition] fsmDeleteDentry inode not equal old: %v, dentry: %v ", old, dentry)
+			return nil
+		}
+		if _, err := mp.dentryTree.Delete(dentry.ParentId, dentry.Name); err != nil {
+			log.LogErrorf("delete dentry has err:[%s]", err.Error())
+			return nil
+		}
+		item = old
 	}
 
 	if item == nil {
 		resp.Status = proto.OpNotExistErr
 		return
 	} else {
-		mp.inodeTree.CopyFind(NewInode(dentry.ParentId, 0),
-			func(item BtreeItem) {
-				if item != nil {
-					ino := item.(*Inode)
-					if !ino.ShouldDelete() {
-						item.(*Inode).DecNLink()
-					}
-				}
-			})
+		inode, _ := mp.inodeTree.Get(dentry.ParentId)
+		if inode != nil {
+			if !inode.ShouldDelete() {
+				inode.DecNLink()
+				log.LogIfNotNil(mp.inodeTree.Update(inode))
+			}
+		}
 	}
-	resp.Msg = item.(*Dentry)
+	resp.Msg = item
 	return
 }
 
 // batch Delete dentry from the dentry tree.
-func (mp *metaPartition) fsmBatchDeleteDentry(db DentryBatch) []*DentryResponse {
+func (mp *MetaPartition) fsmBatchDeleteDentry(db DentryBatch) []*DentryResponse {
 	result := make([]*DentryResponse, 0, len(db))
 	for _, dentry := range db {
-		result = append(result, mp.fsmDeleteDentry(dentry, true))
+		result = append(result, mp.fsmDeleteDentry(dentry))
 	}
 	return result
 }
 
-func (mp *metaPartition) fsmUpdateDentry(dentry *Dentry) (
+func (mp *MetaPartition) fsmUpdateDentry(dentry *Dentry) (
 	resp *DentryResponse) {
 	resp = NewDentryResponse()
 	resp.Status = proto.OpOk
-	mp.dentryTree.CopyFind(dentry, func(item BtreeItem) {
-		if item == nil {
-			resp.Status = proto.OpNotExistErr
-			return
-		}
-		d := item.(*Dentry)
+
+	if d, _ := mp.dentryTree.Get(dentry.ParentId, dentry.Name); d != nil {
 		d.Inode, dentry.Inode = dentry.Inode, d.Inode
 		resp.Msg = dentry
-	})
+	} else {
+		resp.Status = proto.OpNotExistErr
+		return
+	}
 	return
+
 }
 
-func (mp *metaPartition) getDentryTree() *BTree {
-	return mp.dentryTree.GetTree()
-}
-
-func (mp *metaPartition) readDir(req *ReadDirReq) (resp *ReadDirResp) {
+func (mp *MetaPartition) readDir(req *ReadDirReq) (resp *ReadDirResp) {
 	resp = &ReadDirResp{}
-	begDentry := &Dentry{
-		ParentId: req.ParentID,
-	}
-	endDentry := &Dentry{
-		ParentId: req.ParentID + 1,
-	}
-	mp.dentryTree.AscendRange(begDentry, endDentry, func(i BtreeItem) bool {
-		d := i.(*Dentry)
+	err := mp.dentryTree.Range(&Dentry{ParentId: req.ParentID}, &Dentry{ParentId: req.ParentID + 1}, func(v []byte) (bool, error) {
+		d := &Dentry{}
+		if err := d.Unmarshal(v); err != nil {
+			log.LogErrorf("dentry unmarshal has err:[%s]", err.Error())
+			return true, nil
+		}
 		resp.Children = append(resp.Children, proto.Dentry{
+			Name:  d.Name,
 			Inode: d.Inode,
 			Type:  d.Type,
-			Name:  d.Name,
 		})
-		return true
+		return true, nil
 	})
+	if err != nil {
+		log.LogErrorf("read dentry list has err:[%s]", err.Error())
+	}
 	return
 }

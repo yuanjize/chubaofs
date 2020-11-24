@@ -28,8 +28,7 @@ const (
 
 // The proxy is used during the leader change. When a leader of a partition changes, the proxy forwards the request to
 // the new leader.
-func (m *metadataManager) serveProxy(conn net.Conn, mp MetaPartition,
-	p *Packet) (ok bool) {
+func (m *metadataManager) serveProxy(conn net.Conn, mp *MetaPartition, p *Packet) (ok bool) {
 	var (
 		mConn      *net.TCPConn
 		leaderAddr string
@@ -74,7 +73,7 @@ func (m *metadataManager) serveProxy(conn net.Conn, mp MetaPartition,
 end:
 	m.respondToClient(conn, p)
 	if err != nil {
-		log.LogErrorf("[serveProxy]: req: %d - %v, %s", p.GetReqID(),
+		log.LogErrorf("[serveProxy]: partitionID:%d req: %d [%s] - %v, %s", mp.config.PartitionId, p.GetReqID(), conn.LocalAddr().String()+"->"+conn.RemoteAddr().String(),
 			p.GetOpMsg(), err.Error())
 	}
 	log.LogDebugf("[serveProxy] req: %d - %v, resp: %v", p.GetReqID(), p.GetOpMsg(),
