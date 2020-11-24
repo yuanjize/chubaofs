@@ -137,12 +137,11 @@ type Permission string
 
 // grantee
 type Grantee struct {
-	Xmlxsi       string `xml:"xmlns:xsi,attr"`
-	Xmlns        string `xml:"xsi,attr"`
-	XsiType      string `xml:"xsi:type,attr"`
-	Type         string `xml:"type,attr"`
+	Xmlns        string `xml:"xmlns:xsi,attr,omitempty"`
+	Xmlsi        string `xml:"xsi:type,attr,omitempty"`
 	Id           string `xml:"ID,omitempty"`
 	URI          string `xml:"URI,omitempty"`
+	Type         string `xml:"Type,omitempty"`
 	DisplayName  string `xml:"DisplayName,omitempty"`
 	EmailAddress string `xml:"EmailAddress,omitempty"`
 }
@@ -170,7 +169,7 @@ type Owner struct {
 
 // access control policy
 type AccessControlPolicy struct {
-	Xmlns string            `xml:"xmlns,attr"`
+	Xmlns string            `xml:"xmlns:xsi,attr"`
 	Owner Owner             `xml:"Owner,omitempty"`
 	Acl   AccessControlList `xml:"AccessControlList,omitempty"`
 }

@@ -11,3 +11,4 @@ docs/build
 tmp/
 docker/log
 vendor/dep
+console/html

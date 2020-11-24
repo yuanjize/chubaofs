@@ -16,7 +16,6 @@ package proto
 
 import (
 	"regexp"
-	"strings"
 )
 
 var (
@@ -295,27 +294,6 @@ func (p Permission) IsBuiltin() bool {
 	return builtinPermRegexp.MatchString(string(p))
 }
 
-func (p Permission) MatchSubdir(subdir string) bool {
-	if !strings.HasPrefix(string(p), string(BuiltinPermissionPrefix)) {
-		return false
-	}
-
-	s := strings.TrimPrefix(string(p), string(BuiltinPermissionPrefix))
-	var toCompare string
-
-	if subdirRegexp.MatchString(s) {
-		toCompare = strings.Split(s, ":")[0]
-	} else {
-		toCompare = ""
-	}
-
-	if (subdir == "" || subdir == "/") && (toCompare == "" || toCompare == "/") {
-		return true
-	}
-
-	return subdir == toCompare
-}
-
 func (p Permission) IsCustom() bool {
 	return customPermRegexp.MatchString(string(p))
 }
@@ -343,12 +321,9 @@ const (
 )
 
 var (
-	permRegexp                = regexp.MustCompile("^perm:((builtin:((.*/*)([^/]*):*)(Writable|ReadOnly))|(custom:(\\w)+))$")
-	builtinPermRegexp         = regexp.MustCompile("^perm:builtin:((.*/*)([^/]*):*)(Writable|ReadOnly)$")
-	builtinWritablePermRegexp = regexp.MustCompile("^perm:builtin:((.*/*)([^/]*):*)Writable$")
-	builtinReadOnlyPermRegexp = regexp.MustCompile("^perm:builtin:((.*/*)([^/]*):*)ReadOnly$")
-	customPermRegexp          = regexp.MustCompile("^perm:custom:(\\w)+$")
-	subdirRegexp              = regexp.MustCompile("((.*/*)([^/]*)):(Writable|ReadOnly)$")
+	permRegexp        = regexp.MustCompile("^perm:((builtin:(Writable|ReadOnly))|(custom:(\\w)+))$")
+	builtinPermRegexp = regexp.MustCompile("^perm:builtin:(Writable|ReadOnly)$")
+	customPermRegexp  = regexp.MustCompile("^perm:custom:(\\w)+$")
 )
 
 func ParsePermission(value string) Permission {
@@ -422,14 +397,7 @@ var (
 )
 
 func BuiltinPermissionActions(perm Permission) Actions {
-	var p Permission
-
-	if builtinWritablePermRegexp.MatchString(string(perm)) {
-		p = BuiltinPermissionWritable
-	} else if builtinReadOnlyPermRegexp.MatchString(string(perm)) {
-		p = BuiltinPermissionReadOnly
-	}
-	if actions, exists := builtinPermissionActionsMap[p]; exists {
+	if actions, exists := builtinPermissionActionsMap[perm]; exists {
 		return actions
 	}
 	return nil

@@ -45,7 +45,6 @@ const (
 	FsyncOnClose
 	MaxCPUs
 	EnableXattr
-	NearRead
 
 	MaxMountOption
 )
@@ -93,7 +92,6 @@ func InitMountOptions(opts []MountOption) {
 	opts[WriteCache] = MountOption{"writecache", "Enable FUSE writecache feature", "", false}
 	opts[KeepCache] = MountOption{"keepcache", "Enable FUSE keepcache feature", "", false}
 	opts[FollowerRead] = MountOption{"followerRead", "Enable read from follower", "", false}
-	opts[NearRead] = MountOption{"nearRead", "Enable read from nearest node", "", true}
 
 	opts[Authenticate] = MountOption{"authenticate", "Enable Authenticate", "", false}
 	opts[ClientKey] = MountOption{"clientKey", "Client Key", "", ""}
@@ -237,5 +235,4 @@ type MountOptions struct {
 	FsyncOnClose  bool
 	MaxCPUs       int64
 	EnableXattr   bool
-	NearRead      bool
 }

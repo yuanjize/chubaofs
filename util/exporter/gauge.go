@@ -36,7 +36,7 @@ func collectGauge() {
 	for {
 		m := <-GaugeCh
 		metric := m.Metric()
-		metric.Set(m.val)
+		metric.Set(float64(m.val))
 		log.LogDebugf("collect metric %v", m)
 	}
 }
@@ -44,7 +44,7 @@ func collectGauge() {
 type Gauge struct {
 	name   string
 	labels map[string]string
-	val    float64
+	val    int64
 	ch     chan interface{}
 }
 
@@ -89,7 +89,7 @@ func (c *Gauge) Metric() prometheus.Gauge {
 	return actualMetric.(prometheus.Gauge)
 }
 
-func (g *Gauge) Set(val float64) {
+func (g *Gauge) Set(val int64) {
 	if !enabledPrometheus {
 		return
 	}
@@ -104,10 +104,43 @@ func (c *Gauge) publish() {
 	}
 }
 
-func (g *Gauge) SetWithLabels(val float64, labels map[string]string) {
+func (g *Gauge) SetWithLabels(val int64, labels map[string]string) {
 	if !enabledPrometheus {
 		return
 	}
 	g.labels = labels
 	g.Set(val)
+}
+
+type GaugeVec struct {
+	*prometheus.GaugeVec
+}
+
+func NewGaugeVec(name, help string, labels []string) *GaugeVec {
+	if !enabledPrometheus {
+		return nil
+	}
+	v := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: metricsName(name),
+			Help: help,
+		},
+		labels,
+	)
+
+	if err := prometheus.Register(v); err != nil {
+		log.LogErrorf("prometheus register gaugevec name:%v, labels:{%v} error: %v", name, labels, err)
+		return nil
+	}
+
+	return &GaugeVec{GaugeVec: v}
+}
+
+func (v *GaugeVec) SetWithLabelValues(val float64, lvs ...string) {
+	if !enabledPrometheus {
+		return
+	}
+	if m, err := v.GetMetricWithLabelValues(lvs...); err == nil {
+		m.Set(val)
+	}
 }

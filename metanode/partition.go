@@ -65,12 +65,11 @@ type MetaPartitionConfig struct {
 	// Identity for raftStore group. RaftStore nodes in the same raftStore group must have the same groupID.
 	PartitionId uint64              `json:"partition_id"`
 	VolName     string              `json:"vol_name"`
-	Start       uint64              `json:"start"` // Minimal Inode ID of this range. (Required during initialization)
-	End         uint64              `json:"end"`   // Maximal Inode ID of this range. (Required during initialization)
-	Peers       []proto.Peer        `json:"peers"` // Peers information of the raftStore
-	StoreType   proto.StoreType     `json:"store_type"`
-	Cursor      uint64              `json:"-"` // Cursor ID of the inode that have been assigned
-	MaxInode    uint64              `json:"-"`
+	Start       uint64              `json:"start"`    // Minimal Inode ID of this range. (Required during initialization)
+	End         uint64              `json:"end"`      // Maximal Inode ID of this range. (Required during initialization)
+	Peers       []proto.Peer        `json:"peers"`    // Peers information of the raftStore
+	Learners    []proto.Learner     `json:"learners"` // Learners information of the raftStore
+	Cursor      uint64              `json:"-"`        // Cursor ID of the inode that have been assigned
 	NodeId      uint64              `json:"-"`
 	RootDir     string              `json:"-"`
 	RocksDir    string              `json:"-"`
@@ -245,11 +244,16 @@ func (mp *MetaPartition) startRaft() (err error) {
 	}
 	log.LogDebugf("start partition id=%d raft peers: %s", mp.config.PartitionId, peers)
 
+	for _, learner := range mp.config.Learners {
+		rl := raftproto.Learner{ID: learner.ID, PromConfig: &raftproto.PromoteConfig{AutoPromote: learner.PmConfig.AutoProm, PromThreshold: learner.PmConfig.PromThreshold}}
+		learners = append(learners, rl)
+	}
 	pc := &raftstore.PartitionConfig{
-		ID:      mp.config.PartitionId,
-		Applied: mp.applyID,
-		Peers:   peers,
-		SM:      mp,
+		ID:       mp.config.PartitionId,
+		Applied:  mp.applyID,
+		Peers:    peers,
+		Learners: learners,
+		SM:       mp,
 	}
 	mp.raftPartition, err = mp.config.RaftStore.CreatePartition(pc)
 	if err == nil {
@@ -375,6 +379,15 @@ func (mp *MetaPartition) IsLeader() (leaderAddr string, ok bool) {
 		}
 	}
 	return
+}
+
+func (mp *metaPartition) IsLearner() bool {
+	for _, learner := range mp.config.Learners {
+		if mp.config.NodeId == learner.ID {
+			return true
+		}
+	}
+	return false
 }
 
 func (mp *MetaPartition) GetPeers() (peers []string) {
@@ -534,6 +547,12 @@ func (mp *MetaPartition) DeleteRaft() (err error) {
 	return
 }
 
+// ExpiredRaft deletes the raft partition.
+func (mp *metaPartition) ExpiredRaft() (err error) {
+	err = mp.raftPartition.Expired()
+	return
+}
+
 // Return a new inode ID and update the offset.
 func (mp *MetaPartition) nextInodeID() (inodeId uint64, err error) {
 	for {
@@ -548,67 +567,6 @@ func (mp *MetaPartition) nextInodeID() (inodeId uint64, err error) {
 		}
 	}
 }
-
-//TODO: Id reuse
-//func (mp *MetaPartition) nextInodeID() (inodeId uint64, err error) {
-//	mp.inodeLock.Lock()
-//	defer mp.inodeLock.Unlock()
-//
-//	defer func() {
-//		if inodeId > 0 {
-//			atomic.StoreUint64(&mp.config.Cursor, inodeId)
-//		}
-//	}()
-//
-//	newID := atomic.AddUint64(&mp.config.Cursor, 1)
-//
-//	if newID > mp.config.End {
-//		if mp.inodeTree.Count()*mp.config.IdleInodeMultiple > mp.config.End-mp.config.Start {
-//			log.LogErrorf("create inode ID has out of range count:[%d] idleInodeMutiple:[%d]", mp.inodeTree.Count(), mp.config.IdleInodeMultiple)
-//			return 0, ErrInodeIDOutOfRange
-//		}
-//		mp.config.MaxInode = mp.config.End
-//
-//		atomic.StoreUint64(&mp.config.Cursor, mp.config.Start)
-//	}
-//
-//	if mp.config.MaxInode < mp.config.End && newID > mp.config.MaxInode {
-//		mp.config.MaxInode = newID
-//		return newID, nil
-//	}
-//
-//	if mp.inodeIDQueue.Len() > 0 {
-//		return mp.inodeIDQueue.Front().Value.(uint64), nil
-//	}
-//
-//	pre := mp.config.Start
-//	err = mp.inodeTree.Range(&Inode{Inode: newID}, &Inode{Inode: mp.config.End}, func(v []byte) (b bool, err error) {
-//		inode := Inode{}
-//		if err := inode.Unmarshal(v); err != nil {
-//			return false, err
-//		}
-//		for i := pre + 1; i < inode.Inode; i++ {
-//			mp.inodeIDQueue.PushBack(i)
-//			if mp.inodeIDQueue.Len() > 100000 {
-//				return false, nil
-//			}
-//		}
-//		pre = inode.Inode + 1
-//		return true, nil
-//	})
-//
-//	if err != nil {
-//		log.LogErrorf("got inode id has err:[%s]", err.Error())
-//		return 0, ErrInodeIDOutOfRange
-//	}
-//
-//	if mp.inodeIDQueue.Len() > 0 {
-//		return mp.inodeIDQueue.Front().Value.(uint64), nil
-//	}
-//
-//	return 0, ErrInodeIDOutOfRange
-//
-//}
 
 // ChangeMember changes the raft member with the specified one.
 func (mp *MetaPartition) ChangeMember(changeType raftproto.ConfChangeType, peer raftproto.Peer, context []byte) (resp interface{}, err error) {
@@ -659,6 +617,22 @@ func (mp *MetaPartition) IsExsitPeer(peer proto.Peer) bool {
 		}
 	}
 	return false
+}
+
+func (mp *metaPartition) IsExistLearner(learner proto.Learner) bool {
+	var existPeer bool
+	for _, hasExistPeer := range mp.config.Peers {
+		if hasExistPeer.Addr == learner.Addr && hasExistPeer.ID == learner.ID {
+			existPeer = true
+		}
+	}
+	var existLearner bool
+	for _, hasExistLearner := range mp.config.Learners {
+		if hasExistLearner.Addr == learner.Addr && hasExistLearner.ID == learner.ID {
+			existLearner = true
+		}
+	}
+	return existPeer && existLearner
 }
 
 func (mp *MetaPartition) TryToLeader(groupID uint64) error {
@@ -718,16 +692,57 @@ func (mp *MetaPartition) Reset() (err error) {
 		}
 	}
 
-	dir := path.Join(mp.config.RootDir, strconv.Itoa(int(mp.config.PartitionId)))
-	if err := os.RemoveAll(dir); err != nil {
-		log.LogErrorf("drop btree:[%s] has err:[%s]", dir, err.Error())
+	return
+}
+
+func (mp *metaPartition) Expired() (err error) {
+	mp.stop()
+	if mp.delInodeFp != nil {
+		// TODO Unhandled errors
+		mp.delInodeFp.Sync()
+		mp.delInodeFp.Close()
 	}
 
-	if mp.config.RocksDir != "" {
-		if err := os.RemoveAll(mp.config.RocksDir); err != nil {
-			log.LogErrorf("drop rocksdb data:[%s] has err:[%s]", mp.config.RocksDir, err.Error())
+	mp.inodeTree.Reset()
+	mp.dentryTree.Reset()
+	mp.config.Cursor = 0
+	mp.applyID = 0
+
+	currentPath := path.Clean(mp.config.RootDir)
+
+	var newPath = path.Join(path.Dir(currentPath),
+		ExpiredPartitionPrefix+path.Base(currentPath)+"_"+strconv.FormatInt(time.Now().Unix(), 10))
+
+	if err := os.Rename(currentPath, newPath); err != nil {
+		log.LogErrorf("ExpiredPartition: mark expired partition fail: partitionID(%v) path(%v) newPath(%v) err(%v)", mp.config.PartitionId, currentPath, newPath, err)
+		return err
+	}
+	log.LogInfof("ExpiredPartition: mark expired partition: partitionID(%v) path(%v) newPath(%v)",
+		mp.config.PartitionId, currentPath, newPath)
+	return nil
+}
+
+//
+func (mp *metaPartition) canRemoveSelf() (canRemove bool, err error) {
+	var partition *proto.MetaPartitionInfo
+	if partition, err = masterClient.ClientAPI().GetMetaPartition(mp.config.PartitionId); err != nil {
+		log.LogErrorf("action[canRemoveSelf] err[%v]", err)
+		return
+	}
+	canRemove = false
+	var existInPeers bool
+	for _, peer := range partition.Peers {
+		if mp.config.NodeId == peer.ID {
+			existInPeers = true
 		}
 	}
-
+	if !existInPeers {
+		canRemove = true
+		return
+	}
+	if mp.config.NodeId == partition.OfflinePeerID {
+		canRemove = true
+		return
+	}
 	return
 }

@@ -18,7 +18,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -33,7 +32,6 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/sdk/data/stream"
 	"github.com/chubaofs/chubaofs/sdk/meta"
-	"github.com/chubaofs/chubaofs/util/exporter"
 	"github.com/chubaofs/chubaofs/util/log"
 
 	"github.com/chubaofs/chubaofs/util"
@@ -346,23 +344,25 @@ func (v *Volume) ListFilesV1(opt *ListFilesV1Option) (result *ListFilesV1Result,
 
 	var infos []*FSFileInfo
 	var prefixes Prefixes
-	var nextMarker string
 
-	infos, prefixes, nextMarker, err = v.listFilesV1(prefix, marker, delimiter, maxKeys)
+	infos, prefixes, err = v.listFilesV1(prefix, marker, delimiter, maxKeys)
 	if err != nil {
-		log.LogErrorf("ListFilesV1: list fail: volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) nextMarker(%v) err(%v)",
-			v.name, prefix, marker, delimiter, maxKeys, nextMarker, err)
+		log.LogErrorf("ListFilesV1: list fail: volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) err(%v)",
+			v.name, prefix, marker, delimiter, maxKeys, err)
 		return
 	}
 
 	result = &ListFilesV1Result{
 		CommonPrefixes: prefixes,
 	}
-
-	result.NextMarker = nextMarker
-	result.Files = infos
-	if len(nextMarker) > 0 {
+	if len(infos) > int(maxKeys) {
+		result.NextMarker = infos[maxKeys].Path
+		result.Files = infos[:maxKeys]
 		result.Truncated = true
+	} else {
+		result.NextMarker = ""
+		result.Files = infos
+		result.Truncated = false
 	}
 
 	return
@@ -380,9 +380,8 @@ func (v *Volume) ListFilesV2(opt *ListFilesV2Option) (result *ListFilesV2Result,
 
 	var infos []*FSFileInfo
 	var prefixes Prefixes
-	var nextMarker string
 
-	infos, prefixes, nextMarker, err = v.listFilesV2(prefix, startAfter, contToken, delimiter, maxKeys)
+	infos, prefixes, err = v.listFilesV2(prefix, startAfter, contToken, delimiter, maxKeys)
 	if err != nil {
 		log.LogErrorf("ListFilesV2: list fail: volume(%v) prefix(%v) startAfter(%v) contToken(%v) delimiter(%v) maxKeys(%v) err(%v)",
 			v.name, prefix, startAfter, contToken, delimiter, maxKeys, err)
@@ -393,12 +392,18 @@ func (v *Volume) ListFilesV2(opt *ListFilesV2Option) (result *ListFilesV2Result,
 		CommonPrefixes: prefixes,
 	}
 
-	result.Files = infos
-	result.KeyCount = uint64(len(infos))
-	if nextMarker != "" {
+	if len(infos) > int(maxKeys) {
+		result.NextToken = infos[maxKeys].Path
+		result.Files = infos[:maxKeys]
 		result.Truncated = true
-		result.NextToken = nextMarker
+		result.KeyCount = maxKeys
+	} else {
+		result.NextToken = ""
+		result.Files = infos
+		result.Truncated = false
+		result.KeyCount = uint64(len(infos))
 	}
+
 	return
 }
 
@@ -1048,8 +1053,6 @@ func (v *Volume) streamWrite(inode uint64, reader io.Reader, h hash.Hash) (size 
 		if readN > 0 {
 			if writeN, err = v.ec.Write(inode, offset, buf[:readN], false); err != nil {
 				log.LogErrorf("streamWrite: data write tmp file fail, inode(%v) offset(%v) err(%v)", inode, offset, err)
-				exporter.Warning(fmt.Sprintf("write data fail: volume(%v) inode(%v) offset(%v) size(%v) err(%v)",
-					v.name, inode, offset, readN, err))
 				return
 			}
 			offset += writeN
@@ -1228,8 +1231,6 @@ func (v *Volume) ReadFile(path string, writer io.Writer, offset, size uint64) er
 		if err != nil && err != io.EOF {
 			log.LogErrorf("ReadFile: data read fail: volume(%v) path(%v) inode(%v) offset(%v) size(%v) err(%v)",
 				v.name, path, ino, offset, size, err)
-			exporter.Warning(fmt.Sprintf("read data fail: volume(%v) path(%v) inode(%v) offset(%v) size(%v) err(%v)",
-				v.name, path, ino, offset, readSize, err))
 			return err
 		}
 		if n > 0 {
@@ -1494,7 +1495,7 @@ func (v *Volume) lookupDirectories(dirs []string, autoCreate bool) (inode uint64
 	return
 }
 
-func (v *Volume) listFilesV1(prefix, marker, delimiter string, maxKeys uint64) (infos []*FSFileInfo, prefixes Prefixes, nextMarker string, err error) {
+func (v *Volume) listFilesV1(prefix, marker, delimiter string, maxKeys uint64) (infos []*FSFileInfo, prefixes Prefixes, err error) {
 	var prefixMap = PrefixMap(make(map[string]struct{}))
 
 	parentId, dirs, err := v.findParentId(prefix)
@@ -1502,23 +1503,19 @@ func (v *Volume) listFilesV1(prefix, marker, delimiter string, maxKeys uint64) (
 	// The method returns an ENOENT error, indicating that there
 	// are no files or directories matching the prefix.
 	if err == syscall.ENOENT {
-		return nil, nil, "", nil
+		return nil, nil, nil
 	}
 
 	// Errors other than ENOENT are unexpected errors, method stops and returns it to the caller.
 	if err != nil {
 		log.LogErrorf("listFilesV1: find parent ID fail, prefix(%v) marker(%v) err(%v)", prefix, marker, err)
-		return nil, nil, "", err
+		return nil, nil, err
 	}
 
 	log.LogDebugf("listFilesV1: find parent ID, prefix(%v) marker(%v) delimiter(%v) parentId(%v) dirs(%v)", prefix, marker, delimiter, parentId, len(dirs))
 
-	// Init the value that queried result count.
-	// Check this value when adding key to contents or common prefix,
-	// return if it reach to max keys
-	var rc uint64
 	// recursion scan
-	infos, prefixMap, nextMarker, _, err = v.recursiveScan(infos, prefixMap, parentId, maxKeys, rc, dirs, prefix, marker, delimiter)
+	infos, prefixMap, err = v.recursiveScan(infos, prefixMap, parentId, maxKeys, dirs, prefix, marker, delimiter)
 	if err != nil {
 		log.LogErrorf("listFilesV1: volume list dir fail: Volume(%v) err(%v)", v.name, err)
 		return
@@ -1532,13 +1529,13 @@ func (v *Volume) listFilesV1(prefix, marker, delimiter string, maxKeys uint64) (
 
 	prefixes = prefixMap.Prefixes()
 
-	log.LogDebugf("listFilesV1: Volume list dir: Volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) infos(%v) prefixes(%v) nextMarker(%v)",
-		v.name, prefix, marker, delimiter, maxKeys, len(infos), len(prefixes), nextMarker)
+	log.LogDebugf("listFilesV1: Volume list dir: Volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) infos(%v) prefixes(%v)",
+		v.name, prefix, marker, delimiter, maxKeys, len(infos), len(prefixes))
 
 	return
 }
 
-func (v *Volume) listFilesV2(prefix, startAfter, contToken, delimiter string, maxKeys uint64) (infos []*FSFileInfo, prefixes Prefixes, nextMarker string, err error) {
+func (v *Volume) listFilesV2(prefix, startAfter, contToken, delimiter string, maxKeys uint64) (infos []*FSFileInfo, prefixes Prefixes, err error) {
 	var prefixMap = PrefixMap(make(map[string]struct{}))
 
 	var marker string
@@ -1553,23 +1550,19 @@ func (v *Volume) listFilesV2(prefix, startAfter, contToken, delimiter string, ma
 	// The method returns an ENOENT error, indicating that there
 	// are no files or directories matching the prefix.
 	if err == syscall.ENOENT {
-		return nil, nil, "", nil
+		return nil, nil, nil
 	}
 
 	// Errors other than ENOENT are unexpected errors, method stops and returns it to the caller.
 	if err != nil {
 		log.LogErrorf("listFilesV2: find parent ID fail, prefix(%v) marker(%v) err(%v)", prefix, marker, err)
-		return nil, nil, "", err
+		return nil, nil, err
 	}
 
 	log.LogDebugf("listFilesV2: find parent ID, prefix(%v) marker(%v) delimiter(%v) parentId(%v) dirs(%v)", prefix, marker, delimiter, parentId, len(dirs))
 
-	// Init the value that queried result count.
-	// Check this value when adding key to contents or common prefix,
-	// return if it reach to max keys
-	var rc uint64
 	// recursion scan
-	infos, prefixMap, nextMarker, _, err = v.recursiveScan(infos, prefixMap, parentId, maxKeys, rc, dirs, prefix, marker, delimiter)
+	infos, prefixMap, err = v.recursiveScan(infos, prefixMap, parentId, maxKeys, dirs, prefix, marker, delimiter)
 	if err != nil {
 		log.LogErrorf("listFilesV2: Volume list dir fail, Volume(%v) err(%v)", v.name, err)
 		return
@@ -1584,8 +1577,8 @@ func (v *Volume) listFilesV2(prefix, startAfter, contToken, delimiter string, ma
 
 	prefixes = prefixMap.Prefixes()
 
-	log.LogDebugf("listFilesV2: Volume list dir: Volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) infos(%v) prefixes(%v), nextMarker(%v)",
-		v.name, prefix, marker, delimiter, maxKeys, len(infos), len(prefixes), nextMarker)
+	log.LogDebugf("listFilesV2: Volume list dir: Volume(%v) prefix(%v) marker(%v) delimiter(%v) maxKeys(%v) infos(%v) prefixes(%v)",
+		v.name, prefix, marker, delimiter, maxKeys, len(infos), len(prefixes))
 
 	return
 }
@@ -1641,13 +1634,11 @@ func (v *Volume) findParentId(prefix string) (inode uint64, prefixDirs []string,
 // Recursive scan of the directory starting from the given parentID. Match files and directories
 // that match the prefix and delimiter criteria. Stop when the number of matches reaches a threshold
 // or all files and directories are scanned.
-func (v *Volume) recursiveScan(fileInfos []*FSFileInfo, prefixMap PrefixMap, parentId, maxKeys, rc uint64,
-	dirs []string, prefix, marker, delimiter string) ([]*FSFileInfo, PrefixMap, string, uint64, error) {
+func (v *Volume) recursiveScan(fileInfos []*FSFileInfo, prefixMap PrefixMap, parentId, maxKeys uint64,
+	dirs []string, prefix, marker, delimiter string) ([]*FSFileInfo, PrefixMap, error) {
 	var err error
-	var nextMarker string
 
 	var currentPath = strings.Join(dirs, pathSep) + pathSep
-
 	if len(dirs) > 0 && prefix != "" && strings.HasSuffix(currentPath, prefix) {
 		// When the current scanning position is not the root directory, a prefix matching
 		// check is performed on the current directory first.
@@ -1655,23 +1646,16 @@ func (v *Volume) recursiveScan(fileInfos []*FSFileInfo, prefixMap PrefixMap, par
 		// The reason for this is that according to the definition of Amazon S3's ListObjects
 		// interface, directory entries that meet the exact prefix match will be returned as
 		// a Content result, not as a CommonPrefix.
+		fileInfo := &FSFileInfo{
+			Inode: parentId,
+			Path:  currentPath,
+		}
+		fileInfos = append(fileInfos, fileInfo)
 
-		// Add check to marker, if request contain marker, current path must greater than marker,
-		// otherwise can not put it to prefix map
-		if (len(marker) > 0 && currentPath > marker) || len(marker) == 0 {
-			fileInfo := &FSFileInfo{
-				Inode: parentId,
-				Path:  currentPath,
-			}
-			// If the number of matches reaches the threshold given by maxKey,
-			// stop scanning and return results.
-			// To get the next marker, first compare the result counts with the max key
-			// it means that when result count reach the amx key, continue to find the next key as the next marker
-			if rc >= maxKeys {
-				return fileInfos, prefixMap, currentPath, rc, nil
-			}
-			fileInfos = append(fileInfos, fileInfo)
-			rc++
+		// If the number of matches reaches the threshold given by maxKey,
+		// stop scanning and return results.
+		if len(fileInfos) >= int(maxKeys+1) {
+			return fileInfos, prefixMap, nil
 		}
 	}
 
@@ -1682,74 +1666,55 @@ func (v *Volume) recursiveScan(fileInfos []*FSFileInfo, prefixMap PrefixMap, par
 	var children []proto.Dentry
 	children, err = v.mw.ReadDir_ll(parentId)
 	if err != nil && err != syscall.ENOENT {
-		return fileInfos, prefixMap, "", 0, err
+		return fileInfos, prefixMap, err
 	}
 	if err == syscall.ENOENT {
-		return fileInfos, prefixMap, "", 0, nil
+		return fileInfos, prefixMap, nil
 	}
 
 	for _, child := range children {
+
 		var path = strings.Join(append(dirs, child.Name), pathSep)
+
 		if os.FileMode(child.Type).IsDir() {
 			path += pathSep
 		}
+		log.LogDebugf("recursiveScan: process child, path(%v) prefix(%v) marker(%v) delimiter(%v)",
+			path, prefix, marker, delimiter)
+
 		if prefix != "" && !strings.HasPrefix(path, prefix) {
 			continue
 		}
-
-		if marker != "" {
-			if !os.FileMode(child.Type).IsDir() && path < marker {
-				continue
-			}
-			if os.FileMode(child.Type).IsDir() && path < marker {
-				fileInfos, prefixMap, nextMarker, rc, err = v.recursiveScan(fileInfos, prefixMap, child.Inode, maxKeys, rc, append(dirs, child.Name), prefix, marker, delimiter)
-				if err != nil {
-					return fileInfos, prefixMap, nextMarker, rc, err
-				}
-				if rc >= maxKeys && nextMarker != "" {
-					return fileInfos, prefixMap, nextMarker, rc, err
-				}
-				continue
-			}
+		if marker != "" && path < marker {
+			continue
 		}
-
 		if delimiter != "" {
 			var nonPrefixPart = strings.Replace(path, prefix, "", 1)
 			if idx := strings.Index(nonPrefixPart, delimiter); idx >= 0 {
 				var commonPrefix = prefix + util.SubString(nonPrefixPart, 0, idx) + delimiter
-				if prefixMap.contain(commonPrefix) {
-					continue
-				}
-				if rc >= maxKeys {
-					return fileInfos, prefixMap, commonPrefix, rc, nil
-				}
 				prefixMap.AddPrefix(commonPrefix)
-				rc++
 				continue
 			}
 		}
-
-		fileInfo := &FSFileInfo{
-			Inode: child.Inode,
-			Path:  path,
-		}
-		if rc >= maxKeys {
-			return fileInfos, prefixMap, path, rc, nil
-		}
-		fileInfos = append(fileInfos, fileInfo)
-		rc++
-
 		if os.FileMode(child.Type).IsDir() {
-			fileInfos, prefixMap, nextMarker, rc, err = v.recursiveScan(fileInfos, prefixMap, child.Inode, maxKeys, rc, append(dirs, child.Name), prefix, marker, delimiter)
+			fileInfos, prefixMap, err = v.recursiveScan(fileInfos, prefixMap, child.Inode, maxKeys, append(dirs, child.Name), prefix, marker, delimiter)
 			if err != nil {
-				return fileInfos, prefixMap, nextMarker, rc, err
+				return fileInfos, prefixMap, err
 			}
-			if rc >= maxKeys && nextMarker != "" {
-				return fileInfos, prefixMap, nextMarker, rc, err
+		} else {
+			fileInfo := &FSFileInfo{
+				Inode: child.Inode,
+				Path:  path,
+			}
+			fileInfos = append(fileInfos, fileInfo)
+
+			// if file numbers is enough, end list dir
+			if len(fileInfos) >= int(maxKeys+1) {
+				return fileInfos, prefixMap, nil
 			}
 		}
 	}
-	return fileInfos, prefixMap, nextMarker, rc, nil
+	return fileInfos, prefixMap, nil
 }
 
 // This method is used to supplement file metadata. Supplement the specified file
@@ -1797,13 +1762,12 @@ func (v *Volume) supplyListFileInfo(fileInfos []*FSFileInfo) (err error) {
 		})
 		var etagValue ETagValue
 		if i >= 0 && i < len(xattrs) && xattrs[i].Inode == fileInfo.Inode {
-			var xattr = xattrs[i]
-			var rawETag = string(xattr.Get(XAttrKeyOSSETag))
-			if len(rawETag) == 0 {
-				rawETag = string(xattr.Get(XAttrKeyOSSETagDeprecated))
+			etagRaw, etagInvalidRaw := xattrs[i].Get(XAttrKeyOSSETag), xattrs[i].Get(XAttrKeyOSSETagDeprecated)
+			if len(etagRaw) != 0 {
+				etagValue = ParseETagValue(string(etagRaw))
 			}
-			if len(rawETag) > 0 {
-				etagValue = ParseETagValue(rawETag)
+			if len(etagInvalidRaw) != 0 {
+				etagValue = ParseETagValue(string(etagInvalidRaw))
 			}
 		}
 		if !etagValue.Valid() || etagValue.TS.Before(fileInfo.ModifyTime) {

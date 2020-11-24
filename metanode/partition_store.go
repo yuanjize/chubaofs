@@ -79,6 +79,7 @@ func (mp *MetaPartition) loadMetadata() (err error) {
 	mp.config.Start = mConf.Start
 	mp.config.End = mConf.End
 	mp.config.Peers = mConf.Peers
+	mp.config.Learners = mConf.Learners
 	mp.config.Cursor = mp.config.Start
 	mp.config.MaxInode = mp.config.MaxInode
 	mp.config.StoreType = mConf.StoreType

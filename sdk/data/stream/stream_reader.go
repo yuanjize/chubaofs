@@ -80,7 +80,7 @@ func (s *Streamer) GetExtentReader(ek *proto.ExtentKey) (*ExtentReader, error) {
 	if err != nil {
 		return nil, err
 	}
-	reader := NewExtentReader(s.inode, ek, partition, s.client.dataWrapper.FollowerRead())
+	reader := NewExtentReader(s.inode, ek, partition, s.client.followerRead)
 	return reader, nil
 }
 

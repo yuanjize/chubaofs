@@ -56,13 +56,6 @@ func NewStreamConn(dp *wrapper.DataPartition, follower bool) *StreamConn {
 		}
 	}
 
-	if dp.ClientWrapper.NearRead() {
-		return &StreamConn{
-			dp:       dp,
-			currAddr: getNearestHost(dp),
-		}
-	}
-
 	epoch := atomic.AddUint64(&dp.Epoch, 1)
 	hosts := sortByStatus(dp, false)
 	choice := len(hosts)
@@ -172,14 +165,7 @@ func (sc *StreamConn) sendToConn(conn *net.TCPConn, req *Packet, getReply GetRep
 func sortByStatus(dp *wrapper.DataPartition, selectAll bool) (hosts []string) {
 	var failedHosts []string
 	hostsStatus := dp.ClientWrapper.HostsStatus
-	var dpHosts []string
-	if dp.ClientWrapper.FollowerRead() && dp.ClientWrapper.NearRead() {
-		dpHosts = dp.NearHosts
-	} else {
-		dpHosts = dp.Hosts
-	}
-
-	for _, addr := range dpHosts {
+	for _, addr := range dp.Hosts {
 		status, ok := hostsStatus[addr]
 		if ok {
 			if status {
@@ -198,18 +184,4 @@ func sortByStatus(dp *wrapper.DataPartition, selectAll bool) (hosts []string) {
 	}
 
 	return
-}
-
-func getNearestHost(dp *wrapper.DataPartition) string {
-	hostsStatus := dp.ClientWrapper.HostsStatus
-	for _, addr := range dp.NearHosts {
-		status, ok := hostsStatus[addr]
-		if ok {
-			if !status {
-				continue
-			}
-		}
-		return addr
-	}
-	return dp.LeaderAddr
 }

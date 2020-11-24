@@ -16,6 +16,7 @@
 package raft
 
 import (
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"sync"
@@ -69,7 +70,7 @@ type monitorStatus struct {
 func (s *peerState) change(c *proto.ConfChange) {
 	s.mu.Lock()
 	switch c.Type {
-	case proto.ConfAddNode:
+	case proto.ConfAddNode, proto.ConfAddLearner, proto.ConfPromoteLearner:
 		s.peers[c.Peer.ID] = c.Peer
 	case proto.ConfRemoveNode:
 		delete(s.peers, c.Peer.ID)
@@ -109,6 +110,7 @@ type raft struct {
 	prevHardSt        proto.HardState
 	peerState         peerState
 	pending           map[uint64]*Future
+	pendingCmd        map[uint64]proto.EntryType
 	snapping          map[uint64]*snapshotStatus
 	mStatus           *monitorStatus
 	propc             chan *proposal
@@ -149,6 +151,7 @@ func newRaft(config *Config, raftConfig *RaftConfig) (*raft, error) {
 		raftConfig:    raftConfig,
 		mStatus:       mStatus,
 		pending:       make(map[uint64]*Future),
+		pendingCmd:    make(map[uint64]proto.EntryType),
 		snapping:      make(map[uint64]*snapshotStatus),
 		recvc:         make(chan *proto.Message, config.ReqBufferSize),
 		applyc:        make(chan *apply, config.AppBufferSize),
@@ -230,7 +233,9 @@ func (s *raft) runApply() {
 			)
 			switch cmd := apply.command.(type) {
 			case *proto.ConfChange:
+				logger.Error("raft[%v] invoke ApplyMemberChange: cmd(%v) index(%v) futre(%v)", s.raftFsm.id, cmd, apply.index, apply.future)
 				resp, err = s.raftConfig.StateMachine.ApplyMemberChange(cmd, apply.index)
+				logger.Error("raft[%v] finish ApplyMemberChange: cmd(%v) index(%v) futre(%v)", s.raftFsm.id, cmd, apply.index, apply.future)
 			case []byte:
 				resp, err = s.raftConfig.StateMachine.Apply(cmd, apply.index)
 			}
@@ -290,6 +295,7 @@ func (s *raft) run() {
 			msg.From = s.config.NodeID
 			starti := s.raftFsm.raftLog.lastIndex() + 1
 			s.pending[starti] = pr.future
+			s.pendingCmd[starti] = pr.cmdType
 			msg.Entries = append(msg.Entries, &proto.Entry{Term: s.raftFsm.term, Index: starti, Type: pr.cmdType, Data: pr.data})
 			pool.returnProposal(pr)
 
@@ -299,6 +305,7 @@ func (s *raft) run() {
 				select {
 				case pr := <-s.propc:
 					s.pending[starti] = pr.future
+					s.pendingCmd[starti] = pr.cmdType
 					msg.Entries = append(msg.Entries, &proto.Entry{Term: s.raftFsm.term, Index: starti, Type: pr.cmdType, Data: pr.data})
 					pool.returnProposal(pr)
 				default:
@@ -306,6 +313,11 @@ func (s *raft) run() {
 				}
 				if flag {
 					break
+				}
+			}
+			for _, entry := range msg.Entries {
+				if entry.Type == proto.EntryConfChange {
+					logger.Error("raft[%v] step EntryConfChange: index(%v) term(%v)", s.raftFsm.id, entry.Index, entry.Term)
 				}
 			}
 			s.raftFsm.Step(msg)
@@ -331,9 +343,7 @@ func (s *raft) run() {
 				}
 				s.maybeChange(respErr)
 			} else if logger.IsEnableWarn() && m.Type != proto.RespMsgHeartBeat {
-				logger.Warn(" [raft] [%v term: %d] raftFm[%p] raftReplicas[%v] ignored a %s message " +
-					"without the replica from [%v term: %d].",
-					s.raftFsm.id, s.raftFsm.term,s.raftFsm,s.raftFsm.getReplicas(), m.Type, m.From, m.Term)
+				logger.Warn("[raft][%v term: %d] ignored a %s message without the replica from [%v term: %d].", s.raftFsm.id, s.raftFsm.term, m.Type, m.From, m.Term)
 			}
 
 		case snapReq := <-s.snapRecvc:
@@ -489,6 +499,20 @@ func (s *raft) proposeMemberChange(cc *proto.ConfChange, future *Future) {
 	if !s.isLeader() {
 		future.respond(nil, ErrNotLeader)
 		return
+	}
+
+	if cc.Type == proto.ConfPromoteLearner {
+		req := &proto.ConfChangeLearnerReq{}
+		if err := json.Unmarshal(cc.Context, req); err != nil {
+			logger.Error("raft[%v] json unmarshal ConfChangeLearnerReq Context[%s] err[%v]", s.raftFsm.id, string(cc.Context), err)
+			future.respond(nil, ErrUnmarshal)
+			return
+		}
+		replica, ok := s.raftFsm.replicas[cc.Peer.ID]
+		if !ok || !s.isLearnerReady(replica, req.ChangeLearner.PromConfig.PromThreshold) {
+			future.respond(nil, ErrLearnerNotReady)
+			return
+		}
 	}
 
 	pr := pool.getProposal()
@@ -679,6 +703,7 @@ func (s *raft) apply() {
 		if future, ok := s.pending[entry.Index]; ok {
 			apply.future = future
 			delete(s.pending, entry.Index)
+			delete(s.pendingCmd, entry.Index)
 		}
 		apply.readIndexes = s.raftFsm.readOnly.getReady(entry.Index)
 
@@ -731,6 +756,7 @@ func (s *raft) resetPending(err error) {
 		for k, v := range s.pending {
 			v.respond(nil, err)
 			delete(s.pending, k)
+			delete(s.pendingCmd, k)
 		}
 	}
 }
@@ -770,6 +796,11 @@ func (s *raft) getStatus() *Status {
 	default:
 	}
 
+	pendingCmd := make(map[uint64]proto.EntryType)
+	for k, v := range s.pendingCmd {
+		pendingCmd[k] = v
+	}
+
 	st := &Status{
 		ID:                s.raftFsm.id,
 		NodeID:            s.config.NodeID,
@@ -782,6 +813,7 @@ func (s *raft) getStatus() *Status {
 		State:             s.raftFsm.state.String(),
 		RestoringSnapshot: s.restoringSnapshot.Get(),
 		PendQueue:         len(s.pending),
+		PendCmd:           pendingCmd,
 		RecvQueue:         len(s.recvc),
 		AppQueue:          len(s.applyc),
 		Stopped:           stopped,
@@ -790,15 +822,17 @@ func (s *raft) getStatus() *Status {
 		st.Replicas = make(map[uint64]*ReplicaStatus)
 		for id, p := range s.raftFsm.replicas {
 			st.Replicas[id] = &ReplicaStatus{
-				Match:       p.match,
-				Commit:      p.committed,
-				Next:        p.next,
-				State:       p.state.String(),
-				Snapshoting: p.state == replicaStateSnapshot,
-				Paused:      p.paused,
-				Active:      p.active,
-				LastActive:  p.lastActive,
-				Inflight:    p.count,
+				Match:       	p.match,
+				Commit:      	p.committed,
+				Next:        	p.next,
+				State:       	p.state.String(),
+				Snapshoting: 	p.state == replicaStateSnapshot,
+				Paused:      	p.paused,
+				Active:      	p.active,
+				LastActive:  	p.lastActive,
+				Inflight:    	p.count,
+				IsLearner:   	p.isLearner,
+				PromConfig: 	p.promConfig,
 			}
 		}
 	}
@@ -867,4 +901,42 @@ func (s *raft) getEntriesInLoop(req *entryRequest) {
 	}
 	entries, err := s.raftFsm.raftLog.entries(req.index, req.maxSize)
 	req.future.respond(entries, err)
+}
+
+func (s *raft) isLearnerReady(pr *replica, threshold uint8) bool {
+	if !pr.isLearner || !pr.active {
+		return false
+	}
+	leaderPr, ok := s.raftFsm.replicas[s.config.NodeID]
+	if !ok || float64(pr.match) < float64(leaderPr.match)*float64(threshold)*0.01 {
+		return false
+	}
+	// todo learner as quorum?
+	if !s.raftFsm.checkLeaderLease() {
+		return false
+	}
+	if logger.IsEnableDebug() {
+		logger.Debug("raft[%v] leader[%v] promote learner[%v], leader match[%v]",
+			s.raftConfig.ID, s.config.NodeID, pr, leaderPr.match)
+	}
+	return true
+}
+
+func (s *raft) promoteLearner() {
+	for id, pr := range s.raftFsm.replicas {
+		if pr.isLearner && pr.promConfig.AutoPromote {
+			future := newFuture()
+			lear := proto.Learner{ID: id, PromConfig: &proto.PromoteConfig{AutoPromote: true}}
+			req := &proto.ConfChangeLearnerReq{Id: s.raftConfig.ID, ChangeLearner: lear}
+			bytes, err := json.Marshal(req)
+			if err != nil {
+				logger.Error("raft[%v] json marshal ConfChangeLearnerReq[%v] err[%v]", s.raftConfig.ID, req, err)
+				continue
+			}
+			p := proto.Peer{ID: id}
+			s.proposeMemberChange(&proto.ConfChange{Type: proto.ConfPromoteLearner, Peer: p, Context: bytes}, future)
+			resp, err := future.Response()
+			logger.Warn("raft[%v] leader[%v] auto promote learner[%v] resp[%v] err[%v]", s.raftConfig.ID, s.config.NodeID, id, resp, err)
+		}
+	}
 }

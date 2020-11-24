@@ -15,6 +15,7 @@
 package objectnode
 
 import (
+	"github.com/chubaofs/chubaofs/proto"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -22,7 +23,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/log"
 )
 
@@ -192,22 +192,12 @@ func (o *ObjectNode) uploadPartHandler(w http.ResponseWriter, r *http.Request) {
 		errorCode = NoSuchUpload
 		return
 	}
-	if err == io.ErrUnexpectedEOF {
-		log.LogWarnf("uploadPartHandler: write part fail cause unexpected EOF: requestID(%v) volume(%v) path(%v) uploadId(%v) part(%v) remote(%v) err(%v)",
-			GetRequestID(r), vol.Name(), param.Object(), uploadId, partNumberInt, getRequestIP(r), err)
-		errorCode = EntityTooSmall
-		return
-	}
 	if err != nil {
-		log.LogErrorf("uploadPartHandler: write part fail: requestID(%v) volume(%v) path(%v) uploadId(%v) part(%v) remote(%v) err(%v)",
-			GetRequestID(r), vol.Name(), param.Object(), uploadId, partNumberInt, getRequestIP(r), err)
-		if !r.Close {
-			errorCode = InternalErrorCode(err)
-		}
+		log.LogErrorf("uploadPartHandler: write part fail, requestID(%v) err(%v)", GetRequestID(r), err)
+		errorCode = InternalErrorCode(err)
 		return
 	}
-	log.LogDebugf("uploadPartHandler: write part success: requestID(%v) volume(%v) path(%v) uploadId(%v) part(%v) fsFileInfo(%v)",
-		GetRequestID(r), vol.Name(), param.Object(), uploadId, partNumberInt, fsFileInfo)
+	log.LogDebugf("uploadPartHandler: write part, requestID(%v) fsFileInfo(%v)", GetRequestID(r), fsFileInfo)
 
 	// write header to response
 	w.Header()[HeaderNameContentLength] = []string{"0"}

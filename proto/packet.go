@@ -100,27 +100,31 @@ const (
 	OpMetaBatchGetXAttr   uint8 = 0x39
 
 	// Operations: Master -> MetaNode
-	OpCreateMetaPartition           uint8 = 0x40
-	OpMetaNodeHeartbeat             uint8 = 0x41
-	OpDeleteMetaPartition           uint8 = 0x42
-	OpUpdateMetaPartition           uint8 = 0x43
-	OpLoadMetaPartition             uint8 = 0x44
-	OpDecommissionMetaPartition     uint8 = 0x45
-	OpAddMetaPartitionRaftMember    uint8 = 0x46
-	OpRemoveMetaPartitionRaftMember uint8 = 0x47
-	OpMetaPartitionTryToLeader      uint8 = 0x48
+	OpCreateMetaPartition             uint8 = 0x40
+	OpMetaNodeHeartbeat               uint8 = 0x41
+	OpDeleteMetaPartition             uint8 = 0x42
+	OpUpdateMetaPartition             uint8 = 0x43
+	OpLoadMetaPartition               uint8 = 0x44
+	OpDecommissionMetaPartition       uint8 = 0x45
+	OpAddMetaPartitionRaftMember      uint8 = 0x46
+	OpRemoveMetaPartitionRaftMember   uint8 = 0x47
+	OpMetaPartitionTryToLeader        uint8 = 0x48
+	OpAddMetaPartitionRaftLearner     uint8 = 0x4C
+	OpPromoteMetaPartitionRaftLearner uint8 = 0x4D
 
 	// Operations: Master -> DataNode
-	OpCreateDataPartition           uint8 = 0x60
-	OpDeleteDataPartition           uint8 = 0x61
-	OpLoadDataPartition             uint8 = 0x62
-	OpDataNodeHeartbeat             uint8 = 0x63
-	OpReplicateFile                 uint8 = 0x64
-	OpDeleteFile                    uint8 = 0x65
-	OpDecommissionDataPartition     uint8 = 0x66
-	OpAddDataPartitionRaftMember    uint8 = 0x67
-	OpRemoveDataPartitionRaftMember uint8 = 0x68
-	OpDataPartitionTryToLeader      uint8 = 0x69
+	OpCreateDataPartition             uint8 = 0x60
+	OpDeleteDataPartition             uint8 = 0x61
+	OpLoadDataPartition               uint8 = 0x62
+	OpDataNodeHeartbeat               uint8 = 0x63
+	OpReplicateFile                   uint8 = 0x64
+	OpDeleteFile                      uint8 = 0x65
+	OpDecommissionDataPartition       uint8 = 0x66
+	OpAddDataPartitionRaftMember      uint8 = 0x67
+	OpRemoveDataPartitionRaftMember   uint8 = 0x68
+	OpDataPartitionTryToLeader        uint8 = 0x69
+	OpAddDataPartitionRaftLearner     uint8 = 0x6A
+	OpPromoteDataPartitionRaftLearner uint8 = 0x6B
 
 	// Operations: MultipartInfo
 	OpCreateMultipart  uint8 = 0x70
@@ -136,6 +140,9 @@ const (
 	OpMetaBatchDeleteDentry uint8 = 0x91
 	OpMetaBatchUnlinkInode  uint8 = 0x92
 	OpMetaBatchEvictInode   uint8 = 0x93
+
+	//inode reset
+	OpMetaCursorReset uint8 = 0x94
 
 	// Commons
 	OpIntraGroupNetErr uint8 = 0xF3
@@ -156,12 +163,12 @@ const (
 )
 
 const (
-	WriteDeadlineTime                 = 5
-	ReadDeadlineTime                  = 5
-	SyncSendTaskDeadlineTime          = 20
-	NoReadDeadlineTime                = -1
-	BatchDeleteExtentReadDeadLineTime = 120
-	GetAllWatermarksDeadLineTime      = 60
+	WriteDeadlineTime            = 5
+	ReadDeadlineTime             = 5
+	SyncSendTaskDeadlineTime     = 20
+	NoReadDeadlineTime           = -1
+	MaxWaitFollowerRepairTime    = 60 * 30
+	GetAllWatermarksDeadLineTime = 60
 )
 
 const (
@@ -345,10 +352,18 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "OpRemoveDataPartitionRaftMember"
 	case OpAddDataPartitionRaftMember:
 		m = "OpAddDataPartitionRaftMember"
+	case OpAddDataPartitionRaftLearner:
+		m = "OpAddDataPartitionRaftLearner"
+	case OpPromoteDataPartitionRaftLearner:
+		m = "OpPromoteDataPartitionRaftLearner"
 	case OpAddMetaPartitionRaftMember:
 		m = "OpAddMetaPartitionRaftMember"
 	case OpRemoveMetaPartitionRaftMember:
 		m = "OpRemoveMetaPartitionRaftMember"
+	case OpAddMetaPartitionRaftLearner:
+		m = "OpAddMetaPartitionRaftLearner"
+	case OpPromoteMetaPartitionRaftLearner:
+		m = "OpPromoteMetaPartitionRaftLearner"
 	case OpMetaPartitionTryToLeader:
 		m = "OpMetaPartitionTryToLeader"
 	case OpDataPartitionTryToLeader:
@@ -381,6 +396,8 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "OpListMultiparts"
 	case OpBatchDeleteExtent:
 		m = "OpBatchDeleteExtent"
+	case OpMetaCursorReset:
+		m = "OpMetaCursorReset"
 	}
 	return
 }
@@ -401,7 +418,7 @@ func (p *Packet) GetResultMsg() (m string) {
 	case OpErr:
 		m = "Err: " + string(p.Data)
 	case OpAgain:
-		m = "Again: " + string(p.Data)
+		m = "Again"
 	case OpOk:
 		m = "Ok"
 	case OpExistErr:
@@ -709,8 +726,4 @@ func (p *Packet) LogMessage(action, remote string, start int64, err error) (m st
 // ShallRetry returns if we should retry the packet.
 func (p *Packet) ShouldRetry() bool {
 	return p.ResultCode == OpAgain || p.ResultCode == OpErr
-}
-
-func (p *Packet) IsBatchDeleteExtents() bool {
-	return p.Opcode == OpBatchDeleteExtent
 }

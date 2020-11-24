@@ -107,7 +107,10 @@ func (mp *MetaPartition) confAddNode(req *proto.AddMetaPartitionRaftMemberReques
 }
 
 func (mp *MetaPartition) confRemoveNode(req *proto.RemoveMetaPartitionRaftMemberRequest, index uint64) (updated bool, err error) {
-
+	var canRemoveSelf bool
+	if canRemoveSelf, err = mp.canRemoveSelf(); err != nil {
+		return
+	}
 	peerIndex := -1
 	data, _ := json.Marshal(req)
 	log.LogInfof("Start RemoveRaftNode  PartitionID(%v) nodeID(%v)  do RaftLog (%v) ",
@@ -125,14 +128,88 @@ func (mp *MetaPartition) confRemoveNode(req *proto.RemoveMetaPartitionRaftMember
 		return
 	}
 	mp.config.Peers = append(mp.config.Peers[:peerIndex], mp.config.Peers[peerIndex+1:]...)
-	if mp.config.NodeId == req.RemovePeer.ID && !mp.isLoadingMetaPartition {
-		mp.Stop()
-		mp.DeleteRaft()
-		mp.manager.deletePartition(mp.GetBaseConfig().PartitionId)
-		os.RemoveAll(mp.config.RootDir)
+	learnerIndex := -1
+	for i, learner := range mp.config.Learners {
+		if learner.ID == req.RemovePeer.ID {
+			learnerIndex = i
+			break
+		}
+	}
+	if learnerIndex != -1 {
+		mp.config.Learners = append(mp.config.Learners[:learnerIndex], mp.config.Learners[learnerIndex+1:]...)
+	}
+	if mp.config.NodeId == req.RemovePeer.ID && canRemoveSelf {
+		//if req.ReserveResource {
+		//	mp.raftPartition.Stop()
+		//} else {
+		//	mp.ExpiredRaft()
+		//}
+		mp.ExpiredRaft()
+		mp.manager.expiredPartition(mp.GetBaseConfig().PartitionId)
 		updated = false
 	}
-	log.LogInfof("Fininsh RemoveRaftNode  PartitionID(%v) nodeID(%v)  do RaftLog (%v) ", req.PartitionId, mp.config.NodeId, string(data))
+	log.LogInfof("Finish RemoveRaftNode  PartitionID(%v) nodeID(%v)  do RaftLog (%v) ",
+		req.PartitionId, mp.config.NodeId, string(data))
+	return
+}
+
+func (mp *MetaPartition) confAddLearner(req *proto.AddMetaPartitionRaftLearnerRequest, index uint64) (updated bool, err error) {
+	var (
+		heartbeatPort int
+		replicaPort   int
+	)
+	if heartbeatPort, replicaPort, err = mp.getRaftPort(); err != nil {
+		return
+	}
+
+	addPeer := false
+	for _, peer := range mp.config.Peers {
+		if peer.ID == req.AddLearner.ID {
+			addPeer = true
+			break
+		}
+	}
+	if !addPeer {
+		peer := proto.Peer{ID: req.AddLearner.ID, Addr: req.AddLearner.Addr}
+		mp.config.Peers = append(mp.config.Peers, peer)
+	}
+
+	addLearner := false
+	for _, learner := range mp.config.Learners {
+		if learner.ID == req.AddLearner.ID {
+			addLearner = true
+			break
+		}
+	}
+	if !addLearner {
+		mp.config.Learners = append(mp.config.Learners, req.AddLearner)
+	}
+	updated = !addPeer || !addLearner
+	if !updated {
+		return
+	}
+	addr := strings.Split(req.AddLearner.Addr, ":")[0]
+	mp.config.RaftStore.AddNodeWithPort(req.AddLearner.ID, addr, heartbeatPort, replicaPort)
+	return
+}
+
+func (mp *metaPartition) confPromoteLearner(req *proto.PromoteMetaPartitionRaftLearnerRequest, index uint64) (updated bool, err error) {
+	var promoteIndex int
+	for i, learner := range mp.config.Learners {
+		if learner.ID == req.PromoteLearner.ID {
+			updated = true
+			promoteIndex = i
+			break
+		}
+	}
+	if updated {
+		mp.config.Learners = append(mp.config.Learners[:promoteIndex], mp.config.Learners[promoteIndex+1:]...)
+	}
+	return
+}
+
+func (mp *metaPartition) confUpdateNode(req *proto.MetaPartitionDecommissionRequest,
+	index uint64) (updated bool, err error) {
 	return
 }
 
@@ -187,6 +264,11 @@ func (mp *MetaPartition) setExtentDeleteFileCursor(buf []byte) (err error) {
 }
 
 func (mp *MetaPartition) CanRemoveRaftMember(peer proto.Peer) error {
+	for _, learner := range mp.config.Learners {
+		if peer.ID == learner.ID && peer.Addr == learner.Addr {
+			return nil
+		}
+	}
 	downReplicas := mp.config.RaftStore.RaftServer().GetDownReplicas(mp.config.PartitionId)
 	hasExsit := false
 	for _, p := range mp.config.Peers {
@@ -207,7 +289,7 @@ func (mp *MetaPartition) CanRemoveRaftMember(peer proto.Peer) error {
 		hasDownReplicasExcludePeer = append(hasDownReplicasExcludePeer, nodeID.NodeID)
 	}
 
-	sumReplicas := len(mp.config.Peers)
+	sumReplicas := len(mp.config.Peers) - len(mp.config.Learners)
 	if sumReplicas%2 == 1 {
 		if sumReplicas-len(hasDownReplicasExcludePeer) > (sumReplicas/2 + 1) {
 			return nil
@@ -237,6 +319,9 @@ func (mp *MetaPartition) IsEquareCreateMetaPartitionRequst(request *proto.Create
 	}
 	if mp.config.VolName != request.VolName {
 		return fmt.Errorf("Exsit unavali Partition(%v) VolName(%v) requestVolName(%v)", mp.config.PartitionId, mp.config.VolName, request.VolName)
+	}
+	if len(mp.config.Learners) != len(request.Learners) {
+		return fmt.Errorf("Exsit unavali Partition(%v) partitionLearners(%v) requestLearners(%v)", mp.config.PartitionId, mp.config.Learners, request.Learners)
 	}
 
 	return

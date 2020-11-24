@@ -44,14 +44,13 @@ func (ss StringSet) String() string {
 }
 
 func (ss StringSet) MarshalJSON() ([]byte, error) {
-	if len(ss.values) == 0 {
-		return json.Marshal(nil)
+	if len(ss.values) == 1 {
+		for v, _ := range ss.values {
+			return json.Marshal(v)
+		}
 	}
-	array := make([]string, 0)
-	for v, _ := range ss.values {
-		array = append(array, v)
-	}
-	return json.Marshal(array)
+
+	return json.Marshal(ss.values)
 }
 
 func (ss *StringSet) UnmarshalJSON(b []byte) error {

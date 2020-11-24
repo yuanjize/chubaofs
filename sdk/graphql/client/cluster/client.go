@@ -46,23 +46,22 @@ type PartitionReport struct {
 }
 
 type metaNode struct {
-	Addr                      string
-	Carry                     float64
-	ID                        uint64
-	IsActive                  bool
-	MaxMemAvailWeight         uint64
-	MetaPartitionCount        int
-	MetaPartitionInfos        []MetaPartitionReport
-	NodeSetID                 uint64
-	PersistenceMetaPartitions []uint64
-	Ratio                     float64
-	ReportTime                time.Time
-	SelectCount               uint64
-	Threshold                 float32
-	Total                     uint64
-	Used                      uint64
-	ZoneName                  string
-	StoreType                 proto.StoreType
+	Addr	string
+	Carry	float64
+	ID	uint64
+	IsActive	bool
+	MaxMemAvailWeight	uint64
+	MetaPartitionCount	int
+	MetaPartitionInfos	[]MetaPartitionReport
+	NodeSetID	uint64
+	PersistenceMetaPartitions	[]uint64
+	Ratio	float64
+	ReportTime	time.Time
+	SelectCount	uint64
+	Threshold	float32
+	Total	uint64
+	Used	uint64
+	ZoneName	string
 }
 
 type ClusterView struct {
@@ -248,7 +247,6 @@ func (c *ClusterClient) ClusterView(ctx context.Context) (*ClusterView, error) {
 						carry
 						iD
 						isActive
-						storeType
 						maxMemAvailWeight
 						metaPartitionCount
 						metaPartitionInfos{
@@ -292,7 +290,6 @@ func (c *ClusterClient) ClusterView(ctx context.Context) (*ClusterView, error) {
 					iD
 					isWritable
 					status
-					storeType
 					toDataNode{
 						addr
 						availableSpace
@@ -326,7 +323,6 @@ func (c *ClusterClient) ClusterView(ctx context.Context) (*ClusterView, error) {
 						carry
 						iD
 						isActive
-						storeType
 						maxMemAvailWeight
 						metaPartitionCount
 						metaPartitionInfos{
@@ -705,7 +701,6 @@ func (c *ClusterClient) MetaNodeGet(ctx context.Context, addr string) (*metaNode
 				carry
 				iD
 				isActive
-				storeType
 				maxMemAvailWeight
 				metaPartitionCount
 				metaPartitionInfos{
@@ -860,7 +855,6 @@ func (c *ClusterClient) MetaNodeList(ctx context.Context) ([]metaNode, error) {
 				carry
 				iD
 				isActive
-				storeType
 				maxMemAvailWeight
 				metaPartitionCount
 				metaPartitionInfos{

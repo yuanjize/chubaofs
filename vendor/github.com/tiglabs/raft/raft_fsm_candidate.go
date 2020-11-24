@@ -109,13 +109,12 @@ func (r *raftFsm) campaign(force bool) {
 	}
 
 	for id := range r.replicas {
-		if id == r.config.NodeID {
+		if id == r.config.NodeID || r.replicas[id].isLearner {
 			continue
 		}
 		li, lt := r.raftLog.lastIndexAndTerm()
 		if logger.IsEnableDebug() {
-			logger.Debug("[raft->campaign][%v logterm: %d, index: %d] sent " +
-				"vote request to %v at term %d.   raftFSM[%p]", r.id, lt, li, id, r.term,r)
+			logger.Debug("[raft->campaign][%v logterm: %d, index: %d] sent vote request to %v at term %d.", r.id, lt, li, id, r.term)
 		}
 
 		m := proto.GetMessage()

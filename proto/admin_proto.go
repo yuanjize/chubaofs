@@ -14,13 +14,8 @@
 
 package proto
 
-import "fmt"
-
 // api
 const (
-	// All
-	VersionPath = "/version"
-
 	// Admin APIs
 	AdminGetCluster                = "/admin/getCluster"
 	AdminGetDataPartition          = "/dataPartition/get"
@@ -30,10 +25,10 @@ const (
 	AdminDiagnoseDataPartition     = "/dataPartition/diagnose"
 	AdminDeleteDataReplica         = "/dataReplica/delete"
 	AdminAddDataReplica            = "/dataReplica/add"
+	AdminAddDataReplicaLearner     = "/dataLearner/add"
+	AdminPromoteDataReplicaLearner = "/dataLearner/promote"
 	AdminDeleteVol                 = "/vol/delete"
 	AdminUpdateVol                 = "/vol/update"
-	AdminVolShrink                 = "/vol/shrink"
-	AdminVolExpand                 = "/vol/expand"
 	AdminCreateVol                 = "/admin/createVol"
 	AdminGetVol                    = "/admin/getVol"
 	AdminClusterFreeze             = "/cluster/freeze"
@@ -44,6 +39,7 @@ const (
 	AdminListVols                  = "/vol/list"
 	AdminSetNodeInfo               = "/admin/setNodeInfo"
 	AdminGetNodeInfo               = "/admin/getNodeInfo"
+	AdminSetNodeState              = "/admin/setNodeState"
 
 	//graphql master api
 	AdminClusterAPI = "/api/cluster"
@@ -78,13 +74,13 @@ const (
 	DecommissionMetaNode           = "/metaNode/decommission"
 	GetMetaNode                    = "/metaNode/get"
 	AdminUpdateMetaNode            = "/metaNode/update"
-	AdminUpdateDataNode            = "/dataNode/update"
-	AdminGetInvalidNodes           = "/invalid/nodes"
 	AdminLoadMetaPartition         = "/metaPartition/load"
 	AdminDiagnoseMetaPartition     = "/metaPartition/diagnose"
 	AdminDecommissionMetaPartition = "/metaPartition/decommission"
 	AdminAddMetaReplica            = "/metaReplica/add"
 	AdminDeleteMetaReplica         = "/metaReplica/delete"
+	AdminAddMetaReplicaLearner     = "/metaLearner/add"
+	AdminPromoteMetaReplicaLearner = "/metaLearner/promote"
 
 	// Operation response
 	GetMetaNodeTaskResponse = "/metaNode/response" // Method: 'POST', ContentType: 'application/json'
@@ -130,41 +126,6 @@ const (
 	ReadWriteToken = 2
 )
 
-type StoreType uint8
-
-const (
-	MetaTypeMemory StoreType = iota
-	MetaTypeRocks
-
-	MetaTypeUnKnown = 255
-)
-
-func (s StoreType) String() string {
-	switch s {
-	case MetaTypeMemory:
-		return "memory"
-	case MetaTypeRocks:
-		return "rocksdb"
-	default:
-		return "unknown"
-	}
-}
-
-func (s StoreType) ToString() string {
-	return fmt.Sprintf("%d", int(s))
-}
-
-func MpStoreTypeParseFromString(st string) (StoreType, bool) {
-	switch st {
-	case fmt.Sprintf("%d", MetaTypeMemory):
-		return MetaTypeMemory, true
-	case fmt.Sprintf("%d", MetaTypeRocks):
-		return MetaTypeRocks, true
-	default:
-		return MetaTypeUnKnown, false
-	}
-}
-
 type Token struct {
 	TokenType int8
 	Value     string
@@ -190,7 +151,6 @@ type ClusterInfo struct {
 	MetaNodeDeleteBatchCount    uint64
 	MetaNodeDeleteWorkerSleepMs uint64
 	DataNodeDeleteLimitRate     uint64
-	DataNodeAutoRepairLimitRate uint64
 }
 
 // CreateDataPartitionRequest defines the request to create a data partition.
@@ -201,6 +161,7 @@ type CreateDataPartitionRequest struct {
 	VolumeId      string
 	IsRandomWrite bool
 	Members       []Peer
+	Learners      []Learner
 	Hosts         []string
 	CreateType    int
 }
@@ -239,10 +200,23 @@ type AddDataPartitionRaftMemberRequest struct {
 	AddPeer     Peer
 }
 
+// PromoteDataPartitionRaftLearnerRequest defines the request of promote learner raftMember a data partition.
+type PromoteDataPartitionRaftLearnerRequest struct {
+	PartitionId    uint64  `json:"pid"`
+	PromoteLearner Learner `json:"learner"`
+}
+
 // RemoveDataPartitionRaftMemberRequest defines the request of add raftMember a data partition.
 type RemoveDataPartitionRaftMemberRequest struct {
-	PartitionId uint64
-	RemovePeer  Peer
+	PartitionId     uint64
+	RemovePeer      Peer
+	ReserveResource bool
+}
+
+// AddDataPartitionRaftLearnerRequest defines the request of add raftLearner a data partition.
+type AddDataPartitionRaftLearnerRequest struct {
+	PartitionId uint64  `json:"pid"`
+	AddLearner  Learner `json:"learner"`
 }
 
 // AddMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
@@ -251,10 +225,23 @@ type AddMetaPartitionRaftMemberRequest struct {
 	AddPeer     Peer
 }
 
+// AddMetaPartitionRaftLearnerRequest defines the request of add raftLearner a meta partition.
+type AddMetaPartitionRaftLearnerRequest struct {
+	PartitionId uint64  `json:"pid"`
+	AddLearner  Learner `json:"learner"`
+}
+
+// AddMetaPartitionRaftLearnerRequest defines the request of add raftLearner a meta partition.
+type PromoteMetaPartitionRaftLearnerRequest struct {
+	PartitionId    uint64  `json:"pid"`
+	PromoteLearner Learner `json:"learner"`
+}
+
 // RemoveMetaPartitionRaftMemberRequest defines the request of add raftMember a meta partition.
 type RemoveMetaPartitionRaftMemberRequest struct {
-	PartitionId uint64
-	RemovePeer  Peer
+	PartitionId     uint64
+	RemovePeer      Peer
+	ReserveResource bool
 }
 
 // LoadDataPartitionRequest defines the request of loading a data partition.
@@ -290,12 +277,11 @@ type LoadMetaPartitionMetricRequest struct {
 
 // LoadMetaPartitionMetricResponse defines the response to the request of loading the meta partition metrics.
 type LoadMetaPartitionMetricResponse struct {
-	Start     uint64
-	End       uint64
-	MaxInode  uint64
-	Status    uint8
-	StoreType uint8
-	Result    string
+	Start    uint64
+	End      uint64
+	MaxInode uint64
+	Status   uint8
+	Result   string
 }
 
 // HeartBeatRequest define the heartbeat request.
@@ -315,6 +301,7 @@ type PartitionReport struct {
 	IsLeader        bool
 	ExtentCount     int
 	NeedCompare     bool
+	IsLearner       bool
 }
 
 // DataNodeHeartbeatResponse defines the response to the data node heartbeat.
@@ -339,12 +326,12 @@ type MetaPartitionReport struct {
 	Start       uint64
 	End         uint64
 	Status      int
-	StoreType   StoreType
 	MaxInodeID  uint64
 	IsLeader    bool
 	VolName     string
 	InodeCnt    uint64
 	DentryCnt   uint64
+	IsLearner   bool
 }
 
 // MetaNodeHeartbeatResponse defines the response to the meta node heartbeat request.
@@ -354,11 +341,7 @@ type MetaNodeHeartbeatResponse struct {
 	Used                 uint64
 	MetaPartitionReports []*MetaPartitionReport
 	Status               uint8
-	//the param used for disk
-	DiskTotal []uint64
-	DiskUsed  []uint64
-	StoreType StoreType
-	Result    string
+	Result               string
 }
 
 // DeleteFileRequest defines the request to delete a file.
@@ -433,7 +416,6 @@ type MetaPartitionLoadResponse struct {
 	MaxInode    uint64
 	DentryCount uint64
 	InodeCount  uint64
-	StoreType   StoreType
 	Addr        string
 }
 
@@ -470,7 +452,6 @@ type MetaPartitionView struct {
 	IsRecover   bool
 	Members     []string
 	LeaderAddr  string
-	StoreType   StoreType
 	Status      int8
 }
 
@@ -540,6 +521,7 @@ type SimpleVolView struct {
 	NeedToLowerReplica bool
 	Authenticate       bool
 	CrossZone          bool
+	AutoRepair         bool
 	CreateTime         string
 	EnableToken        bool
 	Tokens             map[string]*Token `graphql:"-"`
@@ -570,23 +552,4 @@ func NewVolInfo(name, owner string, createTime int64, status uint8, totalSize, u
 		TotalSize:  totalSize,
 		UsedSize:   usedSize,
 	}
-}
-
-//ZoneView define the view of zone
-type ZoneView struct {
-	Name    string
-	Status  string
-	NodeSet map[uint64]*NodeSetView
-}
-
-type NodeSetView struct {
-	DataNodeLen int
-	MetaNodeLen int
-	MetaNodes   []NodeView
-	DataNodes   []NodeView
-}
-
-// TopologyView provides the view of the topology view of the cluster
-type TopologyView struct {
-	Zones []*ZoneView
 }

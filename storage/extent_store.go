@@ -40,21 +40,20 @@ import (
 )
 
 const (
-	ExtCrcHeaderFileName         = "EXTENT_CRC"
-	ExtBaseExtentIDFileName      = "EXTENT_META"
-	TinyDeleteFileOpt            = os.O_CREATE | os.O_RDWR | os.O_APPEND
-	TinyExtDeletedFileName       = "TINYEXTENT_DELETE"
-	NormalExtDeletedFileName     = "NORMALEXTENT_DELETE"
-	MaxExtentCount               = 20000
-	TinyExtentCount              = 64
-	TinyExtentStartID            = 1
-	MinExtentID                  = 1024
-	DeleteTinyRecordSize         = 24
-	UpdateCrcInterval            = 600
-	RepairInterval               = 60
-	RandomWriteType              = 2
-	AppendWriteType              = 1
-	NormalExtentDeleteRetainTime = 3600 * 4
+	ExtCrcHeaderFileName     = "EXTENT_CRC"
+	ExtBaseExtentIDFileName  = "EXTENT_META"
+	TinyDeleteFileOpt        = os.O_CREATE | os.O_RDWR | os.O_APPEND
+	TinyExtDeletedFileName   = "TINYEXTENT_DELETE"
+	NormalExtDeletedFileName = "NORMALEXTENT_DELETE"
+	MaxExtentCount           = 20000
+	TinyExtentCount          = 64
+	TinyExtentStartID        = 1
+	MinExtentID              = 1024
+	DeleteTinyRecordSize     = 24
+	UpdateCrcInterval        = 600
+	RepairInterval           = 60
+	RandomWriteType          = 2
+	AppendWriteType          = 1
 )
 
 var (
@@ -126,7 +125,6 @@ type ExtentStore struct {
 	partitionID                       uint64
 	verifyExtentFp                    *os.File
 	hasAllocSpaceExtentIDOnVerfiyFile uint64
-	hasDeleteNormalExtentsCache       sync.Map
 }
 
 func MkdirAll(name string) (err error) {
@@ -358,11 +356,7 @@ func (s *ExtentStore) Read(extentID uint64, offset, size int64, nbuf []byte, isR
 	return
 }
 
-func (s *ExtentStore) tinyDelete(extentID uint64, offset, size int64) (err error) {
-	e,err:=s.extentWithHeaderByExtentID(extentID)
-	if err!=nil {
-		return nil
-	}
+func (s *ExtentStore) tinyDelete(e *Extent, offset, size int64) (err error) {
 	if offset+size > e.dataSize {
 		return
 	}
@@ -384,19 +378,22 @@ func (s *ExtentStore) tinyDelete(extentID uint64, offset, size int64) (err error
 // MarkDelete marks the given extent as deleted.
 func (s *ExtentStore) MarkDelete(extentID uint64, offset, size int64) (err error) {
 	var (
+		e  *Extent
 		ei *ExtentInfo
 	)
-
-	if IsTinyExtent(extentID) {
-		return s.tinyDelete(extentID, offset, size)
-	}
 
 	s.eiMutex.RLock()
 	ei = s.extentInfoMap[extentID]
 	s.eiMutex.RUnlock()
-	if ei == nil || ei.IsDeleted {
-		return
+	if e, err = s.extentWithHeader(ei); err != nil {
+		return nil
 	}
+
+	if IsTinyExtent(extentID) {
+		return s.tinyDelete(e, offset, size)
+	}
+	e.Close()
+	s.cache.Del(extentID)
 	extentFilePath := path.Join(s.dataPath, strconv.FormatUint(extentID, 10))
 	if err = os.Remove(extentFilePath); err != nil {
 		return
@@ -404,19 +401,13 @@ func (s *ExtentStore) MarkDelete(extentID uint64, offset, size int64) (err error
 	s.PersistenceHasDeleteExtent(extentID)
 	ei.IsDeleted = true
 	ei.ModifyTime = time.Now().Unix()
-	s.cache.Del(extentID)
+	s.cache.Del(e.extentID)
 	s.DeleteBlockCrc(extentID)
-	s.PutNormalExtentToDeleteCache(extentID)
 
-	return
-}
+	s.eiMutex.Lock()
+	delete(s.extentInfoMap,extentID)
+	s.eiMutex.Unlock()
 
-func (s *ExtentStore) PutNormalExtentToDeleteCache(extentID uint64) {
-	s.hasDeleteNormalExtentsCache.Store(extentID, time.Now().Unix())
-}
-
-func (s *ExtentStore) IsDeletedNormalExtent(extentID uint64) (ok bool) {
-	_, ok = s.hasDeleteNormalExtentsCache.Load(extentID)
 	return
 }
 
@@ -466,36 +457,6 @@ func (s *ExtentStore) GetTinyExtentOffset(extentID uint64) (watermark int64, err
 		watermark = watermark + (PageSize - watermark%PageSize)
 	}
 
-	return
-}
-
-// Sector size
-const (
-	DiskSectorSize = 512
-)
-
-func (s *ExtentStore)GetStoreUsedSize()(used int64){
-	extentInfoSlice := make([]*ExtentInfo, 0, len(s.extentInfoMap))
-	s.eiMutex.RLock()
-	for _, extentID := range s.extentInfoMap {
-		extentInfoSlice = append(extentInfoSlice, extentID)
-	}
-	s.eiMutex.RUnlock()
-	for _,einfo:=range extentInfoSlice{
-		if einfo.IsDeleted {
-			continue
-		}
-		if IsTinyExtent(einfo.FileID){
-			stat := new(syscall.Stat_t)
-			err := syscall.Stat(fmt.Sprintf("%v/%v", s.dataPath, einfo.FileID), stat)
-			if err != nil {
-				continue
-			}
-			used +=(stat.Blocks * DiskSectorSize)
-		}else {
-			used +=int64(einfo.Size)
-		}
-	}
 	return
 }
 
@@ -858,23 +819,7 @@ func (arr ExtentInfoArr) Len() int           { return len(arr) }
 func (arr ExtentInfoArr) Less(i, j int) bool { return arr[i].FileID < arr[j].FileID }
 func (arr ExtentInfoArr) Swap(i, j int)      { arr[i], arr[j] = arr[j], arr[i] }
 
-func (s *ExtentStore) BackendTask() {
-	s.autoComputeExtentCrc()
-	s.cleanExpiredNormalExtentDeleteCache()
-}
-
-func (s *ExtentStore) cleanExpiredNormalExtentDeleteCache() {
-	s.hasDeleteNormalExtentsCache.Range(func(key, value interface{}) bool {
-		deleteTime := value.(int64)
-		extentID := key.(uint64)
-		if time.Now().Unix()-deleteTime > NormalExtentDeleteRetainTime {
-			s.hasDeleteNormalExtentsCache.Delete(extentID)
-		}
-		return true
-	})
-}
-
-func (s *ExtentStore) autoComputeExtentCrc() {
+func (s *ExtentStore) AutoComputeExtentCrc() {
 	defer func() {
 		if r := recover(); r != nil {
 			return
@@ -993,5 +938,34 @@ func (s *ExtentStore) TinyExtentAvaliOffset(extentID uint64, offset int64) (newO
 	}()
 	newOffset, newEnd, err = e.tinyExtentAvaliOffset(offset)
 
+	return
+}
+
+const (
+	DiskSectorSize=512
+)
+
+func (s *ExtentStore)GetStoreUsedSize()(used int64){
+	extentInfoSlice := make([]*ExtentInfo, 0, s.GetExtentCount())
+	s.eiMutex.RLock()
+	for _, extentID := range s.extentInfoMap {
+		extentInfoSlice = append(extentInfoSlice, extentID)
+	}
+	s.eiMutex.RUnlock()
+	for _,einfo:=range extentInfoSlice{
+		if einfo.IsDeleted {
+			continue
+		}
+		if IsTinyExtent(einfo.FileID){
+			stat := new(syscall.Stat_t)
+			err := syscall.Stat(fmt.Sprintf("%v/%v", s.dataPath, einfo.FileID), stat)
+			if err != nil {
+				continue
+			}
+			used +=(stat.Blocks * DiskSectorSize)
+		}else {
+			used +=int64(einfo.Size)
+		}
+	}
 	return
 }

@@ -26,9 +26,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/chubaofs/chubaofs/proto"
+
+	"syscall"
+
 	"github.com/chubaofs/chubaofs/util/log"
 )
 
@@ -314,14 +316,10 @@ func (o *ObjectNode) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 			size = rangeUpper - rangeLower + 1
 		}
 	}
-	err = vol.ReadFile(param.Object(), w, offset, size)
-	if err == syscall.ENOENT {
-		errorCode = NoSuchKey
-		return
-	}
-	if err != nil {
+	if err = vol.ReadFile(param.Object(), w, offset, size); err != nil {
 		log.LogErrorf("getObjectHandler: read from Volume fail: requestId(%v) volume(%v) path(%v) offset(%v) size(%v) err(%v)",
 			GetRequestID(r), param.Bucket(), param.Object(), offset, size, err)
+		errorCode = InternalErrorCode(err)
 		return
 	}
 	log.LogDebugf("getObjectHandler: Volume read file: requestID(%v) Volume(%v) path(%v) offset(%v) size(%v)",
@@ -701,7 +699,7 @@ func (o *ObjectNode) copyObjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !userInfo.Policy.IsAuthorized(sourceBucket, "", proto.OSSCopyObjectAction) {
+	if !userInfo.Policy.IsAuthorized(sourceBucket, proto.OSSCopyObjectAction) {
 		log.LogErrorf("copyObjectHandler: no permission to copy from source bucket, requestID(%v), source bucket(%v), source file(%v), target bucket(%v), target file(%v)",
 			GetRequestID(r), sourceBucket, sourceObject, param.bucket, param.object)
 		errorCode = AccessDenied
@@ -1115,7 +1113,7 @@ func (o *ObjectNode) putObjectHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var validateRes bool
-		if validateRes, errorCode = tagging.Validate(); !validateRes {
+		if validateRes, errorCode =  tagging.Validate(); !validateRes {
 			log.LogErrorf("putObjectHandler: tagging validate fail: requestID(%v) tagging(%v) err(%v)", GetRequestID(r), tagging, err)
 			return
 		}
@@ -1169,18 +1167,8 @@ func (o *ObjectNode) putObjectHandler(w http.ResponseWriter, r *http.Request) {
 		errorCode = ObjectModeConflict
 		return
 	}
-	if err == io.ErrUnexpectedEOF {
-		log.LogWarnf("putObjectHandler: put object fail cause unexpected EOF: requestID(%v) volume(%v) path(%v) remote(%v) err(%v)",
-			GetRequestID(r), vol.Name(), param.Object(), getRequestIP(r), err)
-		errorCode = EntityTooSmall
-		return
-	}
 	if err != nil {
-		log.LogErrorf("putObjectHandler: put object fail: requestId(%v) volume(%v) path(%v) remote(%v) err(%v)",
-			GetRequestID(r), vol.Name(), param.Object(), getRequestIP(r), err)
-		if !r.Close {
-			errorCode = InternalErrorCode(err)
-		}
+		errorCode = InternalErrorCode(err)
 		return
 	}
 
@@ -1362,13 +1350,13 @@ func (o *ObjectNode) putObjectTaggingHandler(w http.ResponseWriter, r *http.Requ
 		errorCode = InvalidArgument
 		return
 	}
-	validateRes, errorCode := tagging.Validate()
+	validateRes, errorCode :=  tagging.Validate()
 	if !validateRes {
 		log.LogErrorf("putObjectTaggingHandler: tagging validate fail: requestID(%v) tagging(%v) err(%v)", GetRequestID(r), tagging, err)
 		return
 	}
 
-	err = vol.SetXAttr(param.object, XAttrKeyOSSTagging, []byte(tagging.Encode()), false)
+	err = vol.SetXAttr(param.object, XAttrKeyOSSTagging, []byte(tagging.Encode()), false);
 
 	if err != nil {
 		log.LogErrorf("pubObjectTaggingHandler: volume set tagging fail: requestID(%v) volume(%v) object(%v) err(%v)",

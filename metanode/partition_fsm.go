@@ -115,7 +115,7 @@ func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		if err = den.Unmarshal(msg.V); err != nil {
 			return
 		}
-		resp = mp.fsmDeleteDentry(den)
+		resp = mp.fsmDeleteDentry(den, false)
 	case opFSMDeleteDentryBatch:
 		db, err := DentryBatchUnmarshal(msg.V)
 		if err != nil {
@@ -149,6 +149,8 @@ func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		mp.storeChan <- msg
 	case opFSMInternalDeleteInode:
 		err = mp.internalDelete(msg.V)
+	case opFSMCursorReset:
+		resp, err = mp.internalCursorReset(msg.V)
 	case opFSMInternalDeleteInodeBatch:
 		err = mp.internalDeleteBatch(msg.V)
 	case opFSMInternalDelExtentFile:
@@ -225,6 +227,18 @@ func (mp *MetaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, ind
 		updated, err = mp.confRemoveNode(req, index)
 	case raftproto.ConfUpdateNode:
 		//updated, err = mp.confUpdateNode(req, index)
+	case raftproto.ConfAddLearner:
+		req := &proto.AddMetaPartitionRaftLearnerRequest{}
+		if err = json.Unmarshal(confChange.Context, req); err != nil {
+			return
+		}
+		updated, err = mp.confAddLearner(req, index)
+	case raftproto.ConfPromoteLearner:
+		req := &proto.PromoteMetaPartitionRaftLearnerRequest{}
+		if err = json.Unmarshal(confChange.Context, req); err != nil {
+			return
+		}
+		updated, err = mp.confPromoteLearner(req, index)
 	}
 	if err != nil {
 		return

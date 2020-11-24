@@ -79,7 +79,6 @@ type ExtentConfig struct {
 	Volume            string
 	Masters           []string
 	FollowerRead      bool
-	NearRead          bool
 	ReadRate          int64
 	WriteRate         int64
 	OnAppendExtentKey AppendExtentKeyFunc
@@ -99,6 +98,7 @@ type ExtentClient struct {
 	appendExtentKey AppendExtentKeyFunc
 	getExtents      GetExtentsFunc
 	truncate        TruncateFunc
+	followerRead    bool
 }
 
 // NewExtentClient returns a new extent client.
@@ -122,8 +122,7 @@ retry:
 	client.appendExtentKey = config.OnAppendExtentKey
 	client.getExtents = config.OnGetExtents
 	client.truncate = config.OnTruncate
-	client.dataWrapper.InitFollowerRead(config.FollowerRead)
-	client.dataWrapper.SetNearRead(config.NearRead)
+	client.followerRead = config.FollowerRead || client.dataWrapper.FollowerRead()
 
 	var readLimit, writeLimit rate.Limit
 	if config.ReadRate <= 0 {

@@ -51,7 +51,6 @@ type MetaNode struct {
 	raftDir           string // root dir of the raftStore log
 	metadataManager   *metadataManager
 	localAddr         string
-	storeType         proto.StoreType
 	clusterId         string
 	raftStore         raftstore.RaftStore
 	raftHeartbeatPort string
@@ -112,6 +111,9 @@ func doStart(s common.Server, cfg *config.Config) (err error) {
 	if err = m.parseConfig(cfg); err != nil {
 		return
 	}
+	if err = m.startDiskStat(); err != nil {
+		return
+	}
 	if err = m.register(); err != nil {
 		return
 	}
@@ -153,6 +155,7 @@ func doShutdown(s common.Server) {
 	m.stopServer()
 	m.stopMetaManager()
 	m.stopRaftServer()
+	m.stopDiskStat()
 }
 
 // Sync blocks the invoker's goroutine until the meta node shuts down.
@@ -174,21 +177,12 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicaPort)
 	m.zoneName = cfg.GetString(cfgZoneName)
+	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
 
 	m.tickInterval = int(cfg.GetFloat(cfgTickIntervalMs))
 	if m.tickInterval <= 300 {
 		log.LogWarnf("get config [%s]:[%v] less than 300 so set it to 500 ", cfgTickIntervalMs, cfg.GetString(cfgTickIntervalMs))
 		m.tickInterval = 500
-	}
-
-	if cfg.GetString(cfgStoreType) != "" {
-		if storeType, err := strconv.ParseUint(cfg.GetString(cfgStoreType), 10, 64); err != nil {
-			return err
-		} else {
-			m.storeType = proto.StoreType(storeType)
-		}
-	} else {
-		m.storeType = proto.MetaTypeMemory //default memory
 	}
 
 	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
@@ -261,11 +255,6 @@ func (m *MetaNode) validConfig() (err error) {
 	if m.metadataDir == "" {
 		m.metadataDir = defaultMetadataDir
 	}
-	if m.storeType == proto.MetaTypeRocks && len(m.rocksDirs) == 0 {
-		err = errors.New("store type for rocksdb must have rocksDirs:[path1, path2]..")
-		return
-
-	}
 	if m.raftDir == "" {
 		m.raftDir = defaultRaftDir
 	}
@@ -314,7 +303,7 @@ func (m *MetaNode) register() (err error) {
 			step++
 		}
 		var nodeID uint64
-		if nodeID, err = masterClient.NodeAPI().AddMetaNode(nodeAddress, m.zoneName, m.storeType); err != nil {
+		if nodeID, err = masterClient.NodeAPI().AddMetaNode(nodeAddress, m.zoneName); err != nil {
 			log.LogErrorf("register: register to master fail: address(%v) err(%s)", nodeAddress, err)
 			time.Sleep(3 * time.Second)
 			continue
