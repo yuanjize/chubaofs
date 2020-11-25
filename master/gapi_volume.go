@@ -65,9 +65,8 @@ func (s *VolumeService) registerObject(schema *schemabuilder.Schema) {
 			FollowerRead:       vol.FollowerRead,
 			NeedToLowerReplica: vol.NeedToLowerReplica,
 			Authenticate:       vol.authenticate,
-			EnableToken:        vol.enableToken,
 			CrossZone:          vol.crossZone,
-			AutoRepair:         vol.autoRepair,
+			EnableToken:        vol.enableToken,
 			Tokens:             vol.tokens,
 			RwDpCnt:            vol.dataPartitions.readableAndWritableCnt,
 			MpCnt:              len(vol.MetaPartitions),
@@ -95,6 +94,19 @@ func (s *VolumeService) registerObject(schema *schemabuilder.Schema) {
 			return 0, err
 		}
 		return v.createTime, nil
+	})
+
+	object.FieldFunc("inodeCount", func(ctx context.Context, v *Vol) (int64, error) {
+		if _, _, err := permissions(ctx, USER|ADMIN); err != nil {
+			return 0, err
+		}
+		var count uint64 = 0
+		v.mpsLock.RLock()
+		defer v.mpsLock.RUnlock()
+		for _, p := range v.MetaPartitions {
+			count += p.InodeCount
+		}
+		return int64(count), nil
 	})
 
 }
@@ -191,6 +203,7 @@ func (s *VolumeService) volPermission(ctx context.Context, args struct {
 func (s *VolumeService) createVolume(ctx context.Context, args struct {
 	Name, Owner, ZoneName, Description                 string
 	Capacity, DataPartitionSize, MpCount, DpReplicaNum uint64
+	StoreType                                          uint8
 	FollowerRead, Authenticate, CrossZone, EnableToken bool
 }) (*Vol, error) {
 	uid, per, err := permissions(ctx, ADMIN|USER)
@@ -206,7 +219,21 @@ func (s *VolumeService) createVolume(ctx context.Context, args struct {
 		return nil, fmt.Errorf("[%s] not has permission to create volume for [%s]", uid, args.Owner)
 	}
 
-	vol, err := s.cluster.createVol(args.Name, args.Owner, args.ZoneName, args.Description, int(args.MpCount), int(args.DpReplicaNum), int(args.DataPartitionSize), int(args.Capacity), args.FollowerRead, args.Authenticate, args.EnableToken, false)
+	arg := &createVolArg{
+		name:         args.Name,
+		owner:        args.Owner,
+		zoneName:     args.ZoneName,
+		description:  args.Description,
+		mpCount:      int(args.DpReplicaNum),
+		mpStoreType:  proto.StoreType(args.StoreType),
+		size:         args.DataPartitionSize,
+		capacity:     args.Capacity,
+		followerRead: args.FollowerRead,
+		authenticate: args.Authenticate,
+		crossZone:    args.CrossZone,
+		enableToken:  args.EnableToken,
+	}
+	vol, err := s.cluster.createVol(arg)
 	if err != nil {
 		return nil, err
 	}
@@ -267,11 +294,11 @@ func (s *VolumeService) markDeleteVol(ctx context.Context, args struct {
 }
 
 func (s *VolumeService) updateVolume(ctx context.Context, args struct {
-	Name, AuthKey                          string
-	ZoneName, Description                  *string
-	Capacity, ReplicaNum                   *uint64
-	EnableToken                            *bool
-	FollowerRead, Authenticate, AutoRepair *bool
+	Name, AuthKey              string
+	ZoneName, Description      *string
+	Capacity, ReplicaNum       *uint64
+	EnableToken                *bool
+	FollowerRead, Authenticate *bool
 }) (*Vol, error) {
 	uid, perm, err := permissions(ctx, ADMIN|USER)
 	if err != nil {
@@ -322,15 +349,11 @@ func (s *VolumeService) updateVolume(ctx context.Context, args struct {
 		args.EnableToken = &vol.enableToken
 	}
 
-	if args.AutoRepair == nil {
-		args.AutoRepair = &vol.autoRepair
-	}
-
 	if args.Description == nil {
 		args.Description = &vol.description
 	}
 
-	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken, *args.AutoRepair); err != nil {
+	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken); err != nil {
 		return nil, err
 	}
 

@@ -49,6 +49,7 @@ type Vol struct {
 	tokens             map[string]*proto.Token
 	tokensLock         sync.RWMutex
 	MetaPartitions     map[uint64]*MetaPartition `graphql:"-"`
+	mpStoreType        proto.StoreType           //metaPartition store type
 	mpsLock            sync.RWMutex
 	dataPartitions     *DataPartitionMap
 	mpsCache           []byte
@@ -60,14 +61,33 @@ type Vol struct {
 	sync.RWMutex
 }
 
-func newVol(id uint64, name, owner, zoneName string, dpSize, capacity uint64, dpReplicaNum, mpReplicaNum uint8, followerRead, authenticate, enableToken, autoRepair bool, createTime int64, description string) (vol *Vol) {
-	vol = &Vol{ID: id, Name: name, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
-	vol.dataPartitions = newDataPartitionMap(name)
+type createVolArg struct {
+	name         string
+	owner        string
+	zoneName     string
+	description  string
+	mpCount      int
+	dpReplicaNum int
+	mpReplicaNum int
+	mpStoreType  proto.StoreType
+	size         uint64
+	capacity     uint64
+	followerRead bool
+	authenticate bool
+	crossZone    bool
+	enableToken  bool
+}
+
+func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
+	vol = &Vol{ID: id, Name: arg.name, MetaPartitions: make(map[uint64]*MetaPartition, 0)}
+	vol.dataPartitions = newDataPartitionMap(arg.name)
+	dpReplicaNum := arg.dpReplicaNum
 	if dpReplicaNum < defaultReplicaNum {
 		dpReplicaNum = defaultReplicaNum
 	}
-	vol.dpReplicaNum = dpReplicaNum
+	vol.dpReplicaNum = uint8(dpReplicaNum)
 	vol.threshold = defaultMetaPartitionMemUsageThreshold
+	mpReplicaNum := arg.mpReplicaNum
 	if mpReplicaNum < defaultReplicaNum {
 		mpReplicaNum = defaultReplicaNum
 	}

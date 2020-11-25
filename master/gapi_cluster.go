@@ -5,17 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/chubaofs/chubaofs/proto"
-	"github.com/chubaofs/chubaofs/util/log"
-	"github.com/samsarahq/thunder/graphql"
-	"github.com/samsarahq/thunder/graphql/schemabuilder"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
+	"github.com/chubaofs/chubaofs/util/log"
+	"github.com/samsarahq/thunder/graphql"
+	"github.com/samsarahq/thunder/graphql/schemabuilder"
 )
 
 type ClusterService struct {
@@ -89,6 +89,17 @@ func (s *ClusterService) registerObject(schema *schemabuilder.Schema) {
 
 	nv := schema.Object("NodeView", proto.NodeView{})
 
+	nv.FieldFunc("storeType", func(ctx context.Context, n *proto.NodeView) (proto.StoreType, error) {
+		if _, _, err := permissions(ctx, ADMIN); err != nil {
+			return proto.MetaTypeUnKnown, err
+		}
+		if m, err := s.cluster.metaNode(n.Addr); err != nil {
+			return proto.MetaTypeUnKnown, err
+		} else {
+			return m.StoreType, nil
+		}
+	})
+
 	nv.FieldFunc("toMetaNode", func(ctx context.Context, n *proto.NodeView) (*MetaNode, error) {
 		if _, _, err := permissions(ctx, ADMIN); err != nil {
 			return nil, err
@@ -148,30 +159,57 @@ func (s *ClusterService) registerObject(schema *schemabuilder.Schema) {
 		return n.metaPartitionInfos
 	})
 
+	object = schema.Object("metaPartition", MetaPartition{})
+	object.FieldFunc("missNodes", func(ctx context.Context, n *MetaPartition) []string {
+		var addrs []string
+		n.RLock()
+		defer n.RUnlock()
+		for addr, _ := range n.MissNodes {
+			addrs = append(addrs, addr)
+		}
+		return addrs
+	})
+
+	object = schema.Object("dataPartition", DataPartition{})
+	object.FieldFunc("missNodes", func(ctx context.Context, n *DataPartition) []string {
+		var addrs []string
+		n.RLock()
+		defer n.RUnlock()
+		for addr, _ := range n.MissingNodes {
+			addrs = append(addrs, addr)
+		}
+		return addrs
+	})
+
 }
 
 func (s *ClusterService) registerQuery(schema *schemabuilder.Schema) {
 	query := schema.Query()
 	query.FieldFunc("clusterView", s.clusterView)
 	query.FieldFunc("dataNodeList", s.dataNodeList)
-	query.FieldFunc("dataNodeListTest", s.dataNodeListTest)
 	query.FieldFunc("dataNodeGet", s.dataNodeGet)
 	query.FieldFunc("metaNodeList", s.metaNodeList)
 	query.FieldFunc("metaNodeGet", s.metaNodeGet)
 	query.FieldFunc("masterList", s.masterList)
 	query.FieldFunc("getTopology", s.getTopology)
 	query.FieldFunc("alarmList", s.alarmList)
+	query.FieldFunc("metaPartitionList", s.metaPartitionList)
+	query.FieldFunc("dataPartitionList", s.dataPartitionList)
 }
 
 func (s *ClusterService) registerMutation(schema *schemabuilder.Schema) {
 	mutation := schema.Mutation()
 
+	mutation.FieldFunc("addMetaReplica", s.addMetaReplica)
+	mutation.FieldFunc("deleteMetaReplica", s.deleteMetaReplica)
+	mutation.FieldFunc("decommissionMetaPartition", s.decommissionMetaPartition)
+	mutation.FieldFunc("addDataReplica", s.addDataReplica)
+	mutation.FieldFunc("deleteDataReplica", s.deleteDataReplica)
+	mutation.FieldFunc("decommissionDataPartition", s.decommissionDataPartition)
+
 	mutation.FieldFunc("clusterFreeze", s.clusterFreeze)
 	mutation.FieldFunc("addRaftNode", s.addRaftNode)
-	mutation.FieldFunc("removeRaftNode", s.removeRaftNode)
-	mutation.FieldFunc("addMetaNode", s.removeRaftNode)
 	mutation.FieldFunc("loadMetaPartition", s.loadMetaPartition)
-	mutation.FieldFunc("decommissionMetaPartition", s.decommissionMetaPartition)
 	mutation.FieldFunc("decommissionMetaNode", s.decommissionMetaNode)
 	mutation.FieldFunc("decommissionDisk", s.decommissionDisk)
 	mutation.FieldFunc("decommissionDataNode", s.decommissionDataNode)
@@ -218,7 +256,7 @@ func (m *ClusterService) decommissionDataNode(ctx context.Context, args struct {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.decommissionDataNode(node, "", false); err != nil {
+	if err := m.cluster.decommissionDataNode(node); err != nil {
 		return nil, err
 	}
 	rstMsg := fmt.Sprintf("decommission data node [%v] successfully", args.OffLineAddr)
@@ -236,7 +274,7 @@ func (m *ClusterService) decommissionMetaNode(ctx context.Context, args struct {
 	if err != nil {
 		return nil, err
 	}
-	if err = m.cluster.decommissionMetaNode(metaNode, false); err != nil {
+	if err = m.cluster.decommissionMetaNode(metaNode); err != nil {
 		return nil, err
 	}
 	log.LogInfof("decommissionMetaNode metaNode [%v] has offline successfully", args.OffLineAddr)
@@ -261,7 +299,7 @@ func (m *ClusterService) loadMetaPartition(ctx context.Context, args struct {
 
 func (m *ClusterService) decommissionMetaPartition(ctx context.Context, args struct {
 	PartitionID uint64
-	NodeAddr    string
+	Addr        string
 }) (*proto.GeneralResp, error) {
 	if _, _, err := permissions(ctx, ADMIN); err != nil {
 		return nil, err
@@ -270,11 +308,32 @@ func (m *ClusterService) decommissionMetaPartition(ctx context.Context, args str
 	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.decommissionMetaPartition(args.NodeAddr, mp, getTargetAddressForMetaPartitionDecommission, false); err != nil {
+	if err := m.cluster.decommissionMetaPartition(args.Addr, mp); err != nil {
 		return nil, err
 	}
-	log.LogInfof(proto.AdminDecommissionMetaPartition+" partitionID :%v  decommissionMetaPartition successfully", args.PartitionID)
-	return proto.Success("success"), nil
+	rstMsg := fmt.Sprintf(proto.AdminDecommissionMetaPartition+" partitionID :%v  decommissionMetaPartition successfully", args.PartitionID)
+	log.LogInfof(rstMsg)
+	return proto.Success(rstMsg), nil
+}
+
+func (m *ClusterService) decommissionDataPartition(ctx context.Context, args struct {
+	PartitionID uint64
+	Addr        string
+}) (*proto.GeneralResp, error) {
+	if _, _, err := permissions(ctx, ADMIN); err != nil {
+		return nil, err
+	}
+
+	dp, err := m.cluster.getDataPartitionByID(args.PartitionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.cluster.decommissionDataPartition(args.Addr, dp, handleDataPartitionOfflineErr); err != nil {
+		return nil, err
+	}
+	rstMsg := fmt.Sprintf(proto.AdminDecommissionDataPartition+" dataPartitionID :%v  on node:%v successfully", args.PartitionID, args.Addr)
+	log.LogInfof(rstMsg)
+	return proto.Success(rstMsg), nil
 }
 
 func (m *ClusterService) getMetaNode(ctx context.Context, args struct {
@@ -309,12 +368,22 @@ func (m *ClusterService) getTopology(ctx context.Context, args struct{}) (*proto
 			cv.NodeSet[ns.ID] = nsView
 			ns.dataNodes.Range(func(key, value interface{}) bool {
 				dataNode := value.(*DataNode)
-				nsView.DataNodes = append(nsView.DataNodes, NodeView{ID: dataNode.ID, Addr: dataNode.Addr, Status: dataNode.isActive, IsWritable: dataNode.isWriteAble()})
+				nsView.DataNodes = append(nsView.DataNodes,
+					proto.NodeView{ID: dataNode.ID,
+						Addr:       dataNode.Addr,
+						Status:     dataNode.isActive,
+						IsWritable: dataNode.isWriteAble(),
+					})
 				return true
 			})
 			ns.metaNodes.Range(func(key, value interface{}) bool {
 				metaNode := value.(*MetaNode)
-				nsView.MetaNodes = append(nsView.MetaNodes, NodeView{ID: metaNode.ID, Addr: metaNode.Addr, Status: metaNode.IsActive, IsWritable: metaNode.isWritable()})
+				nsView.MetaNodes = append(nsView.MetaNodes,
+					proto.NodeView{ID: metaNode.ID,
+						Addr:       metaNode.Addr,
+						Status:     metaNode.IsActive,
+						IsWritable: metaNode.isWritable(),
+					})
 				return true
 			})
 		}
@@ -379,45 +448,17 @@ func (s *ClusterService) dataNodeList(ctx context.Context, args struct{}) ([]*Da
 	return all, nil
 }
 
-func (s *ClusterService) dataNodeListTest(ctx context.Context, args struct {
-	Num int64
-}) ([]*DataNode, error) {
-	if _, _, err := permissions(ctx, ADMIN); err != nil {
-		return nil, err
-	}
-	var all []*DataNode
-
-	for i := 0; i < int(args.Num); i++ {
-		all = append(all, &DataNode{
-			Total:          uint64(i),
-			Used:           1,
-			AvailableSpace: 1,
-			ID:             1,
-			ZoneName:       "123",
-			Addr:           "123123121231",
-			ReportTime:     time.Time{},
-			isActive:       false,
-			RWMutex:        sync.RWMutex{},
-			UsageRatio:     1,
-			SelectedTimes:  2,
-			Carry:          3,
-		})
-	}
-
-	return all, nil
-}
-
 func (s *ClusterService) metaNodeGet(ctx context.Context, args struct {
 	Addr string
 }) (*MetaNode, error) {
 	if _, _, err := permissions(ctx, ADMIN); err != nil {
 		return nil, err
 	}
-	mn, found := s.cluster.metaNodes.Load(args.Addr)
-	if found {
-		return mn.(*MetaNode), nil
+	mn, err := s.cluster.metaNode(args.Addr)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("not found meta_node by add:[%s]", args.Addr)
+	return mn, nil
 }
 
 func (s *ClusterService) metaNodeList(ctx context.Context, args struct{}) ([]*MetaNode, error) {
@@ -432,30 +473,104 @@ func (s *ClusterService) metaNodeList(ctx context.Context, args struct{}) ([]*Me
 	return all, nil
 }
 
+func (s *ClusterService) metaPartitionList(ctx context.Context, args struct{}) ([]*MetaPartition, error) {
+	var result []*MetaPartition
+	for _, vol := range s.cluster.allVols() {
+		result = append(result, vol.allMetaPartition()...)
+	}
+	return result, nil
+}
+
+func (s *ClusterService) dataPartitionList(ctx context.Context, args struct{}) ([]*DataPartition, error) {
+	var result []*DataPartition
+	for _, vol := range s.cluster.allVols() {
+		result = append(result, vol.allDataPartition()...)
+	}
+	return result, nil
+}
+
 func (m *ClusterService) addMetaNode(ctx context.Context, args struct {
-	NodeAddr string
-	ZoneName string
+	NodeAddr  string
+	ZoneName  string
+	StoreType proto.StoreType
 }) (uint64, error) {
-	if id, err := m.cluster.addMetaNode(args.NodeAddr, args.ZoneName); err != nil {
+	if id, err := m.cluster.addMetaNode(args.NodeAddr, args.ZoneName, args.StoreType); err != nil {
 		return 0, err
 	} else {
 		return id, nil
 	}
 }
 
-// Dynamically remove a master node. Similar to addRaftNode, this operation is performed online.
-func (m *ClusterService) removeRaftNode(ctx context.Context, args struct {
-	Id   uint64
-	Addr string
+func (m *ClusterService) addMetaReplica(ctx context.Context, args struct {
+	PartitionID uint64
+	Addr        string
 }) (*proto.GeneralResp, error) {
-	if _, _, err := permissions(ctx, ADMIN); err != nil {
+	mp, err := m.cluster.getMetaPartitionByID(args.PartitionID)
+	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.removeRaftNode(args.Id, args.Addr); err != nil {
+
+	if err = m.cluster.addMetaReplica(mp, args.Addr); err != nil {
 		return nil, err
 	}
-	log.LogInfof("remove  raft node id :%v,adr:%v successfully\n", args.Id, args.Addr)
-	return proto.Success("success"), nil
+	mp.IsRecover = true
+	m.cluster.putBadMetaPartitions(args.Addr, mp.PartitionID)
+	msg := fmt.Sprintf("meta partitionID :%v  add replica [%v] successfully", args.PartitionID, args.Addr)
+	return proto.Success(msg), nil
+}
+
+func (m *ClusterService) deleteMetaReplica(ctx context.Context, args struct {
+	PartitionID uint64
+	Addr        string
+}) (*proto.GeneralResp, error) {
+	mp, err := m.cluster.getMetaPartitionByID(args.PartitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.cluster.deleteMetaReplica(mp, args.Addr, true); err != nil {
+		return nil, err
+	}
+	mp.IsRecover = true
+	m.cluster.putBadMetaPartitions(args.Addr, mp.PartitionID)
+	msg := fmt.Sprintf("meta partitionID :%v  delete replica [%v] successfully", args.PartitionID, args.Addr)
+	return proto.Success(msg), nil
+}
+
+func (m *ClusterService) addDataReplica(ctx context.Context, args struct {
+	PartitionID uint64
+	Addr        string
+}) (*proto.GeneralResp, error) {
+	dp, err := m.cluster.getDataPartitionByID(args.PartitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.cluster.addDataReplica(dp, args.Addr); err != nil {
+		return nil, err
+	}
+	dp.Status = proto.ReadOnly
+	dp.isRecover = true
+	m.cluster.putBadDataPartitionIDs(nil, args.Addr, dp.PartitionID)
+	msg := fmt.Sprintf("data partitionID :%v  add replica [%v] successfully", args.PartitionID, args.Addr)
+	return proto.Success(msg), nil
+}
+
+func (m *ClusterService) deleteDataReplica(ctx context.Context, args struct {
+	PartitionID uint64
+	Addr        string
+}) (*proto.GeneralResp, error) {
+
+	dp, err := m.cluster.getDataPartitionByID(args.PartitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.cluster.removeDataReplica(dp, args.Addr, true); err != nil {
+		return nil, err
+	}
+	msg := fmt.Sprintf("data partitionID :%v  delete replica [%v] successfully", args.PartitionID, args.Addr)
+	return proto.Success(msg), nil
 }
 
 // Dynamically add a raft node (replica) for the master.
@@ -611,8 +726,6 @@ func (m *ClusterService) makeClusterView() *proto.ClusterView {
 		LeaderAddr:          m.cluster.leaderInfo.addr,
 		DisableAutoAlloc:    m.cluster.DisableAutoAllocate,
 		MetaNodeThreshold:   m.cluster.cfg.MetaNodeThreshold,
-		DpRecoverPool:       m.cluster.cfg.DataPartitionsRecoverPoolSize,
-		MpRecoverPool:       m.cluster.cfg.MetaPartitionsRecoverPoolSize,
 		Applied:             m.cluster.fsm.applied,
 		MaxDataPartitionID:  m.cluster.idAlloc.dataPartitionID,
 		MaxMetaNodeID:       m.cluster.idAlloc.commonID,

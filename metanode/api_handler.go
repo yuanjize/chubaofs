@@ -16,6 +16,7 @@ package metanode
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -47,6 +48,13 @@ func (api *APIResponse) Marshal() ([]byte, error) {
 
 // register the APIs
 func (m *MetaNode) registerAPIHandler() (err error) {
+	http.HandleFunc(proto.VersionPath, func(w http.ResponseWriter, _ *http.Request) {
+		version := proto.MakeVersion("MetaNode")
+		marshal, _ := json.Marshal(version)
+		if _, err := w.Write(marshal); err != nil {
+			log.LogErrorf("write version has err:[%s]", err.Error())
+		}
+	})
 	http.HandleFunc("/getPartitions", m.getPartitionsHandler)
 	http.HandleFunc("/getPartitionById", m.getPartitionByIDHandler)
 	http.HandleFunc("/getInode", m.getInodeHandler)
@@ -111,6 +119,7 @@ func (m *MetaNode) getPartitionByIDHandler(w http.ResponseWriter, r *http.Reques
 		resp.Msg = err.Error()
 		return
 	}
+
 	mp, err := m.metadataManager.GetPartition(pid)
 	if err != nil {
 		resp.Code = http.StatusNotFound
@@ -254,7 +263,7 @@ func (m *MetaNode) cursorReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *MetaNode) getInodeHandler(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	log.LogIfNotNil(r.ParseForm())
 	resp := NewAPIResponse(http.StatusBadRequest, "")
 	defer func() {
 		data, _ := resp.Marshal()
@@ -415,36 +424,48 @@ func (m *MetaNode) getAllDentriesHandler(w http.ResponseWriter, r *http.Request)
 		resp.Msg = err.Error()
 		return
 	}
-
 	buff := bytes.NewBufferString(`{"code": 200, "msg": "OK", "data":[`)
 	if _, err := w.Write(buff.Bytes()); err != nil {
 		return
 	}
 	buff.Reset()
 	var (
-		val       []byte
 		delimiter = []byte{',', '\n'}
 		isFirst   = true
 	)
-	mp.GetDentryTree().Ascend(func(i BtreeItem) bool {
+
+	err = mp.dentryTree.Range(&Dentry{}, nil, func(v []byte) (bool, error) {
+
 		if !isFirst {
 			if _, err = w.Write(delimiter); err != nil {
-				return false
+				return false, err
 			}
 		} else {
 			isFirst = false
 		}
-		val, err = json.Marshal(i)
+
+		d := &Dentry{}
+		if err := d.Unmarshal(v); err != nil {
+			return false, err
+		}
+
+		data, err := json.Marshal(d)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return false
+			return false, err
 		}
-		if _, err = w.Write(val); err != nil {
-			return false
+
+		if _, err = w.Write(data); err != nil {
+			return false, err
 		}
-		return true
+		return true, err
 	})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
 	shouldSkip = true
 	buff.WriteString(`]}`)
 	if _, err = w.Write(buff.Bytes()); err != nil {
