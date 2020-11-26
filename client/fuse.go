@@ -69,8 +69,9 @@ const (
 	ControlCommandSetRate      = "/rate/set"
 	ControlCommandGetRate      = "/rate/get"
 	ControlCommandFreeOSMemory = "/debug/freeosmemory"
-	Role                       = "Client"
+	Role="Client"
 )
+
 
 var (
 	configFile       = flag.String("c", "", "FUSE client config file")

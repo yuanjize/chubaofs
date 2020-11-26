@@ -183,6 +183,18 @@ func (m *Server) registerAPIRoutes(router *mux.Router) {
 		Path(proto.AdminDeleteMetaReplica).
 		HandlerFunc(m.deleteMetaReplica)
 	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
+		Path(proto.AdminAddMetaReplicaLearner).
+		HandlerFunc(m.addMetaReplicaLearner)
+	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
+		Path(proto.AdminPromoteMetaReplicaLearner).
+		HandlerFunc(m.promoteMetaReplicaLearner)
+	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
+		Path(proto.AdminAddDataReplicaLearner).
+		HandlerFunc(m.addDataReplicaLearner)
+	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
+		Path(proto.AdminPromoteDataReplicaLearner).
+		HandlerFunc(m.promoteDataReplicaLearner)
+	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
 		Path(proto.AdminDiagnoseMetaPartition).
 		HandlerFunc(m.diagnoseMetaPartition)
 
@@ -228,12 +240,6 @@ func (m *Server) registerAPIRoutes(router *mux.Router) {
 	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
 		Path(proto.AdminUpdateMetaNode).
 		HandlerFunc(m.updateMetaNode)
-	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
-		Path(proto.AdminUpdateDataNode).
-		HandlerFunc(m.updateDataNode)
-	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
-		Path(proto.AdminGetInvalidNodes).
-		HandlerFunc(m.checkInvalidIDNodes)
 
 	// data node management APIs
 	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
@@ -254,6 +260,9 @@ func (m *Server) registerAPIRoutes(router *mux.Router) {
 	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
 		Path(proto.AdminGetNodeInfo).
 		HandlerFunc(m.getNodeInfoHandler)
+	router.NewRoute().Methods(http.MethodGet, http.MethodPost).
+		Path(proto.AdminSetNodeState).
+		HandlerFunc(m.setNodeToOfflineState)
 
 	// user management APIs
 	router.NewRoute().Methods(http.MethodPost).
