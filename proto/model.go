@@ -34,6 +34,7 @@ type MetaNodeInfo struct {
 	Ratio                     float64
 	SelectCount               uint64
 	Carry                     float64
+	DiskCarry                 float64
 	Threshold                 float32
 	ReportTime                time.Time
 	MetaPartitionCount        int

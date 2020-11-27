@@ -35,6 +35,7 @@ const (
 	secondsToFreeDataPartitionAfterLoad = "secondsToFreeDataPartitionAfterLoad"
 	nodeSetCapacity                     = "nodeSetCap"
 	cfgMetaNodeReservedMem              = "metaNodeReservedMem"
+	cfgMetaNodeReservedDisk             = "metaNodeReservedDisk"
 	heartbeatPortKey                    = "heartbeatPort"
 	replicaPortKey                      = "replicaPort"
 )
@@ -78,6 +79,7 @@ type clusterConfig struct {
 	IntervalToAlarmMissingDataPartition int64
 	PeriodToLoadALLDataPartitions       int64
 	metaNodeReservedMem                 uint64
+	metaNodeReservedDisk                uint64
 	IntervalToCheckDataPartition        int // seconds
 	numberOfDataPartitionsToFree        int
 	numberOfDataPartitionsToLoad        int
@@ -108,6 +110,7 @@ func newClusterConfig() (cfg *clusterConfig) {
 	cfg.PeriodToLoadALLDataPartitions = defaultPeriodToLoadAllDataPartitions
 	cfg.MetaNodeThreshold = defaultMetaPartitionMemUsageThreshold
 	cfg.metaNodeReservedMem = defaultMetaNodeReservedMem
+	cfg.metaNodeReservedDisk = defaultMetaNodeReservedDisk
 	cfg.diffSpaceUsage = defaultDiffSpaceUsage
 	cfg.DataPartitionsRecoverPoolSize = defaultRecoverPoolSize
 	cfg.MetaPartitionsRecoverPoolSize = defaultRecoverPoolSize

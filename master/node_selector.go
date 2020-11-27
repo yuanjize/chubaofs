@@ -25,6 +25,7 @@ import (
 const (
 	selectDataNode = 0
 	selectMetaNode = 1
+	selectMetaNodeOfDisk = 2
 )
 
 type weightedNode struct {
@@ -36,8 +37,8 @@ type weightedNode struct {
 
 // Node defines an interface that needs to be implemented by weightedNode
 type Node interface {
-	SetCarry(carry float64)
-	SelectNodeForWrite()
+	SetCarry(carry float64, selectType int)
+	SelectNodeForWrite(selectType int)
 	GetID() uint64
 	GetAddr() string
 }
@@ -57,7 +58,7 @@ func (nodes SortedWeightedNodes) Swap(i, j int) {
 	nodes[i], nodes[j] = nodes[j], nodes[i]
 }
 
-func (nodes SortedWeightedNodes) setNodeCarry(availCarryCount, replicaNum int) {
+func (nodes SortedWeightedNodes) setNodeCarry(availCarryCount, replicaNum int, selectType int) {
 	if availCarryCount >= replicaNum {
 		return
 	}
@@ -69,7 +70,7 @@ func (nodes SortedWeightedNodes) setNodeCarry(availCarryCount, replicaNum int) {
 				carry = 10.0
 			}
 			nt.Carry = carry
-			nt.Ptr.SetCarry(carry)
+			nt.Ptr.SetCarry(carry, selectType)
 			if carry > 1.0 {
 				availCarryCount++
 			}
@@ -95,6 +96,17 @@ func getMetaNodeMaxTotal(metaNodes *sync.Map) (maxTotal uint64) {
 		metaNode := value.(*MetaNode)
 		if metaNode.Total > maxTotal {
 			maxTotal = metaNode.Total
+		}
+		return true
+	})
+	return
+}
+
+func getMetaNodeMaxTotalByDiskSpace(metaNodes *sync.Map) (maxTotal uint64) {
+	metaNodes.Range(func(key, value interface{}) bool {
+		metaNode := value.(*MetaNode)
+		if metaNode.DiskTotal > maxTotal {
+			maxTotal = metaNode.DiskTotal
 		}
 		return true
 	})
@@ -133,6 +145,35 @@ func getAllCarryMetaNodes(maxTotal uint64, excludeHosts []string, metaNodes *syn
 			nt.Weight = 1.0
 		} else {
 			nt.Weight = (float64)(maxTotal-metaNode.Used) / (float64)(maxTotal)
+		}
+		nt.Ptr = metaNode
+		nodes = append(nodes, nt)
+
+		return true
+	})
+
+	return
+}
+
+func getAllCarryMetaNodesByDiskSpace(maxTotal uint64, excludeHosts []string, metaNodes *sync.Map) (nodes SortedWeightedNodes, availCount int) {
+	nodes = make(SortedWeightedNodes, 0)
+	metaNodes.Range(func(key, value interface{}) bool {
+		metaNode := value.(*MetaNode)
+		if contains(excludeHosts, metaNode.Addr) == true {
+			return true
+		}
+		if metaNode.isWritableByDiskSpace() == false {
+			return true
+		}
+		if metaNode.isCarryNodeByDiskSpace() == true {
+			availCount++
+		}
+		nt := new(weightedNode)
+		nt.Carry = metaNode.DiskCarry
+		if metaNode.DiskUsed < 0 {
+			nt.Weight = 1.0
+		} else {
+			nt.Weight = (float64)(maxTotal-metaNode.DiskUsed) / (float64)(maxTotal)
 		}
 		nt.Ptr = metaNode
 		nodes = append(nodes, nt)
@@ -192,6 +233,9 @@ func getAvailHosts(nodes *sync.Map, excludeHosts []string, replicaNum int, selec
 	case selectMetaNode:
 		maxTotalFunc = getMetaNodeMaxTotal
 		getCarryNodesFunc = getAllCarryMetaNodes
+	case selectMetaNodeOfDisk:
+		maxTotalFunc = getMetaNodeMaxTotalByDiskSpace
+		getCarryNodesFunc = getAllCarryMetaNodesByDiskSpace
 	default:
 		return nil, nil, fmt.Errorf("invalid selectType[%v]", selectType)
 	}
@@ -202,12 +246,12 @@ func getAvailHosts(nodes *sync.Map, excludeHosts []string, replicaNum int, selec
 			replicaNum, len(weightedNodes))
 		return
 	}
-	weightedNodes.setNodeCarry(count, replicaNum)
+	weightedNodes.setNodeCarry(count, replicaNum, selectType)
 	sort.Sort(weightedNodes)
 
 	for i := 0; i < replicaNum; i++ {
 		node := weightedNodes[i].Ptr
-		node.SelectNodeForWrite()
+		node.SelectNodeForWrite(selectType)
 		orderHosts = append(orderHosts, node.GetAddr())
 		peer := proto.Peer{ID: node.GetID(), Addr: node.GetAddr()}
 		peers = append(peers, peer)

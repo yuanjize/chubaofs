@@ -188,6 +188,16 @@ func (m *Server) checkConfig(cfg *config.Config) (err error) {
 		m.config.metaNodeReservedMem = defaultMetaNodeReservedMem
 	}
 
+	metaNodeReservedDisk := cfg.GetString(cfgMetaNodeReservedDisk)
+	if metaNodeReservedDisk != "" {
+		if m.config.metaNodeReservedDisk, err = strconv.ParseUint(metaNodeReservedDisk, 10, 64); err != nil {
+			return fmt.Errorf("%v,err:%v", proto.ErrInvalidCfg, err.Error())
+		}
+	}
+	if m.config.metaNodeReservedDisk < defaultMetaNodeReservedDisk {
+		m.config.metaNodeReservedDisk = defaultMetaNodeReservedDisk
+	}
+
 	retainLogs := cfg.GetString(CfgRetainLogs)
 	if retainLogs != "" {
 		if m.retainLogs, err = strconv.ParseUint(retainLogs, 10, 64); err != nil {
