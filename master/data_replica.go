@@ -22,9 +22,9 @@ import (
 
 // DataReplica represents the replica of a data partition
 type DataReplica struct {
-	proto.DataReplica
-	dataNode *DataNode
-	loc      uint8
+	proto.DataReplica `graphql:"-"`
+	dataNode          *DataNode
+	loc               uint8
 }
 
 func newDataReplica(dataNode *DataNode) (replica *DataReplica) {
