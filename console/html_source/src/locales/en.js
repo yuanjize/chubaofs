@@ -158,6 +158,7 @@ export default {
         inodeCount: 'Inode Count',
         start: 'Start',
         end: 'End',
+        storeType: 'StoreType',
         isRecover: 'Is Recover',
         missNodes: 'Miss Nodes',
         replicaNum: 'Replica num',
