@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
@@ -76,6 +77,7 @@ type createVolArg struct {
 	authenticate bool
 	crossZone    bool
 	enableToken  bool
+	autoRepair   bool
 }
 
 func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
@@ -91,49 +93,53 @@ func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
 	if mpReplicaNum < defaultReplicaNum {
 		mpReplicaNum = defaultReplicaNum
 	}
-	vol.mpReplicaNum = mpReplicaNum
-	vol.Owner = owner
+	vol.mpReplicaNum = uint8(mpReplicaNum)
+	vol.Owner = arg.owner
+	dpSize := arg.size
 	if dpSize == 0 {
 		dpSize = util.DefaultDataPartitionSize
 	}
 	if dpSize < util.GB {
 		dpSize = util.DefaultDataPartitionSize
 	}
-	zoneList := strings.Split(zoneName, ",")
+	zoneList := strings.Split(arg.zoneName, ",")
 	if len(zoneList) > 1 {
 		vol.crossZone = true
 	}
 	vol.dataPartitionSize = dpSize
-	vol.Capacity = capacity
-	vol.FollowerRead = followerRead
-	vol.authenticate = authenticate
-	vol.zoneName = zoneName
+	vol.Capacity = arg.capacity
+	vol.FollowerRead = arg.followerRead
+	vol.authenticate = arg.authenticate
+	vol.zoneName = arg.zoneName
 	vol.viewCache = make([]byte, 0)
 	vol.mpsCache = make([]byte, 0)
 	vol.createTime = createTime
-	vol.enableToken = enableToken
-	vol.autoRepair = autoRepair
+	vol.enableToken = arg.enableToken
+	vol.autoRepair = arg.autoRepair
 	vol.tokens = make(map[string]*proto.Token, 0)
-	vol.description = description
+	vol.description = arg.description
 	return
 }
 
 func newVolFromVolValue(vv *volValue) (vol *Vol) {
-	vol = newVol(
-		vv.ID,
-		vv.Name,
-		vv.Owner,
-		vv.ZoneName,
-		vv.DataPartitionSize,
-		vv.Capacity,
-		vv.DpReplicaNum,
-		vv.ReplicaNum,
-		vv.FollowerRead,
-		vv.Authenticate,
-		vv.EnableToken,
-		vv.AutoRepair,
-		vv.CreateTime,
-		vv.Description)
+
+	arg := &createVolArg{
+		name:         vv.Name,
+		owner:        vv.Owner,
+		zoneName:     vv.ZoneName,
+		description:  vv.Description,
+		dpReplicaNum: int(vv.DpReplicaNum),
+		mpStoreType:  vv.MpStoreType,
+		size:         vv.DataPartitionSize, //TODO: is right????
+		capacity:     vv.Capacity,
+		followerRead: vv.FollowerRead,
+		authenticate: vv.Authenticate,
+		crossZone:    vv.CrossZone,
+		enableToken:  vv.EnableToken,
+		autoRepair:   vv.AutoRepair,
+	}
+
+	vol = newVol(vv.ID, time.Now().Unix(), arg)
 	// overwrite oss secure
 	vol.OSSAccessKey, vol.OSSSecretKey = vv.OSSAccessKey, vv.OSSSecretKey
 	vol.Status = vv.Status
@@ -180,6 +186,23 @@ func (vol *Vol) addMetaPartition(mp *MetaPartition) {
 	}
 	// replace the old partition in the map with mp
 	vol.MetaPartitions[mp.PartitionID] = mp
+}
+
+func (vol *Vol) allMetaPartition() []*MetaPartition {
+	vol.mpsLock.RLock()
+	defer vol.mpsLock.RUnlock()
+	result := make([]*MetaPartition, 0, len(vol.MetaPartitions))
+	for _, mp := range vol.MetaPartitions {
+		result = append(result, mp)
+	}
+	return result
+}
+
+func (vol *Vol) allDataPartition() []*DataPartition {
+	dps := vol.dataPartitions
+	dps.RLock()
+	defer dps.RUnlock()
+	return append([]*DataPartition{}, dps.partitions...)
 }
 
 func (vol *Vol) metaPartition(partitionID uint64) (mp *MetaPartition, err error) {

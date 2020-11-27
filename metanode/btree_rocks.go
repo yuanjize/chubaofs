@@ -210,11 +210,12 @@ func (r *RocksTree) Iterator(snapshot *gorocksdb.Snapshot) *gorocksdb.Iterator {
 
 // Has checks if the key exists in the btree.
 func (r *RocksTree) HasKey(key []byte) (bool, error) {
-	bs, err := r.GetBytes(key)
+	v, err := r.db.Get(readOption, key)
 	if err != nil {
 		return false, err
 	}
-	return len(bs) > 0, nil
+	defer v.Free()
+	return v.Size() > 0, nil
 }
 
 // Has checks if the key exists in the btree.
@@ -566,6 +567,20 @@ func (b *ExtendRocks) RealCount() uint64 {
 
 func (b *MultipartRocks) RealCount() uint64 {
 	return b.IteratorCount(MultipartType)
+}
+
+//Has
+func (b *InodeRocks) Has(ino uint64) (bool, error) {
+	return b.HasKey(inodeEncodingKey(ino))
+}
+func (b *DentryRocks) Has(ino uint64, name string) (bool, error) {
+	return b.HasKey(dentryEncodingKey(ino, name))
+}
+func (b *ExtendRocks) Has(ino uint64) (bool, error) {
+	return b.HasKey(extendEncodingKey(ino))
+}
+func (b *MultipartRocks) Has(key, id string) (bool, error) {
+	return b.HasKey(multipartEncodingKey(key, id))
 }
 
 //Get

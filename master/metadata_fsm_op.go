@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	bsProto "github.com/chubaofs/chubaofs/proto"
+	mpproto "github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/errors"
 	"github.com/chubaofs/chubaofs/util/log"
 	"github.com/tiglabs/raft/proto"
@@ -148,6 +149,7 @@ type volValue struct {
 	OSSSecretKey      string
 	CreateTime        int64
 	Description       string
+	MpStoreType       mpproto.StoreType
 }
 
 func (v *volValue) Bytes() (raw []byte, err error) {

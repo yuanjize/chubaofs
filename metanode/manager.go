@@ -40,32 +40,20 @@ import (
 const partitionPrefix = "partition_"
 const ExpiredPartitionPrefix = "expired_"
 
-// MetadataManager manages all the meta partitions.
-type MetadataManager interface {
-	Start() error
-	Stop()
-	//CreatePartition(id string, start, end uint64, peers []proto.Peer) error
-	HandleMetadataOperation(conn net.Conn, p *Packet, remoteAddr string) error
-	GetPartition(id uint64) (MetaPartition, error)
-}
-
-// MetadataManagerConfig defines the configures in the metadata manager.
-type MetadataManagerConfig struct {
-	NodeID    uint64
-	RootDir   string
-	ZoneName  string
-	RaftStore raftstore.RaftStore
+func partitionPrefixPath(dir string, partitionId string) string {
+	return path.Join(dir, partitionPrefix+partitionId)
 }
 
 type metadataManager struct {
 	nodeId             uint64
 	zoneName           string
 	rootDir            string
+	rocksDirs          []string
 	raftStore          raftstore.RaftStore
 	connPool           *util.ConnectPool
 	state              uint32
 	mu                 sync.RWMutex
-	partitions         map[uint64]MetaPartition // Key: metaRangeId, Val: metaPartition
+	partitions         map[uint64]*MetaPartition // Key: metaRangeId, Val: metaPartition
 	metaNode           *MetaNode
 	flDeleteBatchCount atomic.Value
 }
@@ -223,7 +211,7 @@ func (m *metadataManager) onStop() {
 }
 
 // LoadMetaPartition returns the meta partition with the specified volName.
-func (m *metadataManager) getPartition(id uint64) (mp MetaPartition, err error) {
+func (m *metadataManager) getPartition(id uint64) (mp *MetaPartition, err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	mp, ok := m.partitions[id]
@@ -302,6 +290,7 @@ func (m *metadataManager) loadPartitions() (err error) {
 			wg.Add(1)
 			go func(fileName string) {
 				var errload error
+				start := time.Now()
 				defer func() {
 					if r := recover(); r != nil {
 						log.LogErrorf("loadPartitions partition: %s, "+
@@ -314,9 +303,12 @@ func (m *metadataManager) loadPartitions() (err error) {
 							"error: %s", fileName, errload)
 						log.LogFlush()
 						panic(errload)
+					} else {
+						log.LogInfof("load partition:[%s] end use time:[%s]", fileName, time.Now().Sub(start))
 					}
 				}()
 				defer wg.Done()
+
 				if len(fileName) < 10 {
 					log.LogWarnf("ignore unknown partition dir: %s", fileName)
 					return
@@ -330,11 +322,48 @@ func (m *metadataManager) loadPartitions() (err error) {
 				}
 
 				partitionConfig := &MetaPartitionConfig{
-					NodeId:    m.nodeId,
-					RaftStore: m.raftStore,
-					RootDir:   path.Join(m.rootDir, fileName),
-					ConnPool:  m.connPool,
+					PartitionId: id,
+					NodeId:      m.nodeId,
+					RaftStore:   m.raftStore,
+					RootDir:     path.Join(m.rootDir, fileName),
+					ConnPool:    m.connPool,
 				}
+
+				if err = loadMetadata(partitionConfig); err != nil {
+					log.LogWarnf("load meta data has err:%s ,ignore path: %s,not partition", err.Error(), partitionId)
+					return
+				}
+
+				//if sotreType is rocksdb , so find rocksdir in path
+				if partitionConfig.StoreType == proto.MetaTypeRocks {
+					for _, dir := range m.rocksDirs {
+						rocksdbDir := partitionPrefixPath(dir, partitionId)
+						if _, err = os.Stat(rocksdbDir); err != nil {
+							if os.IsNotExist(err) {
+								err = nil
+							} else {
+								errload = err
+								return
+							}
+						} else {
+							partitionConfig.RocksDir = rocksdbDir
+							break
+						}
+					}
+
+					if partitionConfig.RocksDir == "" {
+						dir, err := util.SelectDisk(m.rocksDirs)
+						if err != nil {
+							errload = err
+							return
+						}
+						partitionConfig.RocksDir = partitionPrefixPath(dir, partitionId)
+						if errload = os.MkdirAll(partitionConfig.RocksDir, os.ModePerm); errload != nil {
+							return
+						}
+					}
+				}
+
 				partitionConfig.AfterStop = func() {
 					m.detachPartition(id)
 				}
@@ -352,11 +381,14 @@ func (m *metadataManager) loadPartitions() (err error) {
 					}
 					errload = nil
 				}
-				partition := NewMetaPartition(partitionConfig, m)
+				partition, err := NewMetaPartition(partitionConfig, m)
+				if err != nil {
+					errload = errors.Trace(errload, fmt.Sprintf(": fail init meta partition:[%s]", err.Error()))
+					return
+				}
 				errload = m.attachPartition(id, partition)
 				if errload != nil {
-					log.LogErrorf("load partition id=%d failed: %s.",
-						id, errload.Error())
+					log.LogErrorf("load partition id=%d failed: %s.", id, errload.Error())
 				}
 			}(fileInfo.Name())
 		}
@@ -365,8 +397,9 @@ func (m *metadataManager) loadPartitions() (err error) {
 	return
 }
 
-func (m *metadataManager) attachPartition(id uint64, partition MetaPartition) (err error) {
+func (m *metadataManager) attachPartition(id uint64, partition *MetaPartition) (err error) {
 	fmt.Println(fmt.Sprintf("start load metaPartition %v", id))
+	partition.ForceSetMetaPartitionToLoadding()
 	if err = partition.Start(); err != nil {
 		log.LogErrorf("load meta partition %v fail: %v", id, err)
 		return
@@ -381,7 +414,8 @@ func (m *metadataManager) attachPartition(id uint64, partition MetaPartition) (e
 func (m *metadataManager) detachPartition(id uint64) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, has := m.partitions[id]; has {
+	if mp, has := m.partitions[id]; has {
+		log.LogIfNotNil(mp.Reset())
 		delete(m.partitions, id)
 	} else {
 		err = fmt.Errorf("unknown partition: %d", id)
@@ -406,8 +440,22 @@ func (m *metadataManager) createPartition(request *proto.CreateMetaPartitionRequ
 		RaftStore:   m.raftStore,
 		NodeId:      m.nodeId,
 		RootDir:     path.Join(m.rootDir, partitionPrefix+partitionId),
-		ConnPool:    m.connPool,
+
+		ConnPool: m.connPool,
 	}
+
+	// only allow to create MetaTypeMemory/ MetaTypeRocks mp
+	if mpc.StoreType == proto.MetaTypeRocks {
+		rocksPath, err := util.SelectDisk(m.rocksDirs)
+		if err != nil {
+			return err
+		}
+		mpc.RocksDir = partitionPrefixPath(rocksPath, partitionId)
+	} else {
+		log.LogDebugf("====xxx===createMetaPartition: %v\n", mpc)
+		//mpc.StoreType = proto.MetaTypeMemory
+	}
+
 	mpc.AfterStop = func() {
 		m.detachPartition(request.PartitionID)
 	}
@@ -417,7 +465,11 @@ func (m *metadataManager) createPartition(request *proto.CreateMetaPartitionRequ
 		return
 	}
 
-	partition := NewMetaPartition(mpc, m)
+	partition, err := NewMetaPartition(mpc, m)
+	if err != nil {
+		err = errors.NewErrorf("[createPartition]->%s", err.Error())
+		return
+	}
 	if err = partition.PersistMetadata(); err != nil {
 		err = errors.NewErrorf("[createPartition]->%s", err.Error())
 		return
@@ -461,7 +513,7 @@ func (m *metadataManager) expiredPartition(id uint64) (err error) {
 }
 
 // Range scans all the meta partitions.
-func (m *metadataManager) Range(f func(i uint64, p MetaPartition) bool) {
+func (m *metadataManager) Range(f func(i uint64, p *MetaPartition) bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for k, v := range m.partitions {
@@ -472,7 +524,7 @@ func (m *metadataManager) Range(f func(i uint64, p MetaPartition) bool) {
 }
 
 // GetPartition returns the meta partition with the given ID.
-func (m *metadataManager) GetPartition(id uint64) (mp MetaPartition, err error) {
+func (m *metadataManager) GetPartition(id uint64) (mp *MetaPartition, err error) {
 	mp, err = m.getPartition(id)
 	return
 }
@@ -485,13 +537,14 @@ func (m *metadataManager) MarshalJSON() (data []byte, err error) {
 }
 
 // NewMetadataManager returns a new metadata manager.
-func NewMetadataManager(conf MetadataManagerConfig, metaNode *MetaNode) MetadataManager {
+func NewMetadataManager(metaNode *MetaNode) *metadataManager {
 	return &metadataManager{
-		nodeId:     conf.NodeID,
-		zoneName:   conf.ZoneName,
-		rootDir:    conf.RootDir,
-		raftStore:  conf.RaftStore,
-		partitions: make(map[uint64]MetaPartition),
+		nodeId:     metaNode.nodeId,
+		zoneName:   metaNode.zoneName,
+		rootDir:    metaNode.metadataDir,
+		rocksDirs:  metaNode.rocksDirs,
+		raftStore:  metaNode.raftStore,
+		partitions: make(map[uint64]*MetaPartition),
 		metaNode:   metaNode,
 	}
 }

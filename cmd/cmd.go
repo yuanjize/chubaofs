@@ -78,12 +78,6 @@ const (
 )
 
 var (
-	CommitID   string
-	BranchName string
-	BuildTime  string
-)
-
-var (
 	configFile       = flag.String("c", "", "config file path")
 	configVersion    = flag.Bool("v", false, "show version")
 	configForeground = flag.Bool("f", false, "run foreground")
@@ -124,7 +118,7 @@ func modifyOpenFiles() (err error) {
 func main() {
 	flag.Parse()
 
-	Version := proto.DumpVersion("Server",BranchName,CommitID,BuildTime)
+	Version := proto.DumpVersion("Server")
 	if *configVersion {
 		fmt.Printf("%v", Version)
 		os.Exit(0)

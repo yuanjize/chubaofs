@@ -15,13 +15,9 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/chubaofs/chubaofs/cli/api"
 	"github.com/chubaofs/chubaofs/metanode"
-	"github.com/chubaofs/chubaofs/proto"
 	"github.com/spf13/cobra"
-	"reflect"
-	"strconv"
 )
 
 const (
@@ -47,128 +43,131 @@ const (
 )
 
 func newMetaCompatibilityCmd() *cobra.Command {
-	var cmd = &cobra.Command{
-		Use:     CliOpMetaCompatibility,
-		Short:   cmdMetaCompatibilityShort,
-		Aliases: []string{"meta"},
-		Args:    cobra.MinimumNArgs(3),
-		Run: func(cmd *cobra.Command, args []string) {
-			var err error
-			var (
-				snapshotPath = args[0]
-				host         = args[1]
-				pid          = args[2]
-			)
-			client := api.NewMetaHttpClient(host, false)
-			defer func() {
-				if err != nil {
-					errout("Verify metadata consistency failed: %v\n", err)
-				}
-			}()
-			id, err := strconv.ParseUint(pid, 10, 64)
-			if err != nil {
-				errout("parse pid[%v] failed: %v\n", pid, err)
-				return
-			}
-			cursor, err := client.GetMetaPartition(id)
-			if err != nil {
-				return
-			}
-			mpcfg := &metanode.MetaPartitionConfig{
-				Cursor:      cursor,
-				PartitionId: id,
-			}
-			mp := metanode.NewMetaPartition(mpcfg, nil)
-			err = mp.LoadSnapshot(snapshotPath)
-			if err != nil {
-				return
-			}
-			stdout("[Meta partition is %v, verify result]\n", id)
-			if err = verifyDentry(client, mp); err != nil {
-				stdout("%v\n", err)
-				return
-			}
-			if err = verifyInode(client, mp); err != nil {
-				stdout("%v\n", err)
-				return
-			}
-			stdout("All meta has checked\n")
-		},
-	}
-	return cmd
+	panic("TODO")
+	//var cmd = &cobra.Command{
+	//	Use:     CliOpMetaCompatibility,
+	//	Short:   cmdMetaCompatibilityShort,
+	//	Aliases: []string{"meta"},
+	//	Args:    cobra.MinimumNArgs(3),
+	//	Run: func(cmd *cobra.Command, args []string) {
+	//		var err error
+	//		var (
+	//			snapshotPath = args[0]
+	//			host         = args[1]
+	//			pid          = args[2]
+	//		)
+	//		client := api.NewMetaHttpClient(host, false)
+	//		defer func() {
+	//			if err != nil {
+	//				errout("Verify metadata consistency failed: %v\n", err)
+	//			}
+	//		}()
+	//		id, err := strconv.ParseUint(pid, 10, 64)
+	//		if err != nil {
+	//			errout("parse pid[%v] failed: %v\n", pid, err)
+	//			return
+	//		}
+	//		cursor, err := client.GetMetaPartition(id)
+	//		if err != nil {
+	//			return
+	//		}
+	//		mpcfg := &metanode.MetaPartitionConfig{
+	//			Cursor:      cursor,
+	//			PartitionId: id,
+	//		}
+	//		mp := metanode.NewMetaPartition(mpcfg, nil)
+	//		err = mp.LoadSnapshot(snapshotPath)
+	//		if err != nil {
+	//			return
+	//		}
+	//		stdout("[Meta partition is %v, verify result]\n", id)
+	//		if err = verifyDentry(client, mp); err != nil {
+	//			stdout("%v\n", err)
+	//			return
+	//		}
+	//		if err = verifyInode(client, mp); err != nil {
+	//			stdout("%v\n", err)
+	//			return
+	//		}
+	//		stdout("All meta has checked\n")
+	//	},
+	//}
+	//return cmd
 }
 
 func verifyDentry(client *api.MetaHttpClient, mp metanode.MetaPartition) (err error) {
-	dentryMap, err := client.GetAllDentry(mp.GetBaseConfig().PartitionId)
-	if err != nil {
-		return
-	}
-	mp.GetDentryTree().Ascend(func(d metanode.BtreeItem) bool {
-		dentry, ok := d.(*metanode.Dentry)
-		if !ok {
-			stdout("item type is not *metanode.Dentry")
-			err = fmt.Errorf("item type is not *metanode.Dentry")
-			return false
-		}
-		key := fmt.Sprintf("%v_%v", dentry.ParentId, dentry.Name)
-		oldDentry, ok := dentryMap[key]
-		if !ok {
-			stdout("dentry %v is not in old version", key)
-			err = fmt.Errorf("dentry %v is not in old version", key)
-			return false
-		}
-		if !reflect.DeepEqual(dentry, oldDentry) {
-			stdout("dentry %v is not equal with old version", key)
-			err = fmt.Errorf("dentry %v is not equal with old version,dentry[%v],oldDentry[%v]", key, dentry, oldDentry)
-			return false
-		}
-		return true
-	})
-	stdout("The number of dentry is %v, all dentry are consistent \n", mp.GetDentryTree().Len())
-	return
+	panic("TODO")
+	//dentryMap, err := client.GetAllDentry(mp.GetBaseConfig().PartitionId)
+	//if err != nil {
+	//	return
+	//}
+	//mp.GetDentryTree().Ascend(func(d metanode.BtreeItem) bool {
+	//	dentry, ok := d.(*metanode.Dentry)
+	//	if !ok {
+	//		stdout("item type is not *metanode.Dentry")
+	//		err = fmt.Errorf("item type is not *metanode.Dentry")
+	//		return false
+	//	}
+	//	key := fmt.Sprintf("%v_%v", dentry.ParentId, dentry.Name)
+	//	oldDentry, ok := dentryMap[key]
+	//	if !ok {
+	//		stdout("dentry %v is not in old version", key)
+	//		err = fmt.Errorf("dentry %v is not in old version", key)
+	//		return false
+	//	}
+	//	if !reflect.DeepEqual(dentry, oldDentry) {
+	//		stdout("dentry %v is not equal with old version", key)
+	//		err = fmt.Errorf("dentry %v is not equal with old version,dentry[%v],oldDentry[%v]", key, dentry, oldDentry)
+	//		return false
+	//	}
+	//	return true
+	//})
+	//stdout("The number of dentry is %v, all dentry are consistent \n", mp.GetDentryTree().Len())
+	//return
 }
 
 func verifyInode(client *api.MetaHttpClient, mp metanode.MetaPartition) (err error) {
-	inodesMap, err := client.GetAllInodes(mp.GetBaseConfig().PartitionId)
-	if err != nil {
-		return
-	}
-	var localInode *metanode.Inode
-	mp.GetInodeTree().Ascend(func(d metanode.BtreeItem) bool {
-		inode, ok := d.(*metanode.Inode)
-		if !ok {
-			return true
-		}
-		oldInode, ok := inodesMap[inode.Inode]
-		if !ok {
-			stdout("inode %v is not in old version \n", inode.Inode)
-			return true
-		}
-		localInode = &metanode.Inode{
-			Inode:      inode.Inode,
-			Type:       inode.Type,
-			Uid:        inode.Uid,
-			Gid:        inode.Gid,
-			Size:       inode.Size,
-			Generation: inode.Generation,
-			CreateTime: inode.CreateTime,
-			AccessTime: inode.AccessTime,
-			ModifyTime: inode.ModifyTime,
-			LinkTarget: inode.LinkTarget,
-			NLink:      inode.NLink,
-			Flag:       inode.Flag,
-			Reserved:   inode.Reserved,
-			Extents:    metanode.NewSortedExtents(),
-		}
-		inode.Extents.Range(func(ek proto.ExtentKey) bool {
-			localInode.Extents.Append(ek)
-			return true
-		})
-		if !reflect.DeepEqual(oldInode, localInode) {
-			stdout("inode %v is not equal with old version,inode[%v],oldInode[%v]\n", inode.Inode, inode, oldInode)
-		}
-		return true
-	})
-	stdout("The number of inodes is %v, all inodes are consistent \n", mp.GetInodeTree().Len())
-	return
+	panic("TODO")
+	//inodesMap, err := client.GetAllInodes(mp.GetBaseConfig().PartitionId)
+	//if err != nil {
+	//	return
+	//}
+	//var localInode *metanode.Inode
+	//mp.GetInodeTree().Ascend(func(d metanode.BtreeItem) bool {
+	//	inode, ok := d.(*metanode.Inode)
+	//	if !ok {
+	//		return true
+	//	}
+	//	oldInode, ok := inodesMap[inode.Inode]
+	//	if !ok {
+	//		stdout("inode %v is not in old version \n", inode.Inode)
+	//		return true
+	//	}
+	//	localInode = &metanode.Inode{
+	//		Inode:      inode.Inode,
+	//		Type:       inode.Type,
+	//		Uid:        inode.Uid,
+	//		Gid:        inode.Gid,
+	//		Size:       inode.Size,
+	//		Generation: inode.Generation,
+	//		CreateTime: inode.CreateTime,
+	//		AccessTime: inode.AccessTime,
+	//		ModifyTime: inode.ModifyTime,
+	//		LinkTarget: inode.LinkTarget,
+	//		NLink:      inode.NLink,
+	//		Flag:       inode.Flag,
+	//		Reserved:   inode.Reserved,
+	//		Extents:    metanode.NewSortedExtents(),
+	//	}
+	//	inode.Extents.Range(func(ek proto.ExtentKey) bool {
+	//		localInode.Extents.Append(ek)
+	//		return true
+	//	})
+	//	if !reflect.DeepEqual(oldInode, localInode) {
+	//		stdout("inode %v is not equal with old version,inode[%v],oldInode[%v]\n", inode.Inode, inode, oldInode)
+	//	}
+	//	return true
+	//})
+	//stdout("The number of inodes is %v, all inodes are consistent \n", mp.GetInodeTree().Len())
+	//return
 }

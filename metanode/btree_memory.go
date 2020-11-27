@@ -95,6 +95,20 @@ func (i *InodeBTree) GetMaxInode() (uint64, error) {
 	return maxInode, nil
 }
 
+//Has
+func (b *InodeBTree) Has(ino uint64) (bool, error) {
+	return b.tree.Has(&Inode{Inode: ino}), nil
+}
+func (b *DentryBTree) Has(ino uint64, name string) (bool, error) {
+	return b.tree.Has(&Dentry{ParentId: ino, Name: name}), nil
+}
+func (b *ExtendBTree) Has(ino uint64) (bool, error) {
+	return b.tree.Has(&Extend{inode: ino}), nil
+}
+func (b *MultipartBTree) Has(key, id string) (bool, error) {
+	return b.tree.Has(&Multipart{key: key, id: id}), nil
+}
+
 //get
 func (i *InodeBTree) RefGet(ino uint64) (*Inode, error) {
 	item := i.BTree.Get(&Inode{Inode: ino})

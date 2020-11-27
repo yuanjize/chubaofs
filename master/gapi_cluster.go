@@ -89,17 +89,6 @@ func (s *ClusterService) registerObject(schema *schemabuilder.Schema) {
 
 	nv := schema.Object("NodeView", proto.NodeView{})
 
-	nv.FieldFunc("storeType", func(ctx context.Context, n *proto.NodeView) (proto.StoreType, error) {
-		if _, _, err := permissions(ctx, ADMIN); err != nil {
-			return proto.MetaTypeUnKnown, err
-		}
-		if m, err := s.cluster.metaNode(n.Addr); err != nil {
-			return proto.MetaTypeUnKnown, err
-		} else {
-			return m.StoreType, nil
-		}
-	})
-
 	nv.FieldFunc("toMetaNode", func(ctx context.Context, n *proto.NodeView) (*MetaNode, error) {
 		if _, _, err := permissions(ctx, ADMIN); err != nil {
 			return nil, err
@@ -249,14 +238,16 @@ func (m *ClusterService) decommissionDisk(ctx context.Context, args struct {
 
 // Decommission a data node. This will decommission all the data partition on that node.
 func (m *ClusterService) decommissionDataNode(ctx context.Context, args struct {
-	OffLineAddr string
+	OffLineAddr  string
+	DestZoneName string
+	StrictFlag   bool
 }) (*proto.GeneralResp, error) {
 
 	node, err := m.cluster.dataNode(args.OffLineAddr)
 	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.decommissionDataNode(node); err != nil {
+	if err := m.cluster.decommissionDataNode(node, args.DestZoneName, args.StrictFlag); err != nil {
 		return nil, err
 	}
 	rstMsg := fmt.Sprintf("decommission data node [%v] successfully", args.OffLineAddr)
@@ -266,6 +257,7 @@ func (m *ClusterService) decommissionDataNode(ctx context.Context, args struct {
 
 func (m *ClusterService) decommissionMetaNode(ctx context.Context, args struct {
 	OffLineAddr string
+	StrictMode  bool
 }) (*proto.GeneralResp, error) {
 	if _, _, err := permissions(ctx, ADMIN); err != nil {
 		return nil, err
@@ -274,7 +266,7 @@ func (m *ClusterService) decommissionMetaNode(ctx context.Context, args struct {
 	if err != nil {
 		return nil, err
 	}
-	if err = m.cluster.decommissionMetaNode(metaNode); err != nil {
+	if err = m.cluster.decommissionMetaNode(metaNode, args.StrictMode); err != nil {
 		return nil, err
 	}
 	log.LogInfof("decommissionMetaNode metaNode [%v] has offline successfully", args.OffLineAddr)
@@ -308,7 +300,7 @@ func (m *ClusterService) decommissionMetaPartition(ctx context.Context, args str
 	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.decommissionMetaPartition(args.Addr, mp); err != nil {
+	if err := m.cluster.decommissionMetaPartition(args.Addr, mp, getTargetAddressForMetaPartitionDecommission, false); err != nil {
 		return nil, err
 	}
 	rstMsg := fmt.Sprintf(proto.AdminDecommissionMetaPartition+" partitionID :%v  decommissionMetaPartition successfully", args.PartitionID)
@@ -328,7 +320,7 @@ func (m *ClusterService) decommissionDataPartition(ctx context.Context, args str
 	if err != nil {
 		return nil, err
 	}
-	if err := m.cluster.decommissionDataPartition(args.Addr, dp, handleDataPartitionOfflineErr); err != nil {
+	if err := m.cluster.decommissionDataPartition(args.Addr, dp, getTargetAddressForBalanceDataPartitionZone, balanceDataPartitionZoneErr, "", false); err != nil {
 		return nil, err
 	}
 	rstMsg := fmt.Sprintf(proto.AdminDecommissionDataPartition+" dataPartitionID :%v  on node:%v successfully", args.PartitionID, args.Addr)
@@ -369,7 +361,7 @@ func (m *ClusterService) getTopology(ctx context.Context, args struct{}) (*proto
 			ns.dataNodes.Range(func(key, value interface{}) bool {
 				dataNode := value.(*DataNode)
 				nsView.DataNodes = append(nsView.DataNodes,
-					proto.NodeView{ID: dataNode.ID,
+					NodeView{ID: dataNode.ID,
 						Addr:       dataNode.Addr,
 						Status:     dataNode.isActive,
 						IsWritable: dataNode.isWriteAble(),
@@ -379,7 +371,7 @@ func (m *ClusterService) getTopology(ctx context.Context, args struct{}) (*proto
 			ns.metaNodes.Range(func(key, value interface{}) bool {
 				metaNode := value.(*MetaNode)
 				nsView.MetaNodes = append(nsView.MetaNodes,
-					proto.NodeView{ID: metaNode.ID,
+					NodeView{ID: metaNode.ID,
 						Addr:       metaNode.Addr,
 						Status:     metaNode.IsActive,
 						IsWritable: metaNode.isWritable(),
@@ -494,7 +486,7 @@ func (m *ClusterService) addMetaNode(ctx context.Context, args struct {
 	ZoneName  string
 	StoreType proto.StoreType
 }) (uint64, error) {
-	if id, err := m.cluster.addMetaNode(args.NodeAddr, args.ZoneName, args.StoreType); err != nil {
+	if id, err := m.cluster.addMetaNode(args.NodeAddr, args.ZoneName); err != nil {
 		return 0, err
 	} else {
 		return id, nil
@@ -522,13 +514,14 @@ func (m *ClusterService) addMetaReplica(ctx context.Context, args struct {
 func (m *ClusterService) deleteMetaReplica(ctx context.Context, args struct {
 	PartitionID uint64
 	Addr        string
+	StrictMode  bool
 }) (*proto.GeneralResp, error) {
 	mp, err := m.cluster.getMetaPartitionByID(args.PartitionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = m.cluster.deleteMetaReplica(mp, args.Addr, true); err != nil {
+	if err = m.cluster.deleteMetaReplica(mp, args.Addr, true, args.StrictMode); err != nil {
 		return nil, err
 	}
 	mp.IsRecover = true
@@ -559,6 +552,7 @@ func (m *ClusterService) addDataReplica(ctx context.Context, args struct {
 func (m *ClusterService) deleteDataReplica(ctx context.Context, args struct {
 	PartitionID uint64
 	Addr        string
+	StrictMode  bool
 }) (*proto.GeneralResp, error) {
 
 	dp, err := m.cluster.getDataPartitionByID(args.PartitionID)
@@ -566,7 +560,7 @@ func (m *ClusterService) deleteDataReplica(ctx context.Context, args struct {
 		return nil, err
 	}
 
-	if err = m.cluster.removeDataReplica(dp, args.Addr, true); err != nil {
+	if err = m.cluster.removeDataReplica(dp, args.Addr, true, args.StrictMode); err != nil {
 		return nil, err
 	}
 	msg := fmt.Sprintf("data partitionID :%v  delete replica [%v] successfully", args.PartitionID, args.Addr)

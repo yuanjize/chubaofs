@@ -18,14 +18,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
+	"runtime"
+	"strconv"
+
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util"
 	"github.com/chubaofs/chubaofs/util/errors"
 	"github.com/chubaofs/chubaofs/util/log"
 	raftProto "github.com/tiglabs/raft/proto"
-	"net"
-	"os"
-	"runtime"
 )
 
 const (
@@ -42,6 +45,7 @@ func (m *metadataManager) opMasterHeartbeat(conn net.Conn, p *Packet,
 		adminTask = &proto.AdminTask{
 			Request: req,
 		}
+		readOnlyPartitions = make(map[uint64]bool)
 	)
 	decode := json.NewDecoder(bytes.NewBuffer(p.Data))
 	decode.UseNumber()
@@ -54,22 +58,57 @@ func (m *metadataManager) opMasterHeartbeat(conn net.Conn, p *Packet,
 	// collect memory info
 	resp.Total = configTotalMem
 	resp.Used, err = util.GetProcessMemory(os.Getpid())
+
+	if resp.StoreType == proto.MetaTypeRocks {
+		for _, rd := range m.rocksDirs {
+			if total, used, err := util.GetDiskInfo(rd); err != nil {
+				log.LogErrorf("get disk info by path:[%s] has err:[%s]", m.rootDir, err.Error())
+			} else {
+				resp.DiskTotal += total
+				resp.DiskUsed += used
+
+				if total-used < util.GB {
+					//find all partitionID
+					dirs, _ := ioutil.ReadDir(rd)
+
+					for _, dir := range dirs {
+						if dir.IsDir() {
+							fileName := dir.Name()
+							if len(fileName) < 10 {
+								log.LogWarnf("ignore unknown partition dir: %s", fileName)
+								continue
+							}
+							partitionId := fileName[len(partitionPrefix):]
+							if id, err := strconv.ParseUint(partitionId, 10, 64); err != nil {
+								log.LogWarnf("ignore path: %s,not partition", partitionId)
+							} else {
+								readOnlyPartitions[id] = true
+							}
+
+						}
+
+					}
+
+				}
+			}
+		}
+	}
+
 	if err != nil {
 		adminTask.Status = proto.TaskFailed
 		goto end
 	}
-	m.Range(func(id uint64, partition MetaPartition) bool {
+	m.Range(func(id uint64, partition *MetaPartition) bool {
 		mConf := partition.GetBaseConfig()
 		mpr := &proto.MetaPartitionReport{
 			PartitionID: mConf.PartitionId,
 			Start:       mConf.Start,
 			End:         mConf.End,
 			Status:      proto.ReadWrite,
-			MaxInodeID:  mConf.Cursor,
+			StoreType:   mConf.StoreType,
 			VolName:     mConf.VolName,
-			InodeCnt:    uint64(partition.GetInodeTree().Len()),
-			DentryCnt:   uint64(partition.GetDentryTree().Len()),
-			IsLearner:   partition.IsLearner(),
+			InodeCnt:    uint64(partition.inodeTree.Count()),
+			DentryCnt:   uint64(partition.dentryTree.Count()),
 		}
 		addr, isLeader := partition.IsLeader()
 		if addr == "" {
@@ -79,9 +118,15 @@ func (m *metadataManager) opMasterHeartbeat(conn net.Conn, p *Packet,
 		if mConf.Cursor >= mConf.End {
 			mpr.Status = proto.ReadOnly
 		}
+
 		if resp.Used > uint64(float64(resp.Total)*MaxUsedMemFactor) {
 			mpr.Status = proto.ReadOnly
 		}
+
+		if readOnlyPartitions[mpr.PartitionID] {
+			mpr.Status = proto.ReadOnly
+		}
+
 		resp.MetaPartitionReports = append(resp.MetaPartitionReports, mpr)
 		return true
 	})
@@ -197,7 +242,7 @@ func (m *metadataManager) opFreeInodeOnRaftFollower(conn net.Conn, p *Packet,
 		err = errors.NewErrorf("[%v],err[%v]", p.GetOpMsgWithReqAndResult(), string(p.Data))
 		return
 	}
-	mp.(*metaPartition).internalDelete(p.Data[:p.Size])
+	mp.internalDelete(p.Data[:p.Size])
 	p.PacketOkReply()
 	m.respondToClient(conn, p)
 
@@ -1147,7 +1192,7 @@ func (m *metadataManager) opMetaCursorReset(conn net.Conn, p *Packet, remoteAddr
 	if !m.serveProxy(conn, mp, p) {
 		return nil
 	}
-	if _, err = mp.(*metaPartition).CursorReset(req); err != nil {
+	if _, err = mp.CursorReset(req); err != nil {
 		p.PacketErrorWithBody(proto.OpErr, ([]byte)(err.Error()))
 	} else {
 		p.PacketOkReply()

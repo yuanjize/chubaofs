@@ -85,6 +85,7 @@ type Tree interface {
 
 type InodeTree interface {
 	Tree
+	Has(ino uint64) (bool, error)
 	RefGet(ino uint64) (*Inode, error)
 	Get(ino uint64) (*Inode, error)
 	Put(inode *Inode) error
@@ -99,6 +100,7 @@ type InodeTree interface {
 
 type DentryTree interface {
 	Tree
+	Has(ino uint64, name string) (bool, error)
 	RefGet(ino uint64, name string) (*Dentry, error)
 	Get(ino uint64, name string) (*Dentry, error)
 	Put(dentry *Dentry) error
@@ -111,6 +113,7 @@ type DentryTree interface {
 
 type ExtendTree interface {
 	Tree
+	Has(ino uint64) (bool, error)
 	RefGet(ino uint64) (*Extend, error)
 	Get(ino uint64) (*Extend, error)
 	Put(extend *Extend) error
@@ -121,9 +124,9 @@ type ExtendTree interface {
 	RealCount() uint64
 	Count() uint64
 }
-
 type MultipartTree interface {
 	Tree
+	Has(key, id string) (bool, error)
 	RefGet(key, id string) (*Multipart, error)
 	Get(key, id string) (*Multipart, error)
 	Put(mutipart *Multipart) error

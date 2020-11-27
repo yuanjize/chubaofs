@@ -193,7 +193,7 @@ func (mp *MetaPartition) confAddLearner(req *proto.AddMetaPartitionRaftLearnerRe
 	return
 }
 
-func (mp *metaPartition) confPromoteLearner(req *proto.PromoteMetaPartitionRaftLearnerRequest, index uint64) (updated bool, err error) {
+func (mp *MetaPartition) confPromoteLearner(req *proto.PromoteMetaPartitionRaftLearnerRequest, index uint64) (updated bool, err error) {
 	var promoteIndex int
 	for i, learner := range mp.config.Learners {
 		if learner.ID == req.PromoteLearner.ID {
@@ -208,7 +208,7 @@ func (mp *metaPartition) confPromoteLearner(req *proto.PromoteMetaPartitionRaftL
 	return
 }
 
-func (mp *metaPartition) confUpdateNode(req *proto.MetaPartitionDecommissionRequest,
+func (mp *MetaPartition) confUpdateNode(req *proto.MetaPartitionDecommissionRequest,
 	index uint64) (updated bool, err error) {
 	return
 }
@@ -263,7 +263,7 @@ func (mp *MetaPartition) setExtentDeleteFileCursor(buf []byte) (err error) {
 	return
 }
 
-func (mp *metaPartition) CanRemoveRaftMember(peer proto.Peer) error {
+func (mp *MetaPartition) CanRemoveRaftMember(peer proto.Peer) error {
 	for _, learner := range mp.config.Learners {
 		if peer.ID == learner.ID && peer.Addr == learner.Addr {
 			return nil

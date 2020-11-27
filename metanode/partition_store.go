@@ -48,8 +48,8 @@ const (
 	metadataFileTmp = ".meta"
 )
 
-func (mp *MetaPartition) loadMetadata() (err error) {
-	metaFile := path.Join(mp.config.RootDir, metadataFile)
+func loadMetadata(config *MetaPartitionConfig) (err error) {
+	metaFile := path.Join(config.RootDir, metadataFile)
 	fp, err := os.OpenFile(metaFile, os.O_RDONLY, 0644)
 	if err != nil {
 		err = errors.NewErrorf("[loadMetadata]: OpenFile %s", err.Error())
@@ -74,18 +74,17 @@ func (mp *MetaPartition) loadMetadata() (err error) {
 	if mConf.checkMeta() != nil {
 		return
 	}
-	mp.config.PartitionId = mConf.PartitionId
-	mp.config.VolName = mConf.VolName
-	mp.config.Start = mConf.Start
-	mp.config.End = mConf.End
-	mp.config.Peers = mConf.Peers
-	mp.config.Learners = mConf.Learners
-	mp.config.Cursor = mp.config.Start
-	mp.config.MaxInode = mp.config.MaxInode
-	mp.config.StoreType = mConf.StoreType
+	config.PartitionId = mConf.PartitionId
+	config.VolName = mConf.VolName
+	config.Start = mConf.Start
+	config.End = mConf.End
+	config.Peers = mConf.Peers
+	config.Learners = mConf.Learners
+	config.Cursor = config.Start
+	config.StoreType = mConf.StoreType
 
 	log.LogInfof("loadMetadata: load complete: partitionID(%v) volume(%v) range(%v,%v) cursor(%v) storeType(%v)",
-		mp.config.PartitionId, mp.config.VolName, mp.config.Start, mp.config.End, mp.config.Cursor, mp.config.StoreType)
+		config.PartitionId, config.VolName, config.Start, config.End, config.Cursor, config.StoreType)
 	return
 }
 
@@ -146,9 +145,6 @@ func (mp *MetaPartition) loadInode(rootDir string) (err error) {
 			mp.config.Cursor = ino.Inode
 		}
 
-		if mp.config.MaxInode < ino.Inode {
-			mp.config.MaxInode = ino.Inode
-		}
 		numInodes += 1
 	}
 }

@@ -57,9 +57,6 @@ func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		if mp.config.Cursor < ino.Inode {
 			mp.config.Cursor = ino.Inode
 		}
-		if mp.config.MaxInode < ino.Inode {
-			mp.config.MaxInode = ino.Inode
-		}
 		resp = mp.fsmCreateInode(ino)
 	case opFSMUnlinkInode:
 		ino := NewInode(0, 0)
@@ -115,7 +112,7 @@ func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		if err = den.Unmarshal(msg.V); err != nil {
 			return
 		}
-		resp = mp.fsmDeleteDentry(den, false)
+		resp = mp.fsmDeleteDentry(den)
 	case opFSMDeleteDentryBatch:
 		db, err := DentryBatchUnmarshal(msg.V)
 		if err != nil {
@@ -186,9 +183,6 @@ func (mp *MetaPartition) Apply(command []byte, index uint64) (resp interface{}, 
 		cursor = binary.BigEndian.Uint64(msg.V)
 		if cursor > mp.config.Cursor {
 			mp.config.Cursor = cursor
-		}
-		if cursor > mp.config.MaxInode {
-			mp.config.MaxInode = cursor
 		}
 	}
 
@@ -316,7 +310,6 @@ func (mp *MetaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.Sn
 			mp.extendTree = extendTree
 			mp.multipartTree = multipartTree
 			mp.config.Cursor = cursor
-			mp.config.MaxInode = cursor
 			err = nil
 			// store message
 			mp.storeChan <- &storeMsg{

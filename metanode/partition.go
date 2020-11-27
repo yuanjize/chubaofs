@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/chubaofs/chubaofs/cmd/common"
 	"github.com/chubaofs/chubaofs/proto"
@@ -65,9 +66,10 @@ type MetaPartitionConfig struct {
 	// Identity for raftStore group. RaftStore nodes in the same raftStore group must have the same groupID.
 	PartitionId uint64              `json:"partition_id"`
 	VolName     string              `json:"vol_name"`
-	Start       uint64              `json:"start"`    // Minimal Inode ID of this range. (Required during initialization)
-	End         uint64              `json:"end"`      // Maximal Inode ID of this range. (Required during initialization)
-	Peers       []proto.Peer        `json:"peers"`    // Peers information of the raftStore
+	Start       uint64              `json:"start"` // Minimal Inode ID of this range. (Required during initialization)
+	End         uint64              `json:"end"`   // Maximal Inode ID of this range. (Required during initialization)
+	Peers       []proto.Peer        `json:"peers"` // Peers information of the raftStore
+	StoreType   proto.StoreType     `json:"store_type"`
 	Learners    []proto.Learner     `json:"learners"` // Learners information of the raftStore
 	Cursor      uint64              `json:"-"`        // Cursor ID of the inode that have been assigned
 	NodeId      uint64              `json:"-"`
@@ -226,6 +228,7 @@ func (mp *MetaPartition) startRaft() (err error) {
 		heartbeatPort int
 		replicaPort   int
 		peers         []raftstore.PeerAddress
+		learners      []raftproto.Learner
 	)
 	if heartbeatPort, replicaPort, err = mp.getRaftPort(); err != nil {
 		return
@@ -381,7 +384,7 @@ func (mp *MetaPartition) IsLeader() (leaderAddr string, ok bool) {
 	return
 }
 
-func (mp *metaPartition) IsLearner() bool {
+func (mp *MetaPartition) IsLearner() bool {
 	for _, learner := range mp.config.Learners {
 		if mp.config.NodeId == learner.ID {
 			return true
@@ -421,8 +424,16 @@ func (mp *MetaPartition) GetInodeTree() InodeTree {
 	return mp.inodeTree
 }
 
+func (mp *MetaPartition) GetMultipartTree() MultipartTree {
+	return mp.multipartTree
+}
+
+func (mp *MetaPartition) GetExtendTree() ExtendTree {
+	return mp.extendTree
+}
+
 func (mp *MetaPartition) LoadSnapshot(snapshotPath string) (err error) {
-	if err = mp.loadMetadata(); err != nil {
+	if err = loadMetadata(mp.config); err != nil {
 		return
 	}
 
@@ -435,7 +446,6 @@ func (mp *MetaPartition) LoadSnapshot(snapshotPath string) (err error) {
 			return err
 		} else {
 			mp.config.Cursor = maxID
-			mp.config.MaxInode = maxID
 		}
 		return err
 	}
@@ -457,7 +467,7 @@ func (mp *MetaPartition) LoadSnapshot(snapshotPath string) (err error) {
 }
 
 func (mp *MetaPartition) load() (err error) {
-	if err = mp.loadMetadata(); err != nil {
+	if err = loadMetadata(mp.config); err != nil {
 		return
 	}
 	return mp.LoadSnapshot(path.Join(mp.config.RootDir, snapshotDir))
@@ -548,7 +558,7 @@ func (mp *MetaPartition) DeleteRaft() (err error) {
 }
 
 // ExpiredRaft deletes the raft partition.
-func (mp *metaPartition) ExpiredRaft() (err error) {
+func (mp *MetaPartition) ExpiredRaft() (err error) {
 	err = mp.raftPartition.Expired()
 	return
 }
@@ -610,7 +620,7 @@ func (mp *MetaPartition) DecommissionPartition(req []byte) (err error) {
 	return
 }
 
-func (mp *MetaPartition) IsExsitPeer(peer proto.Peer) bool {
+func (mp *MetaPartition) IsExistPeer(peer proto.Peer) bool {
 	for _, hasExsitPeer := range mp.config.Peers {
 		if hasExsitPeer.Addr == peer.Addr && hasExsitPeer.ID == peer.ID {
 			return true
@@ -619,7 +629,7 @@ func (mp *MetaPartition) IsExsitPeer(peer proto.Peer) bool {
 	return false
 }
 
-func (mp *metaPartition) IsExistLearner(learner proto.Learner) bool {
+func (mp *MetaPartition) IsExistLearner(learner proto.Learner) bool {
 	var existPeer bool
 	for _, hasExistPeer := range mp.config.Peers {
 		if hasExistPeer.Addr == learner.Addr && hasExistPeer.ID == learner.ID {
@@ -650,11 +660,6 @@ func (mp *MetaPartition) ResponseLoadMetaPartition(p *Packet) (err error) {
 	resp.DentryCount = uint64(mp.dentryTree.Count())
 	resp.ApplyID = mp.applyID
 	resp.StoreType = mp.config.StoreType
-	if err != nil {
-		err = errors.Trace(err,
-			"[ResponseLoadMetaPartition] check snapshot")
-		return
-	}
 
 	data, err := json.Marshal(resp)
 	if err != nil {
@@ -679,7 +684,6 @@ func (mp *MetaPartition) Reset() (err error) {
 	mp.multipartTree.Release()
 
 	mp.config.Cursor = 0
-	mp.config.MaxInode = 0
 
 	mp.applyID = 0
 
@@ -695,7 +699,7 @@ func (mp *MetaPartition) Reset() (err error) {
 	return
 }
 
-func (mp *metaPartition) Expired() (err error) {
+func (mp *MetaPartition) Expired() (err error) {
 	mp.stop()
 	if mp.delInodeFp != nil {
 		// TODO Unhandled errors
@@ -703,8 +707,6 @@ func (mp *metaPartition) Expired() (err error) {
 		mp.delInodeFp.Close()
 	}
 
-	mp.inodeTree.Reset()
-	mp.dentryTree.Reset()
 	mp.config.Cursor = 0
 	mp.applyID = 0
 
@@ -723,7 +725,7 @@ func (mp *metaPartition) Expired() (err error) {
 }
 
 //
-func (mp *metaPartition) canRemoveSelf() (canRemove bool, err error) {
+func (mp *MetaPartition) canRemoveSelf() (canRemove bool, err error) {
 	var partition *proto.MetaPartitionInfo
 	if partition, err = masterClient.ClientAPI().GetMetaPartition(mp.config.PartitionId); err != nil {
 		log.LogErrorf("action[canRemoveSelf] err[%v]", err)

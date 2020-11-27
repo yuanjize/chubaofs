@@ -19,9 +19,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/chubaofs/chubaofs/proto"
 	"io"
 	"sync"
+	"time"
+
+	"github.com/chubaofs/chubaofs/proto"
 )
 
 const (
@@ -270,6 +272,7 @@ func (i *Inode) MarshalValue() (val []byte) {
 	buff := bytes.NewBuffer(make([]byte, 0, 128))
 	buff.Grow(64)
 	i.RLock()
+	defer i.RUnlock()
 	if err = binary.Write(buff, binary.BigEndian, &i.Type); err != nil {
 		panic(err)
 	}
@@ -312,17 +315,19 @@ func (i *Inode) MarshalValue() (val []byte) {
 	if err = binary.Write(buff, binary.BigEndian, &i.Reserved); err != nil {
 		panic(err)
 	}
-	// marshal ExtentsKey
-	extData, err := i.Extents.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-	if _, err = buff.Write(extData); err != nil {
-		panic(err)
+	if i.Extents != nil {
+		// marshal ExtentsKey
+		extData, err := i.Extents.MarshalBinary()
+		if err != nil {
+			panic(err)
+		}
+		if _, err = buff.Write(extData); err != nil {
+			panic(err)
+		}
 	}
 
 	val = buff.Bytes()
-	i.RUnlock()
+	//i.RUnlock()
 	return
 }
 
@@ -374,13 +379,16 @@ func (i *Inode) UnmarshalValue(val []byte) (err error) {
 	if err = binary.Read(buff, binary.BigEndian, &i.Reserved); err != nil {
 		return
 	}
-	if buff.Len() == 0 {
-		return
-	}
+
 	// unmarshal ExtentsKey
 	if i.Extents == nil {
 		i.Extents = NewSortedExtents()
 	}
+
+	if buff.Len() == 0 {
+		return
+	}
+
 	if err = i.Extents.UnmarshalBinary(buff.Bytes()); err != nil {
 		return
 	}
@@ -390,6 +398,10 @@ func (i *Inode) UnmarshalValue(val []byte) (err error) {
 // AppendExtents append the extent to the btree.
 func (i *Inode) AppendExtents(eks []proto.ExtentKey, ct int64) (delExtents []proto.ExtentKey) {
 	i.Lock()
+	defer i.Unlock()
+	if i.Extents == nil {
+		i.Extents = NewSortedExtents()
+	}
 	for _, ek := range eks {
 		delItems := i.Extents.Append(ek)
 		size := i.Extents.Size()
@@ -400,7 +412,6 @@ func (i *Inode) AppendExtents(eks []proto.ExtentKey, ct int64) (delExtents []pro
 	}
 	i.Generation++
 	i.ModifyTime = ct
-	i.Unlock()
 	return
 }
 
@@ -462,10 +473,24 @@ func (i *Inode) SetDeleteMark() {
 }
 
 // ShouldDelete returns if the inode has been marked as deleted.
-func (i *Inode) ShouldDelete() bool {
+func (i *Inode) ShouldDelete() (ok bool) {
 	i.RLock()
-	defer i.RUnlock()
-	return i.Flag&DeleteMarkFlag == DeleteMarkFlag
+	ok = i.Flag&DeleteMarkFlag == DeleteMarkFlag
+	i.RUnlock()
+	return
+}
+
+// inode should delay remove if as 3 conditions:
+// 1. DeleteMarkFlag is unset
+// 2. NLink == 0
+// 3. AccessTime is 7 days ago
+func (i *Inode) ShouldDelayDelete() (ok bool) {
+	i.RLock()
+	ok = (i.Flag&DeleteMarkFlag != DeleteMarkFlag) &&
+		(i.NLink == 0) &&
+		time.Now().Unix()-i.AccessTime < InodeNLink0DelayDeleteSeconds
+	i.RUnlock()
+	return
 }
 
 // SetAttr sets the attributes of the inode.

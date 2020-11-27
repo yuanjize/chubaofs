@@ -74,13 +74,6 @@ const (
 
 
 var (
-	CommitID   string
-	BranchName string
-	BuildTime  string
-)
-
-
-var (
 	configFile       = flag.String("c", "", "FUSE client config file")
 	configVersion    = flag.Bool("v", false, "show version")
 	configForeground = flag.Bool("f", false, "run foreground")
@@ -97,7 +90,7 @@ func main() {
 	flag.Parse()
 
 	if *configVersion {
-		fmt.Print(proto.DumpVersion(Role,BranchName,CommitID,BuildTime))
+		fmt.Print(proto.DumpVersion(Role))
 		os.Exit(0)
 	}
 
@@ -149,7 +142,7 @@ func main() {
 	}()
 	syslog.SetOutput(outputFile)
 
-	syslog.Println(dumpVersion())
+	syslog.Println(proto.DumpVersion(Role))
 	syslog.Println("*** Final Mount Options ***")
 	for _, o := range GlobalMountOptions {
 		syslog.Println(o)
@@ -197,10 +190,6 @@ func main() {
 		syslog.Printf("fs Serve returns err(%v)\n", err)
 		os.Exit(1)
 	}
-}
-
-func dumpVersion() string {
-	return fmt.Sprintf("ChubaoFS Client\nBranch: %s\nCommit: %s\nBuild: %s %s %s %s\n", BranchName, CommitID, runtime.Version(), runtime.GOOS, runtime.GOARCH, BuildTime)
 }
 
 func startDaemon() error {

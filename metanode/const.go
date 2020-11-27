@@ -142,6 +142,7 @@ const (
 	cfgLocalIP           = "localIP"
 	cfgListen            = "listen"
 	cfgMetadataDir       = "metadataDir"
+	cfgRocksDirs         = "rocksDirs"
 	cfgRaftDir           = "raftDir"
 	cfgMasterAddrs       = "masterAddrs" // will be deprecated
 	cfgRaftHeartbeatPort = "raftHeartbeatPort"
@@ -149,6 +150,7 @@ const (
 	cfgDeleteBatchCount  = "deleteBatchCount"
 	cfgTotalMem          = "totalMem"
 	cfgZoneName          = "zoneName"
+	cfgIdleInodeMultiple = "idleInodeMultiple"
 	cfgTickIntervalMs    = "tickIntervalMs"
 
 	metaNodeDeleteBatchCountKey = "batchCount"

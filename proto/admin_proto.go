@@ -14,8 +14,13 @@
 
 package proto
 
+import "fmt"
+
 // api
 const (
+	// All
+	VersionPath = "/version"
+
 	// Admin APIs
 	AdminGetCluster                = "/admin/getCluster"
 	AdminGetDataPartition          = "/dataPartition/get"
@@ -125,6 +130,41 @@ const (
 	ReadOnlyToken  = 1
 	ReadWriteToken = 2
 )
+
+type StoreType uint8
+
+const (
+	MetaTypeMemory StoreType = iota
+	MetaTypeRocks
+
+	MetaTypeUnKnown = 255
+)
+
+func (s StoreType) String() string {
+	switch s {
+	case MetaTypeMemory:
+		return "memory"
+	case MetaTypeRocks:
+		return "rocksdb"
+	default:
+		return "unknown"
+	}
+}
+
+func (s StoreType) ToString() string {
+	return fmt.Sprintf("%d", int(s))
+}
+
+func MpStoreTypeParseFromString(st string) (StoreType, bool) {
+	switch st {
+	case fmt.Sprintf("%d", MetaTypeMemory):
+		return MetaTypeMemory, true
+	case fmt.Sprintf("%d", MetaTypeRocks):
+		return MetaTypeRocks, true
+	default:
+		return MetaTypeUnKnown, false
+	}
+}
 
 type Token struct {
 	TokenType int8
@@ -277,11 +317,12 @@ type LoadMetaPartitionMetricRequest struct {
 
 // LoadMetaPartitionMetricResponse defines the response to the request of loading the meta partition metrics.
 type LoadMetaPartitionMetricResponse struct {
-	Start    uint64
-	End      uint64
-	MaxInode uint64
-	Status   uint8
-	Result   string
+	Start     uint64
+	End       uint64
+	MaxInode  uint64
+	Status    uint8
+	StoreType uint8
+	Result    string
 }
 
 // HeartBeatRequest define the heartbeat request.
@@ -326,6 +367,7 @@ type MetaPartitionReport struct {
 	Start       uint64
 	End         uint64
 	Status      int
+	StoreType   StoreType
 	MaxInodeID  uint64
 	IsLeader    bool
 	VolName     string
@@ -341,7 +383,11 @@ type MetaNodeHeartbeatResponse struct {
 	Used                 uint64
 	MetaPartitionReports []*MetaPartitionReport
 	Status               uint8
-	Result               string
+	//the param used for disk
+	DiskTotal uint64
+	DiskUsed  uint64
+	StoreType StoreType
+	Result    string
 }
 
 // DeleteFileRequest defines the request to delete a file.
@@ -416,6 +462,7 @@ type MetaPartitionLoadResponse struct {
 	MaxInode    uint64
 	DentryCount uint64
 	InodeCount  uint64
+	StoreType   StoreType
 	Addr        string
 }
 
@@ -452,6 +499,7 @@ type MetaPartitionView struct {
 	IsRecover   bool
 	Members     []string
 	LeaderAddr  string
+	StoreType   StoreType
 	Status      int8
 }
 

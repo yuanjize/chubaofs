@@ -58,6 +58,7 @@ type MetaNode struct {
 	tickInterval      int
 	zoneName          string
 	httpStopC         chan uint8
+	disks             map[string]*Disk
 
 	control common.Control
 }

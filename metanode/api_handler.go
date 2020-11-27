@@ -16,7 +16,6 @@ package metanode
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -134,11 +133,11 @@ func (m *MetaNode) getPartitionByIDHandler(w http.ResponseWriter, r *http.Reques
 	msg["learners"] = conf.Learners
 	msg["nodeId"] = conf.NodeId
 	msg["cursor"] = conf.Cursor
-	msg["inode_count"] = mp.GetInodeTree().Len()
-	msg["dentry_count"] = mp.GetDentryTree().Len()
-	msg["multipart_count"] = mp.(*metaPartition).multipartTree.Len()
-	msg["extend_count"] = mp.(*metaPartition).extendTree.Len()
-	msg["free_list_count"] = mp.(*metaPartition).freeList.Len()
+	msg["inode_count"] = mp.GetInodeTree().Count()
+	msg["dentry_count"] = mp.GetDentryTree().Count()
+	msg["multipart_count"] = mp.GetMultipartTree().Count()
+	msg["extend_count"] = mp.GetExtendTree().Count()
+	msg["free_list_count"] = mp.freeList.Len()
 	msg["cursor"] = mp.GetCursor()
 	_, msg["leader"] = mp.IsLeader()
 	resp.Data = msg
@@ -188,26 +187,34 @@ func (m *MetaNode) getAllInodesHandler(w http.ResponseWriter, r *http.Request) {
 		isFirst   = true
 	)
 
-	mp.GetInodeTree().Ascend(func(i BtreeItem) bool {
+	err = mp.GetInodeTree().Range(&Inode{}, nil, func(v []byte) (bool, error) {
 		if !isFirst {
 			if _, err = w.Write(delimiter); err != nil {
-				return false
+				return false, err
 			}
 		} else {
 			isFirst = false
 		}
-
+		i := &Inode{}
+		if err = i.Unmarshal(v); err != nil {
+			return false, err
+		}
 		val, err = json.Marshal(i)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return false
+			return false, err
 		}
 		if _, err = w.Write(val); err != nil {
-			return false
+			return false, err
 		}
-		return true
+		return true, nil
 	})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
 	shouldSkip = true
 	buff.WriteString(`]}`)
 	if _, err = w.Write(buff.Bytes()); err != nil {
@@ -245,7 +252,7 @@ func (m *MetaNode) cursorReset(w http.ResponseWriter, r *http.Request) {
 		VolName:     vol,
 		PartitionId: pid,
 	}
-	cursor, err := mp.(*metaPartition).CursorReset(req)
+	cursor, err := mp.CursorReset(req)
 	if err != nil {
 		resp.Code = http.StatusInternalServerError
 		resp.Msg = err.Error()

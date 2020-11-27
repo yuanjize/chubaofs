@@ -294,11 +294,11 @@ func (s *VolumeService) markDeleteVol(ctx context.Context, args struct {
 }
 
 func (s *VolumeService) updateVolume(ctx context.Context, args struct {
-	Name, AuthKey              string
-	ZoneName, Description      *string
-	Capacity, ReplicaNum       *uint64
-	EnableToken                *bool
-	FollowerRead, Authenticate *bool
+	Name, AuthKey                          string
+	ZoneName, Description                  *string
+	Capacity, ReplicaNum                   *uint64
+	EnableToken                            *bool
+	FollowerRead, Authenticate, AutoRepair *bool
 }) (*Vol, error) {
 	uid, perm, err := permissions(ctx, ADMIN|USER)
 	if err != nil {
@@ -353,7 +353,11 @@ func (s *VolumeService) updateVolume(ctx context.Context, args struct {
 		args.Description = &vol.description
 	}
 
-	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken); err != nil {
+	if args.AutoRepair == nil {
+		args.AutoRepair = &vol.autoRepair
+	}
+
+	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken, *args.AutoRepair); err != nil {
 		return nil, err
 	}
 

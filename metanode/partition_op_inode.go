@@ -17,6 +17,7 @@ package metanode
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/chubaofs/chubaofs/proto"
@@ -333,11 +334,15 @@ func (mp *MetaPartition) CursorReset(req *proto.CursorResetRequest) (uint64, err
 		return 0, fmt.Errorf("before partition:[%d] reset vol name not equal mp:[%s] req:[%s]", mp.config.PartitionId, mp.config.VolName, req.VolName)
 	}
 	if mp.freeList.Len() != 0 {
-		return 0, fmt.Errorf("before partition:[%d] freeList len must 0, but got [%d]", mp.config.PartitionId, mp.inodeTree.Len())
+		return 0, fmt.Errorf("before partition:[%d] freeList len must 0, but got [%d]", mp.config.PartitionId, mp.inodeTree.Count())
 	}
-	if mp.inodeTree.Len() != 0 {
-		if mp.inodeTree.Len() != 1 || !mp.inodeTree.Has(NewInode(1, 0)) { // if is root inode
-			return 0, fmt.Errorf("before partition:[%d] reset inode len must 0, but got [%d]  hahshs %v  count %v", mp.config.PartitionId, mp.inodeTree.Len(), mp.inodeTree.Has(NewInode(1, 0)), mp.inodeTree.Len())
+	if mp.inodeTree.Count() != 0 {
+		has, err := mp.inodeTree.Has(1)
+		if err != nil {
+			return 0, err
+		}
+		if mp.inodeTree.Count() != 1 || !has { // if is root inode
+			return 0, fmt.Errorf("before partition:[%d] reset inode len must 0, but got [%d]  hahshs %v  count %v", mp.config.PartitionId, mp.inodeTree.Count(), has, mp.inodeTree.Count())
 		}
 	}
 
