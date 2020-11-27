@@ -42,7 +42,7 @@ type DataPartition struct {
 	sync.RWMutex
 	total                   uint64
 	used                    uint64
-	MissingNodes            map[string]int64 // key: address of the missing node, value: when the node is missing
+	MissingNodes            map[string]int64 `graphql:"-"` // key: address of the missing node, value: when the node is missing
 	VolName                 string
 	VolID                   uint64
 	modifyTime              int64
