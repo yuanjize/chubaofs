@@ -39,7 +39,6 @@ const baseGql = {
         addr
         status
         isWritable
-        storeType
         toMetaNode {
           zoneName
           used
@@ -164,7 +163,6 @@ const baseGql = {
         addr
         isWritable
         status
-        storeType
         toMetaNode{
           metaPartitionCount
           total

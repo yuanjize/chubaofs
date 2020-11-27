@@ -22,7 +22,6 @@ const baseGql = {
         addr # serverIP
         status # status
         iD
-        storeType
         toMetaNode {
           zoneName # idc
           metaPartitionCount
@@ -31,7 +30,6 @@ const baseGql = {
           ratio
           reportTime
           isActive
-          storeType
         }
       }
     }

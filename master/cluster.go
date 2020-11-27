@@ -409,7 +409,7 @@ func (c *Cluster) repairMetaPartition(wg sync.WaitGroup) {
 						return
 					}
 					Warn(c.Name, fmt.Sprintf("action[repairMetaPartition] clusterID[%v] vol[%v] meta partition[%v] "+
-						"Repair success, task type[%v]", c.Name, mp.volName, mp.PartitionID, task.RType))
+						"Repair success, task type[%v]", c.Name, mp.VolName, mp.PartitionID, task.RType))
 				default:
 					err = fmt.Errorf("action[repairMetaPartition] unknown repair task type")
 					return
@@ -880,7 +880,7 @@ func (c *Cluster) syncCreateDataPartitionToDataNode(host string, size uint64, dp
 func (c *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaPartition) (err error) {
 	hosts := make([]string, 0)
 	hosts = append(hosts, host)
-	tasks := mp.buildNewMetaPartitionTasks(hosts, mp.Peers, mp.volName)
+	tasks := mp.buildNewMetaPartitionTasks(hosts, mp.Peers, mp.VolName)
 	metaNode, err := c.metaNode(host)
 	if err != nil {
 		return
@@ -2638,10 +2638,10 @@ func (c *Cluster) sendRepairMetaPartitionTask(mp *MetaPartition, rType RepairTyp
 	select {
 	case c.mpRepairChan <- repairTask:
 		Warn(c.Name, fmt.Sprintf("action[sendRepairMetaPartitionTask] clusterID[%v] vol[%v] meta partition[%v] "+
-			"task type[%v]", c.Name, mp.volName, mp.PartitionID, rType))
+			"task type[%v]", c.Name, mp.VolName, mp.PartitionID, rType))
 	default:
 		Warn(c.Name, fmt.Sprintf("action[sendRepairMetaPartitionTask] clusterID[%v] vol[%v] meta partition[%v] "+
-			"task type[%v], mpRepairChan has been full", c.Name, mp.volName, mp.PartitionID, rType))
+			"task type[%v], mpRepairChan has been full", c.Name, mp.VolName, mp.PartitionID, rType))
 	}
 	return
 }

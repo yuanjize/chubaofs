@@ -55,7 +55,7 @@ type MetaPartition struct {
 	Status        int8
 	IsRecover     bool
 	volID         uint64
-	volName       string
+	VolName       string
 	Hosts         []string
 	Peers         []proto.Peer
 	Learners      []proto.Learner
@@ -74,7 +74,7 @@ func newMetaReplica(start, end uint64, metaNode *MetaNode) (mr *MetaReplica) {
 }
 
 func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string, volID uint64) (mp *MetaPartition) {
-	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, volName: volName, volID: volID}
+	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, VolName: volName, volID: volID}
 	mp.ReplicaNum = replicaNum
 	mp.Replicas = make([]*MetaReplica, 0)
 	mp.Status = proto.Unavailable
@@ -151,7 +151,7 @@ func (mp *MetaPartition) canSplit(end uint64) (err error) {
 	// overflow
 	if end > (defaultMaxMetaPartitionInodeID - defaultMetaPartitionInodeIDStep) {
 		msg := fmt.Sprintf("action[updateInodeIDRange] vol[%v] partitionID[%v] nextStart[%v] "+
-			"to prevent overflow ,not update end", mp.volName, mp.PartitionID, end)
+			"to prevent overflow ,not update end", mp.VolName, mp.PartitionID, end)
 		log.LogWarn(msg)
 		err = fmt.Errorf(msg)
 		return
@@ -161,7 +161,7 @@ func (mp *MetaPartition) canSplit(end uint64) (err error) {
 		return
 	}
 	if _, err = mp.getMetaReplicaLeader(); err != nil {
-		log.LogWarnf("action[updateInodeIDRange] vol[%v] id[%v] no leader", mp.volName, mp.PartitionID)
+		log.LogWarnf("action[updateInodeIDRange] vol[%v] id[%v] no leader", mp.VolName, mp.PartitionID)
 		return
 	}
 	return
@@ -187,9 +187,9 @@ func (mp *MetaPartition) checkEnd(c *Cluster, maxPartitionID uint64) {
 	if mp.PartitionID < maxPartitionID {
 		return
 	}
-	vol, err := c.getVol(mp.volName)
+	vol, err := c.getVol(mp.VolName)
 	if err != nil {
-		log.LogWarnf("action[checkEnd] vol[%v] not exist", mp.volName)
+		log.LogWarnf("action[checkEnd] vol[%v] not exist", mp.VolName)
 		return
 	}
 	vol.createMpMutex.RLock()
@@ -475,7 +475,7 @@ func (mp *MetaPartition) reportMissingReplicas(clusterID, leaderAddr string, sec
 			}
 			msg := fmt.Sprintf("action[reportMissingReplicas], clusterID[%v] volName[%v] partition:%v  on Node:%v  "+
 				"miss time > :%v  vlocLastRepostTime:%v   dnodeLastReportTime:%v  nodeisActive:%v",
-				clusterID, mp.volName, mp.PartitionID, replica.Addr, seconds, replica.ReportTime, lastReportTime, isActive)
+				clusterID, mp.VolName, mp.PartitionID, replica.Addr, seconds, replica.ReportTime, lastReportTime, isActive)
 			Warn(clusterID, msg)
 			msg = fmt.Sprintf("decommissionMetaPartitionURL is http://%v/dataPartition/decommission?id=%v&addr=%v", leaderAddr, mp.PartitionID, replica.Addr)
 			Warn(clusterID, msg)
@@ -486,7 +486,7 @@ func (mp *MetaPartition) reportMissingReplicas(clusterID, leaderAddr string, sec
 		if mp.isMissingReplica(addr) && mp.shouldReportMissingReplica(addr, interval) {
 			msg := fmt.Sprintf("action[reportMissingReplicas],clusterID[%v] volName[%v] partition:%v  on Node:%v  "+
 				"miss time  > %v ",
-				clusterID, mp.volName, mp.PartitionID, addr, defaultMetaPartitionTimeOutSec)
+				clusterID, mp.VolName, mp.PartitionID, addr, defaultMetaPartitionTimeOutSec)
 			Warn(clusterID, msg)
 			msg = fmt.Sprintf("decommissionMetaPartitionURL is http://%v/dataPartition/decommission?id=%v&addr=%v", leaderAddr, mp.PartitionID, addr)
 			Warn(clusterID, msg)
@@ -562,7 +562,7 @@ func (mp *MetaPartition) createTaskToCreateReplica(host string) (t *proto.AdminT
 		End:         mp.End,
 		PartitionID: mp.PartitionID,
 		Members:     mp.Peers,
-		VolName:     mp.volName,
+		VolName:     mp.VolName,
 		Learners:    mp.Learners,
 	}
 	t = proto.NewAdminTask(proto.OpCreateMetaPartition, host, req)
@@ -626,7 +626,7 @@ func (mp *MetaPartition) createTaskToUpdateMetaReplica(clusterID string, partiti
 		Warn(clusterID, msg)
 		return
 	}
-	req := &proto.UpdateMetaPartitionRequest{PartitionID: partitionID, End: end, VolName: mp.volName}
+	req := &proto.UpdateMetaPartitionRequest{PartitionID: partitionID, End: end, VolName: mp.VolName}
 	t = proto.NewAdminTask(proto.OpUpdateMetaPartition, mr.Addr, req)
 	resetMetaPartitionTaskID(t, mp.PartitionID)
 	return

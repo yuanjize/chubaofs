@@ -18,7 +18,6 @@
         <el-table-column prop="volName" :label="$t('chubaoFS.operations.MetaPartitionManagement.VolName')"></el-table-column>
         <el-table-column prop="start" :label="$t('chubaoFS.operations.MetaPartitionManagement.start')"></el-table-column>
         <el-table-column prop="end" :label="$t('chubaoFS.operations.MetaPartitionManagement.end')"></el-table-column>
-        <el-table-column prop="storeType" :label="$t('chubaoFS.operations.MetaPartitionManagement.storeType')"></el-table-column>
         <el-table-column prop :label="$t('chubaoFS.tools.Actions')">
           <template slot-scope="scope">
             <el-dropdown trigger="click" size="medium">
@@ -210,7 +209,6 @@ export default {
               item.status = formatStatus(item.status);
               item.isRecover = item.isRecover.toString();
               item.replicaNum = item.replicaNum +"/"+ item.peers.length ;
-              item.storeType = formatStoreType(item.storeType)
               if(item.missNodes == undefined || item.missNodes == null || item.missNodes.length ==0){
                 item.missNodes = "none";
               }else{

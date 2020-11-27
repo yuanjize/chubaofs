@@ -12,14 +12,14 @@ module.exports = {
     assetsPublicPath: '/',
     proxyTable: {
       '/proxy': {
-        target: 'http://10.194.133.103/', // 测试环境API
+        target: 'http://console.chubao.io/', // 测试环境API
         changeOrigin: true,
         pathRewrite: {
           '^/proxy': '/'
         }
       },
       '/api': {
-        target: 'http://10.194.133.103/', // 测试环境API
+        target: 'http://console.chubao.io/', // 测试环境API
         changeOrigin: true,
         pathRewrite: {
           '^/api': '/api'

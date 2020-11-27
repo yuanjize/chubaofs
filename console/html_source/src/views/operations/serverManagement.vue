@@ -128,7 +128,6 @@ export default {
             item.serverType = 'metaNodes'
             item.statusStr = item.status.toString()
             item.isWritableStr = item.isWritable.toString()
-            item.storeType = item.storeType.toString()
             item.allDataNode = item.toMetaNode
             item.allDataNode.used = formatSize(item.toMetaNode.used,10)
             item.allDataNode.total = formatSize(item.toMetaNode.total,10)

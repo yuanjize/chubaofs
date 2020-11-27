@@ -80,7 +80,7 @@ func newMetaPartitionValue(mp *MetaPartition) (mpv *metaPartitionValue) {
 		VolID:         mp.volID,
 		ReplicaNum:    mp.ReplicaNum,
 		Status:        mp.Status,
-		VolName:       mp.volName,
+		VolName:       mp.VolName,
 		Hosts:         mp.hostsToString(),
 		Peers:         mp.Peers,
 		Learners:      mp.Learners,

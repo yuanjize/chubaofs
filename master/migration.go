@@ -109,7 +109,7 @@ func (c *Cluster) checkMigratedMetaPartitionRecoveryProgress() {
 			if err != nil {
 				continue
 			}
-			vol, err := c.getVol(partition.volName)
+			vol, err := c.getVol(partition.VolName)
 			if err != nil {
 				continue
 			}
