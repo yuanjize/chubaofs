@@ -59,7 +59,7 @@ type MetaPartition struct {
 	Hosts         []string
 	Peers         []proto.Peer
 	Learners      []proto.Learner
-	MissNodes     map[string]int64
+	MissNodes     map[string]int64 `graphql:"-"`
 	OfflinePeerID uint64
 	LoadResponse  []*proto.MetaPartitionLoadResponse
 	offlineMutex  sync.RWMutex
