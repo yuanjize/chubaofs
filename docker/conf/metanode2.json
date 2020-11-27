@@ -13,7 +13,9 @@
   "zoneName": "zone-02",
   "totalMem": "536870912",
   "metadataDir": "/cfs/data/meta",
-  "rocksDirs": "/cfs/data/meta/rocks",
+  "rocksDirs": [
+    "/cfs/data/meta/rocks"
+  ],
   "raftDir": "/cfs/data/raft",
   "masterAddr": [
     "192.168.0.11:17010",
