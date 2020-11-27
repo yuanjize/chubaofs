@@ -344,7 +344,7 @@ export default {
         totalCapacity: null,
         dpReplicaNum: null,
         owner: "",
-        zoneName: "default",
+        zoneName: "",
         storeType: mpStoreTypeList[0],
         notes: "",
       },
