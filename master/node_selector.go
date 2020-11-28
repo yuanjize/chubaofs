@@ -267,3 +267,7 @@ func getAvailHosts(nodes *sync.Map, excludeHosts []string, replicaNum int, selec
 func (ns *nodeSet) getAvailMetaNodeHosts(excludeHosts []string, replicaNum int) (newHosts []string, peers []proto.Peer, err error) {
 	return getAvailHosts(ns.metaNodes, excludeHosts, replicaNum, selectMetaNode)
 }
+
+func (ns *nodeSet) getAvailMetaNodeHostsOfDisk(excludeHosts []string, replicaNum int) (newHosts []string, peers []proto.Peer, err error) {
+	return getAvailHosts(ns.metaNodes, excludeHosts, replicaNum, selectMetaNodeOfDisk)
+}

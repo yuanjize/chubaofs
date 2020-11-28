@@ -812,6 +812,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		autoRepair   bool
 		zoneName     string
 		description  string
+		mpStoreType  proto.StoreType
 		vol          *Vol
 	)
 	if name, authKey, replicaNum, err = parseRequestToUpdateVol(r); err != nil {
@@ -827,7 +828,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
 		return
 	}
-	if zoneName, capacity, description, err = parseDefaultInfoToUpdateVol(r, vol); err != nil {
+	if zoneName, capacity, description, mpStoreType, err = parseDefaultInfoToUpdateVol(r, vol); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -838,7 +839,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
-	if err = m.cluster.updateVol(name, authKey, zoneName, description, uint64(capacity), uint8(replicaNum), followerRead, authenticate, enableToken, autoRepair); err != nil {
+	if err = m.cluster.updateVol(name, authKey, zoneName, description, uint64(capacity), uint8(replicaNum), followerRead, authenticate, enableToken, autoRepair, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
 		return
 	}
@@ -923,6 +924,7 @@ func newSimpleView(vol *Vol) *proto.SimpleVolView {
 		EnableToken:        vol.enableToken,
 		CrossZone:          vol.crossZone,
 		AutoRepair:         vol.autoRepair,
+		MpStoreType:        vol.mpStoreType,
 		Tokens:             vol.tokens,
 		RwDpCnt:            vol.dataPartitions.readableAndWritableCnt,
 		MpCnt:              len(vol.MetaPartitions),
@@ -1555,7 +1557,7 @@ func parseRequestToUpdateVol(r *http.Request) (name, authKey string, replicaNum 
 	}
 	return
 }
-func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, capacity int, description string, err error) {
+func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, capacity int, description string, mpStoreType proto.StoreType, err error) {
 	if err = r.ParseForm(); err != nil {
 		return
 	}
@@ -1569,6 +1571,16 @@ func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, ca
 		}
 	} else {
 		capacity = int(vol.Capacity)
+	}
+	if mpStoreTypeStr := r.FormValue(volMpStoreTypeKey); mpStoreTypeStr != "" {
+		if storeType, ok := proto.MpStoreTypeParseFromString(mpStoreTypeStr); ok {
+			mpStoreType = storeType
+		} else {
+			err = unmatchedKey(volMpStoreTypeKey)
+			return
+		}
+	} else {
+		mpStoreType = vol.mpStoreType
 	}
 	if description = r.FormValue(descriptionKey); description == "" {
 		description = vol.description

@@ -958,6 +958,7 @@ var getTargetAddressForRepairMetaZone = func(c *Cluster, nodeAddr string, mp *Me
 	if nodesetInTargetZone, err = targetZone.getNodeSet(targetNode.NodeSetID); err != nil {
 		return
 	}
+	//mp.StoreType
 	if targetHosts, _, err = nodesetInTargetZone.getAvailMetaNodeHosts(mp.Hosts, 1); err != nil {
 		// select meta nodes from the other node set in same zone
 		excludeNodeSets = append(excludeNodeSets, nodesetInTargetZone.ID)

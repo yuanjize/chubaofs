@@ -118,6 +118,7 @@ func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
 	vol.autoRepair = arg.autoRepair
 	vol.tokens = make(map[string]*proto.Token, 0)
 	vol.description = arg.description
+	vol.mpStoreType = arg.mpStoreType
 	return
 }
 

@@ -1986,7 +1986,7 @@ func (c *Cluster) deleteMetaNodeFromCache(metaNode *MetaNode) {
 	go metaNode.clean()
 }
 
-func (c *Cluster) updateVol(name, authKey, zoneName, description string, capacity uint64, replicaNum uint8, followerRead, authenticate, enableToken, autoRepair bool) (err error) {
+func (c *Cluster) updateVol(name, authKey, zoneName, description string, capacity uint64, replicaNum uint8, followerRead, authenticate, enableToken, autoRepair bool, mpStoreType proto.StoreType) (err error) {
 	var (
 		vol             *Vol
 		serverAuthKey   string
@@ -1999,6 +1999,7 @@ func (c *Cluster) updateVol(name, authKey, zoneName, description string, capacit
 		oldZoneName     string
 		oldDescription  string
 		oldCrossZone    bool
+		oldMpStoreType  proto.StoreType
 		zoneList        []string
 	)
 	if vol, err = c.getVol(name); err != nil {
@@ -2052,11 +2053,13 @@ func (c *Cluster) updateVol(name, authKey, zoneName, description string, capacit
 	oldEnableToken = vol.enableToken
 	oldAutoRepair = vol.autoRepair
 	oldDescription = vol.description
+	oldMpStoreType = vol.mpStoreType
 	vol.Capacity = capacity
 	vol.FollowerRead = followerRead
 	vol.authenticate = authenticate
 	vol.enableToken = enableToken
 	vol.autoRepair = autoRepair
+	vol.mpStoreType = mpStoreType
 	if description != "" {
 		vol.description = description
 	}
@@ -2074,6 +2077,7 @@ func (c *Cluster) updateVol(name, authKey, zoneName, description string, capacit
 		vol.crossZone = oldCrossZone
 		vol.autoRepair = oldAutoRepair
 		vol.description = oldDescription
+		vol.mpStoreType = oldMpStoreType
 		log.LogErrorf("action[updateVol] vol[%v] err[%v]", name, err)
 		err = proto.ErrPersistenceByRaft
 		goto errHandler

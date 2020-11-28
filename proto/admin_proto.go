@@ -571,6 +571,7 @@ type SimpleVolView struct {
 	CrossZone          bool
 	AutoRepair         bool
 	CreateTime         string
+	MpStoreType        StoreType
 	EnableToken        bool
 	Tokens             map[string]*Token `graphql:"-"`
 	Description        string
