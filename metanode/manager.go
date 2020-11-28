@@ -440,8 +440,8 @@ func (m *metadataManager) createPartition(request *proto.CreateMetaPartitionRequ
 		RaftStore:   m.raftStore,
 		NodeId:      m.nodeId,
 		RootDir:     path.Join(m.rootDir, partitionPrefix+partitionId),
-
-		ConnPool: m.connPool,
+		StoreType:   request.StoreType,
+		ConnPool:    m.connPool,
 	}
 
 	// only allow to create MetaTypeMemory/ MetaTypeRocks mp
