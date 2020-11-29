@@ -68,14 +68,15 @@ type MetaPartition struct {
 	sync.RWMutex
 }
 
-func newMetaReplica(start, end uint64, metaNode *MetaNode) (mr *MetaReplica) {
+func newMetaReplica(start, end uint64, metaNode *MetaNode, storeType proto.StoreType) (mr *MetaReplica) {
 	mr = &MetaReplica{start: start, end: end, nodeID: metaNode.ID, Addr: metaNode.Addr}
 	mr.metaNode = metaNode
+	mr.StoreType = storeType
 	mr.ReportTime = time.Now().Unix()
 	return
 }
 
-func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string, volID uint64) (mp *MetaPartition) {
+func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string, volID uint64, storeType proto.StoreType) (mp *MetaPartition) {
 	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, VolName: volName, volID: volID}
 	mp.ReplicaNum = replicaNum
 	mp.Replicas = make([]*MetaReplica, 0)
@@ -85,6 +86,7 @@ func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName 
 	mp.Learners = make([]proto.Learner, 0)
 	mp.Hosts = make([]string, 0)
 	mp.LoadResponse = make([]*proto.MetaPartitionLoadResponse, 0)
+	mp.StoreType = storeType
 	return
 }
 
@@ -348,7 +350,7 @@ func (mp *MetaPartition) updateMetaPartition(mgr *proto.MetaPartitionReport, met
 	defer mp.Unlock()
 	mr, err := mp.getMetaReplica(metaNode.Addr)
 	if err != nil {
-		mr = newMetaReplica(mp.Start, mp.End, metaNode)
+		mr = newMetaReplica(mp.Start, mp.End, metaNode, mgr.StoreType)
 		mp.addReplica(mr)
 	}
 	mr.updateMetric(mgr)
@@ -526,6 +528,7 @@ func (mp *MetaPartition) buildNewMetaPartitionTasks(specifyAddrs []string, peers
 		PartitionID: mp.PartitionID,
 		Members:     peers,
 		VolName:     volName,
+		StoreType:   mp.StoreType,
 	}
 	if specifyAddrs == nil {
 		hosts = mp.Hosts
@@ -671,13 +674,12 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.setLastReportTime()
 }
 
-func (mp *MetaPartition) afterCreation(nodeAddr string, c *Cluster, StoreType proto.StoreType) (err error) {
+func (mp *MetaPartition) afterCreation(nodeAddr string, c *Cluster, storeType proto.StoreType) (err error) {
 	metaNode, err := c.metaNode(nodeAddr)
 	if err != nil {
 		return err
 	}
-	mr := newMetaReplica(mp.Start, mp.End, metaNode)
-	mr.StoreType = StoreType
+	mr := newMetaReplica(mp.Start, mp.End, metaNode, storeType)
 	mr.Status = proto.ReadWrite
 	mr.ReportTime = time.Now().Unix()
 	mp.addReplica(mr)

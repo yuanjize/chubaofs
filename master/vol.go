@@ -815,7 +815,7 @@ func (vol *Vol) doCreateMetaPartition(c *Cluster, start, end uint64) (mp *MetaPa
 	if partitionID, err = c.idAlloc.allocateMetaPartitionID(); err != nil {
 		return nil, errors.NewError(err)
 	}
-	mp = newMetaPartition(partitionID, start, end, vol.mpReplicaNum, vol.Name, vol.ID)
+	mp = newMetaPartition(partitionID, start, end, vol.mpReplicaNum, vol.Name, vol.ID, vol.mpStoreType)
 	mp.setHosts(hosts)
 	mp.setPeers(peers)
 	for _, host := range hosts {
