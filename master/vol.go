@@ -36,6 +36,8 @@ type Vol struct {
 	OSSSecretKey       string
 	dpReplicaNum       uint8
 	mpReplicaNum       uint8
+	writableMpCount    int
+	MinWritableMPNum   uint64
 	Status             uint8
 	threshold          float32
 	dataPartitionSize  uint64
@@ -78,6 +80,7 @@ type createVolArg struct {
 	crossZone    bool
 	enableToken  bool
 	autoRepair   bool
+	minRwMPNum   uint64
 }
 
 func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
@@ -119,6 +122,7 @@ func newVol(id uint64, createTime int64, arg *createVolArg) (vol *Vol) {
 	vol.tokens = make(map[string]*proto.Token, 0)
 	vol.description = arg.description
 	vol.mpStoreType = arg.mpStoreType
+	vol.MinWritableMPNum = arg.minRwMPNum
 	return
 }
 
@@ -131,6 +135,7 @@ func newVolFromVolValue(vv *volValue) (vol *Vol) {
 		description:  vv.Description,
 		dpReplicaNum: int(vv.DpReplicaNum),
 		mpStoreType:  vv.MpStoreType,
+		minRwMPNum:   vv.MinWritableMPNum,
 		size:         vv.DataPartitionSize, //TODO: is right????
 		capacity:     vv.Capacity,
 		followerRead: vv.FollowerRead,
@@ -233,6 +238,25 @@ func (vol *Vol) getDataPartitionsView() (body []byte, err error) {
 
 func (vol *Vol) getDataPartitionByID(partitionID uint64) (dp *DataPartition, err error) {
 	return vol.dataPartitions.get(partitionID)
+}
+
+func (vol *Vol) setWritableMpCount(count int) {
+	vol.writableMpCount = count
+}
+
+func (vol *Vol) getWritableMpCount() int {
+	return vol.writableMpCount
+}
+
+func (vol *Vol) checkAndUpdateWritableMpCount() (writableMpCount int) {
+	mps := vol.cloneMetaPartitionMap()
+	for _, mp := range mps {
+		if mp.Status == proto.ReadWrite {
+			writableMpCount++
+		}
+	}
+	vol.setWritableMpCount(writableMpCount)
+	return
 }
 
 func (vol *Vol) initMetaPartitions(c *Cluster, count int) (err error) {
@@ -356,7 +380,7 @@ func (vol *Vol) checkRepairDataPartitions(c *Cluster) {
 	}
 }
 
-func (vol *Vol) checkMetaPartitions(c *Cluster) {
+func (vol *Vol) checkMetaPartitions(c *Cluster) (writableMpCount int) {
 	vol.checkSplitMetaPartition(c)
 	maxPartitionID := vol.maxPartitionID()
 	mps := vol.cloneMetaPartitionMap()
@@ -378,7 +402,11 @@ func (vol *Vol) checkMetaPartitions(c *Cluster) {
 		mp.checkEnd(c, maxPartitionID)
 		mp.reportMissingReplicas(c.Name, c.leaderInfo.addr, defaultMetaPartitionTimeOutSec, defaultIntervalToAlarmMissingMetaPartition)
 		mp.replicaCreationTasks(c, vol.Name)
+		if mp.Status == proto.ReadWrite {
+			writableMpCount++
+		}
 	}
+	return
 }
 
 func (vol *Vol) checkSplitMetaPartition(c *Cluster) {

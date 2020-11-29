@@ -152,6 +152,7 @@ type volValue struct {
 	CreateTime        int64
 	Description       string
 	MpStoreType       mpproto.StoreType
+	MinWritableMPNum  uint64
 }
 
 func (v *volValue) Bytes() (raw []byte, err error) {
@@ -180,6 +181,7 @@ func newVolValue(vol *Vol) (vv *volValue) {
 		CreateTime:        vol.createTime,
 		Description:       vol.description,
 		MpStoreType: 	   vol.mpStoreType,
+		MinWritableMPNum:  vol.MinWritableMPNum,
 	}
 	return
 }

@@ -815,6 +815,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		zoneName     string
 		description  string
 		mpStoreType  proto.StoreType
+		minRwMPNum   uint64
 		vol          *Vol
 	)
 	if name, authKey, replicaNum, err = parseRequestToUpdateVol(r); err != nil {
@@ -830,7 +831,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
 		return
 	}
-	if zoneName, capacity, description, mpStoreType, err = parseDefaultInfoToUpdateVol(r, vol); err != nil {
+	if zoneName, capacity, description, mpStoreType, minRwMPNum, err = parseDefaultInfoToUpdateVol(r, vol); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -841,7 +842,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
-	if err = m.cluster.updateVol(name, authKey, zoneName, description, uint64(capacity), uint8(replicaNum), followerRead, authenticate, enableToken, autoRepair, mpStoreType); err != nil {
+	if err = m.cluster.updateVol(name, authKey, zoneName, description, uint64(capacity), minRwMPNum, uint8(replicaNum), followerRead, authenticate, enableToken, autoRepair, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
 		return
 	}
@@ -929,6 +930,8 @@ func newSimpleView(vol *Vol) *proto.SimpleVolView {
 		MpStoreType:        vol.mpStoreType,
 		Tokens:             vol.tokens,
 		RwDpCnt:            vol.dataPartitions.readableAndWritableCnt,
+		RwMpCnt:            vol.writableMpCount,
+		MinWritableMPNum:	vol.MinWritableMPNum,
 		MpCnt:              len(vol.MetaPartitions),
 		DpCnt:              len(vol.dataPartitions.partitionMap),
 		CreateTime:         time.Unix(vol.createTime, 0).Format(proto.TimeFormat),
@@ -1559,7 +1562,7 @@ func parseRequestToUpdateVol(r *http.Request) (name, authKey string, replicaNum 
 	}
 	return
 }
-func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, capacity int, description string, mpStoreType proto.StoreType, err error) {
+func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, capacity int, description string, mpStoreType proto.StoreType, minRwMPNum uint64, err error) {
 	if err = r.ParseForm(); err != nil {
 		return
 	}
@@ -1583,6 +1586,16 @@ func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, ca
 		}
 	} else {
 		mpStoreType = vol.mpStoreType
+	}
+	if minWritableMPNumStr := r.FormValue(volMinWritableMPNum); minWritableMPNumStr != "" {
+		minWritableMPNum, err1 := strconv.Atoi(minWritableMPNumStr)
+		if err1 != nil || minWritableMPNum < 0 {
+			err = unmatchedKey(volMinWritableMPNum)
+			return
+		}
+		minRwMPNum = uint64(minWritableMPNum)
+	} else {
+		minRwMPNum = vol.MinWritableMPNum
 	}
 	if description = r.FormValue(descriptionKey); description == "" {
 		description = vol.description
@@ -1676,6 +1689,9 @@ func parseRequestToCreateVol(r *http.Request) (arg *createVolArg, err error) {
 	}
 
 	if arg.crossZone, err = extractCrossZone(r); err != nil {
+		return
+	}
+	if arg.minRwMPNum, err = extractMinWritableMPNum(r); err != nil {
 		return
 	}
 	arg.zoneName = r.FormValue(zoneNameKey)
@@ -1959,6 +1975,20 @@ func extractCrossZone(r *http.Request) (crossZone bool, err error) {
 	}
 	if crossZone, err = strconv.ParseBool(value); err != nil {
 		return
+	}
+	return
+}
+
+func extractMinWritableMPNum(r *http.Request) (minRwMPNum uint64, err error) {
+	if minWritableMPNumStr := r.FormValue(volMinWritableMPNum); minWritableMPNumStr != "" {
+		minWritableMPNum, err1 := strconv.Atoi(minWritableMPNumStr)
+		if err1 != nil || minWritableMPNum < 0 {
+			err = unmatchedKey(volMinWritableMPNum)
+			return
+		}
+		minRwMPNum = uint64(minWritableMPNum)
+	} else {
+		minRwMPNum = DefaultVolMinWritableMPNum
 	}
 	return
 }

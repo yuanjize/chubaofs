@@ -61,6 +61,7 @@ const (
 	dpRecoverPoolSizeKey    = "dpRecoverPool"
 	mpRecoverPoolSizeKey    = "mpRecoverPool"
 	autoKey                 = "auto"
+	volMinWritableMPNum     = "minWritableMp"
 )
 
 const (
@@ -115,6 +116,7 @@ const (
 	maxDataPartitionsRecoverPoolSize             = 50
 	maxMetaPartitionsRecoverPoolSize             = 30
 	defaultLearnerPromThreshold                  = 90
+	DefaultVolMinWritableMPNum                   = 1
 )
 
 const (
