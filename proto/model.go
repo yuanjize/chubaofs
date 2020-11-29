@@ -96,6 +96,7 @@ type MetaReplicaInfo struct {
 	IsLeader    bool
 	InodeCount  uint64
 	DentryCount uint64
+	StoreType   StoreType
 }
 
 // ClusterView provides the view of a cluster.

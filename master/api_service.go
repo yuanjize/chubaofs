@@ -493,10 +493,11 @@ func (m *Server) addMetaReplica(w http.ResponseWriter, r *http.Request) {
 		addr        string
 		mp          *MetaPartition
 		partitionID uint64
+		mpStoreType proto.StoreType
 		err         error
 	)
 
-	if partitionID, addr, err = parseRequestToAddMetaReplica(r); err != nil {
+	if partitionID, addr, mpStoreType, err = parseRequestToAddMetaReplica(r); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -505,7 +506,7 @@ func (m *Server) addMetaReplica(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, newErrHTTPReply(proto.ErrMetaPartitionNotExists))
 		return
 	}
-	if err = m.cluster.addMetaReplica(mp, addr); err != nil {
+	if err = m.cluster.addMetaReplica(mp, addr, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
 		return
 	}
@@ -551,10 +552,11 @@ func (m *Server) addMetaReplicaLearner(w http.ResponseWriter, r *http.Request) {
 		partitionID uint64
 		auto        bool
 		threshold   uint8
+		mpStoreType proto.StoreType
 		err         error
 	)
 
-	if partitionID, addr, auto, threshold, err = parseRequestToAddMetaReplicaLearner(r); err != nil {
+	if partitionID, addr, auto, threshold, mpStoreType, err = parseRequestToAddMetaReplicaLearner(r); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -563,7 +565,7 @@ func (m *Server) addMetaReplicaLearner(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, newErrHTTPReply(proto.ErrMetaPartitionNotExists))
 		return
 	}
-	if err = m.cluster.addMetaReplicaLearner(mp, addr, auto, threshold); err != nil {
+	if err = m.cluster.addMetaReplicaLearner(mp, addr, auto, threshold, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
 		return
 	}
@@ -1728,15 +1730,21 @@ func parseRequestToLoadDataPartition(r *http.Request) (ID uint64, err error) {
 	return
 }
 
-func parseRequestToAddMetaReplica(r *http.Request) (ID uint64, addr string, err error) {
-	return extractMetaPartitionIDAndAddr(r)
+func parseRequestToAddMetaReplica(r *http.Request) (ID uint64, addr string, mpStoreType proto.StoreType, err error) {
+	if mpStoreType, err = extractMpStoreTypeToAddMetaReplica(r); err != nil {
+		return
+	}
+	if ID, addr, err = extractMetaPartitionIDAndAddr(r); err != nil {
+		return
+	}
+	return
 }
 
 func parseRequestToRemoveMetaReplica(r *http.Request) (ID uint64, addr string, err error) {
 	return extractMetaPartitionIDAndAddr(r)
 }
 
-func parseRequestToAddMetaReplicaLearner(r *http.Request) (ID uint64, addr string, auto bool, threshold uint8, err error) {
+func parseRequestToAddMetaReplicaLearner(r *http.Request) (ID uint64, addr string, auto bool, threshold uint8, mpStoreType proto.StoreType, err error) {
 	if err = r.ParseForm(); err != nil {
 		return
 	}
@@ -1748,6 +1756,9 @@ func parseRequestToAddMetaReplicaLearner(r *http.Request) (ID uint64, addr strin
 	}
 	auto = extractAuto(r)
 	threshold = extractLearnerThreshold(r)
+	if mpStoreType, err = extractMpStoreTypeToAddMetaReplica(r); err != nil {
+		return
+	}
 	return
 }
 
@@ -2254,6 +2265,7 @@ func getMetaPartitionView(mp *MetaPartition) (mpView *proto.MetaPartitionView) {
 	mpView.InodeCount = mp.InodeCount
 	mpView.DentryCount = mp.DentryCount
 	mpView.IsRecover = mp.IsRecover
+	mpView.StoreType = mp.StoreType
 	return
 }
 
@@ -2291,6 +2303,7 @@ func (m *Server) getMetaPartition(w http.ResponseWriter, r *http.Request) {
 				IsLeader:    mp.Replicas[i].IsLeader,
 				DentryCount: mp.Replicas[i].DentryCount,
 				InodeCount:  mp.Replicas[i].InodeCount,
+				StoreType:   mp.Replicas[i].StoreType,
 			}
 		}
 		var mpInfo = &proto.MetaPartitionInfo{
@@ -2422,6 +2435,23 @@ func extractMpStoreType(r *http.Request) (mpStoreType proto.StoreType, err error
 		mpStoreType = storeType
 	} else {
 		mpStoreType = proto.MetaTypeUnKnown
+		err = unmatchedKey(volMpStoreTypeKey)
+		return
+	}
+
+	return
+}
+
+func extractMpStoreTypeToAddMetaReplica(r *http.Request) (mpStoreType proto.StoreType, err error) {
+	var s string
+	if s = r.FormValue(volMpStoreTypeKey); s == "" {
+		err = unmatchedKey(volMpStoreTypeKey)
+		return
+	}
+
+	if storeType, ok := proto.MpStoreTypeParseFromString(s); ok {
+		mpStoreType = storeType
+	} else {
 		err = unmatchedKey(volMpStoreTypeKey)
 		return
 	}

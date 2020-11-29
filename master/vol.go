@@ -830,7 +830,7 @@ func (vol *Vol) doCreateMetaPartition(c *Cluster, start, end uint64) (mp *MetaPa
 			}
 			mp.Lock()
 			defer mp.Unlock()
-			if err = mp.afterCreation(host, c); err != nil {
+			if err = mp.afterCreation(host, c, mp.StoreType); err != nil {
 				errChannel <- err
 			}
 		}(host)
