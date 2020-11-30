@@ -117,8 +117,11 @@ MetaPartitionOfflineRequest, index uint64) (updated bool, err error) {
 	return
 }
 
-func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
-	index uint64) (updated bool, err error) {
+func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest, index uint64) (updated bool, err error) {
+	var canRemoveSelf bool
+	if canRemoveSelf, err = mp.canRemoveSelf(); err != nil {
+		return
+	}
 	peerIndex := -1
 	for i, peer := range mp.config.Peers {
 		if peer.ID == req.RemovePeer.ID {
@@ -130,7 +133,7 @@ func (mp *metaPartition) confRemoveNode(req *proto.MetaPartitionOfflineRequest,
 	if !updated {
 		return
 	}
-	if req.RemovePeer.ID == mp.config.NodeId {
+	if req.RemovePeer.ID == mp.config.NodeId && canRemoveSelf {
 		go func(index uint64) {
 			for {
 				time.Sleep(time.Millisecond)

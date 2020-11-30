@@ -17,6 +17,8 @@ package metanode
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/chubaofs/chubaofs/master"
+	"net/http"
 	"path"
 	"sort"
 	"strconv"
@@ -218,11 +220,11 @@ func (mp *metaPartition) Start() (err error) {
 	return
 }
 
-func (mp *metaPartition)GetInodeCount() uint64{
+func (mp *metaPartition) GetInodeCount() uint64 {
 	return uint64(mp.inodeTree.Len())
 }
 
-func (mp *metaPartition)GetDentryCount() uint64{
+func (mp *metaPartition) GetDentryCount() uint64 {
 	return uint64(mp.dentryTree.Len())
 }
 
@@ -590,4 +592,32 @@ func (mp *metaPartition) ResponseLoadMetaPartition(p *Packet) (resp *proto.LoadM
 	resp.DentryCount = uint64(mp.dentryTree.Len())
 	resp.ApplyID = mp.applyID
 	return
+}
+
+func (mp *metaPartition) canRemoveSelf() (bool, error) {
+	params := make(map[string]string)
+	params["id"] = fmt.Sprintf("%d", mp.config.PartitionId)
+
+	partition := new(master.MetaPartition)
+	if data, err := masterHelper.Request(http.MethodGet, master.ClientMetaPartition, params, nil); err != nil {
+		log.LogErrorf("action[canRemoveSelf] err[%v]", err)
+		return false, err
+	} else {
+		if err = json.Unmarshal(data, partition); err != nil {
+			err = fmt.Errorf("getMetaPartitionFromMaster jsonUnmarsh failed %v", err)
+			log.LogErrorf(err.Error())
+			return false, err
+		}
+	}
+
+	var existInPeers bool
+	for _, peer := range partition.Peers {
+		if mp.config.NodeId == peer.ID {
+			existInPeers = true
+		}
+	}
+	if !existInPeers {
+		return true, nil
+	}
+	return false, nil
 }
