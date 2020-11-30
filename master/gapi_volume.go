@@ -69,8 +69,11 @@ func (s *VolumeService) registerObject(schema *schemabuilder.Schema) {
 			EnableToken:        vol.enableToken,
 			Tokens:             vol.tokens,
 			RwDpCnt:            vol.dataPartitions.readableAndWritableCnt,
+			RwMpCnt:            vol.writableMpCount,
+			MinWritableMPNum:	vol.MinWritableMPNum,
 			MpCnt:              len(vol.MetaPartitions),
 			DpCnt:              len(vol.dataPartitions.partitionMap),
+			MpStoreType:		vol.mpStoreType,
 			CreateTime:         time.Unix(vol.createTime, 0).Format(proto.TimeFormat),
 			Description:        vol.description,
 		}, nil
@@ -296,9 +299,10 @@ func (s *VolumeService) markDeleteVol(ctx context.Context, args struct {
 func (s *VolumeService) updateVolume(ctx context.Context, args struct {
 	Name, AuthKey                          string
 	ZoneName, Description                  *string
-	Capacity, ReplicaNum                   *uint64
+	Capacity, ReplicaNum,MinWritableMPNum  *uint64
 	EnableToken                            *bool
 	FollowerRead, Authenticate, AutoRepair *bool
+	MpStoreType 						   *proto.StoreType
 }) (*Vol, error) {
 	uid, perm, err := permissions(ctx, ADMIN|USER)
 	if err != nil {
@@ -356,8 +360,14 @@ func (s *VolumeService) updateVolume(ctx context.Context, args struct {
 	if args.AutoRepair == nil {
 		args.AutoRepair = &vol.autoRepair
 	}
+	if args.MpStoreType == nil {
+		args.MpStoreType = &vol.mpStoreType
+	}
+	if args.MinWritableMPNum == nil {
+		args.MinWritableMPNum = &vol.MinWritableMPNum
+	}
 
-	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken, *args.AutoRepair); err != nil {
+	if err = s.cluster.updateVol(args.Name, args.AuthKey, *args.ZoneName, *args.Description, *args.Capacity, *args.MinWritableMPNum, uint8(*args.ReplicaNum), *args.FollowerRead, *args.Authenticate, *args.EnableToken, *args.AutoRepair, *args.MpStoreType); err != nil {
 		return nil, err
 	}
 

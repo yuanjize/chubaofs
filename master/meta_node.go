@@ -15,6 +15,7 @@
 package master
 
 import (
+	"github.com/chubaofs/chubaofs/util/log"
 	"math/rand"
 	"sync"
 	"time"
@@ -33,6 +34,12 @@ type MetaNode struct {
 	Total                     uint64            `json:"TotalWeight"`
 	Used                      uint64            `json:"UsedWeight"`
 	Ratio                     float64
+
+	DiskTotal                 uint64
+	DiskUsed                  uint64
+	MaxDiskAvailableSpace        uint64 // 这个值在哪里进行同步计算
+	DiskCarry                 float64 // TODO  类似Carry,disktotal、used也需要类似的
+
 	SelectCount               uint64
 	Carry                     float64
 	Threshold                 float32
@@ -52,6 +59,7 @@ func newMetaNode(addr, zoneName, clusterID string) (node *MetaNode) {
 		ZoneName: zoneName,
 		Sender:   newAdminTaskManager(addr, clusterID),
 		Carry:    rand.Float64(),
+		DiskCarry:rand.Float64(),
 	}
 }
 
@@ -72,18 +80,32 @@ func (metaNode *MetaNode) GetAddr() string {
 }
 
 // SetCarry implements the Node interface
-func (metaNode *MetaNode) SetCarry(carry float64) {
+func (metaNode *MetaNode) SetCarry(carry float64, selectType int) {
 	metaNode.Lock()
 	defer metaNode.Unlock()
-	metaNode.Carry = carry
+	switch selectType {
+	case selectMetaNode:
+		metaNode.Carry = carry
+	case selectMetaNodeOfDisk:
+		metaNode.DiskCarry = carry
+	default:
+		log.LogErrorf("action[SetCarry] node[%v] wrong type[%v]", metaNode.Addr, selectType)
+	}
 }
 
 // SelectNodeForWrite implements the Node interface
-func (metaNode *MetaNode) SelectNodeForWrite() {
+func (metaNode *MetaNode) SelectNodeForWrite(selectType int) {
 	metaNode.Lock()
 	defer metaNode.Unlock()
 	metaNode.SelectCount++
-	metaNode.Carry = metaNode.Carry - 1.0
+	switch selectType {
+	case selectMetaNode:
+		metaNode.Carry = metaNode.Carry - 1.0
+	case selectMetaNodeOfDisk:
+		metaNode.DiskCarry = metaNode.DiskCarry - 1.0
+	default:
+		log.LogErrorf("action[SelectNodeForWrite] node[%v] wrong type[%v]", metaNode.Addr, selectType)
+	}
 }
 
 func (metaNode *MetaNode) isWritable() (ok bool) {
@@ -97,11 +119,29 @@ func (metaNode *MetaNode) isWritable() (ok bool) {
 	return
 }
 
+func (metaNode *MetaNode) isWritableByDiskSpace() (ok bool) {
+	metaNode.RLock()
+	defer metaNode.RUnlock()
+	if metaNode.IsActive && metaNode.MaxMemAvailWeight > gConfig.metaNodeReservedMem &&
+		metaNode.MetaPartitionCount < defaultMaxMetaPartitionCountOnEachNode &&
+		metaNode.ToBeOffline == false && metaNode.ToBeMigrated == false &&
+		metaNode.DiskTotal - metaNode.Used > gConfig.metaNodeReservedDisk {
+		ok = true
+	}
+	return
+}
+
 // A carry node is the meta node whose carry is greater than one.
 func (metaNode *MetaNode) isCarryNode() (ok bool) {
 	metaNode.RLock()
 	defer metaNode.RUnlock()
 	return metaNode.Carry >= 1
+}
+
+func (metaNode *MetaNode) isCarryNodeByDiskSpace() (ok bool) {
+	metaNode.RLock()
+	defer metaNode.RUnlock()
+	return metaNode.DiskCarry >= 1
 }
 
 func (metaNode *MetaNode) setNodeActive() {
@@ -124,6 +164,7 @@ func (metaNode *MetaNode) updateMetric(resp *proto.MetaNodeHeartbeatResponse, th
 		metaNode.Ratio = float64(resp.Used) / float64(resp.Total)
 	}
 	metaNode.MaxMemAvailWeight = resp.Total - resp.Used
+	//metaNode.MaxDiskAvailableSpace =
 	metaNode.ZoneName = resp.ZoneName
 	metaNode.Threshold = threshold
 }

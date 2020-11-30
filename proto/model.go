@@ -34,6 +34,7 @@ type MetaNodeInfo struct {
 	Ratio                     float64
 	SelectCount               uint64
 	Carry                     float64
+	DiskCarry                 float64
 	Threshold                 float32
 	ReportTime                time.Time
 	MetaPartitionCount        int
@@ -95,6 +96,7 @@ type MetaReplicaInfo struct {
 	IsLeader    bool
 	InodeCount  uint64
 	DentryCount uint64
+	StoreType   StoreType
 }
 
 // ClusterView provides the view of a cluster.

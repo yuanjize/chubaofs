@@ -39,6 +39,7 @@ type MetaReplica struct {
 	ReportTime  int64
 	Status      int8 // unavailable, readOnly, readWrite
 	IsLeader    bool
+	StoreType   proto.StoreType
 	metaNode    *MetaNode
 }
 
@@ -67,14 +68,15 @@ type MetaPartition struct {
 	sync.RWMutex
 }
 
-func newMetaReplica(start, end uint64, metaNode *MetaNode) (mr *MetaReplica) {
+func newMetaReplica(start, end uint64, metaNode *MetaNode, storeType proto.StoreType) (mr *MetaReplica) {
 	mr = &MetaReplica{start: start, end: end, nodeID: metaNode.ID, Addr: metaNode.Addr}
 	mr.metaNode = metaNode
+	mr.StoreType = storeType
 	mr.ReportTime = time.Now().Unix()
 	return
 }
 
-func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string, volID uint64) (mp *MetaPartition) {
+func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName string, volID uint64, storeType proto.StoreType) (mp *MetaPartition) {
 	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, VolName: volName, volID: volID}
 	mp.ReplicaNum = replicaNum
 	mp.Replicas = make([]*MetaReplica, 0)
@@ -84,6 +86,7 @@ func newMetaPartition(partitionID, start, end uint64, replicaNum uint8, volName 
 	mp.Learners = make([]proto.Learner, 0)
 	mp.Hosts = make([]string, 0)
 	mp.LoadResponse = make([]*proto.MetaPartitionLoadResponse, 0)
+	mp.StoreType = storeType
 	return
 }
 
@@ -347,7 +350,7 @@ func (mp *MetaPartition) updateMetaPartition(mgr *proto.MetaPartitionReport, met
 	defer mp.Unlock()
 	mr, err := mp.getMetaReplica(metaNode.Addr)
 	if err != nil {
-		mr = newMetaReplica(mp.Start, mp.End, metaNode)
+		mr = newMetaReplica(mp.Start, mp.End, metaNode, mgr.StoreType)
 		mp.addReplica(mr)
 	}
 	mr.updateMetric(mgr)
@@ -525,6 +528,7 @@ func (mp *MetaPartition) buildNewMetaPartitionTasks(specifyAddrs []string, peers
 		PartitionID: mp.PartitionID,
 		Members:     peers,
 		VolName:     volName,
+		StoreType:   mp.StoreType,
 	}
 	if specifyAddrs == nil {
 		hosts = mp.Hosts
@@ -557,7 +561,7 @@ func (mp *MetaPartition) createTaskToTryToChangeLeader(addr string) (task *proto
 	return
 }
 
-func (mp *MetaPartition) createTaskToCreateReplica(host string) (t *proto.AdminTask, err error) {
+func (mp *MetaPartition) createTaskToCreateReplica(host string, mpStoreType proto.StoreType) (t *proto.AdminTask, err error) {
 	req := &proto.CreateMetaPartitionRequest{
 		Start:       mp.Start,
 		End:         mp.End,
@@ -565,6 +569,7 @@ func (mp *MetaPartition) createTaskToCreateReplica(host string) (t *proto.AdminT
 		Members:     mp.Peers,
 		VolName:     mp.VolName,
 		Learners:    mp.Learners,
+		StoreType:   mpStoreType,
 	}
 	t = proto.NewAdminTask(proto.OpCreateMetaPartition, host, req)
 	resetMetaPartitionTaskID(t, mp.PartitionID)
@@ -665,15 +670,16 @@ func (mr *MetaReplica) updateMetric(mgr *proto.MetaPartitionReport) {
 	mr.MaxInodeID = mgr.MaxInodeID
 	mr.InodeCount = mgr.InodeCnt
 	mr.DentryCount = mgr.DentryCnt
+	mr.StoreType = mgr.StoreType
 	mr.setLastReportTime()
 }
 
-func (mp *MetaPartition) afterCreation(nodeAddr string, c *Cluster) (err error) {
+func (mp *MetaPartition) afterCreation(nodeAddr string, c *Cluster, storeType proto.StoreType) (err error) {
 	metaNode, err := c.metaNode(nodeAddr)
 	if err != nil {
 		return err
 	}
-	mr := newMetaReplica(mp.Start, mp.End, metaNode)
+	mr := newMetaReplica(mp.Start, mp.End, metaNode, storeType)
 	mr.Status = proto.ReadWrite
 	mr.ReportTime = time.Now().Unix()
 	mp.addReplica(mr)
@@ -958,6 +964,7 @@ var getTargetAddressForRepairMetaZone = func(c *Cluster, nodeAddr string, mp *Me
 	if nodesetInTargetZone, err = targetZone.getNodeSet(targetNode.NodeSetID); err != nil {
 		return
 	}
+	//mp.StoreType
 	if targetHosts, _, err = nodesetInTargetZone.getAvailMetaNodeHosts(mp.Hosts, 1); err != nil {
 		// select meta nodes from the other node set in same zone
 		excludeNodeSets = append(excludeNodeSets, nodesetInTargetZone.ID)

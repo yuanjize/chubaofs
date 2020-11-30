@@ -70,6 +70,7 @@ type metaPartitionValue struct {
 	Peers         []bsProto.Peer
 	Learners      []bsProto.Learner
 	IsRecover     bool
+	StoreType     mpproto.StoreType
 }
 
 func newMetaPartitionValue(mp *MetaPartition) (mpv *metaPartitionValue) {
@@ -86,6 +87,7 @@ func newMetaPartitionValue(mp *MetaPartition) (mpv *metaPartitionValue) {
 		Learners:      mp.Learners,
 		OfflinePeerID: mp.OfflinePeerID,
 		IsRecover:     mp.IsRecover,
+		StoreType:     mp.StoreType,
 	}
 	return
 }
@@ -150,6 +152,7 @@ type volValue struct {
 	CreateTime        int64
 	Description       string
 	MpStoreType       mpproto.StoreType
+	MinWritableMPNum  uint64
 }
 
 func (v *volValue) Bytes() (raw []byte, err error) {
@@ -177,6 +180,8 @@ func newVolValue(vol *Vol) (vv *volValue) {
 		OSSSecretKey:      vol.OSSSecretKey,
 		CreateTime:        vol.createTime,
 		Description:       vol.description,
+		MpStoreType: 	   vol.mpStoreType,
+		MinWritableMPNum:  vol.MinWritableMPNum,
 	}
 	return
 }
@@ -706,7 +711,7 @@ func (c *Cluster) loadMetaPartitions() (err error) {
 				mpv.Learners[i].ID = mn.(*MetaNode).ID
 			}
 		}
-		mp := newMetaPartition(mpv.PartitionID, mpv.Start, mpv.End, vol.mpReplicaNum, vol.Name, mpv.VolID)
+		mp := newMetaPartition(mpv.PartitionID, mpv.Start, mpv.End, vol.mpReplicaNum, vol.Name, mpv.VolID, mpv.StoreType)
 		mp.setHosts(strings.Split(mpv.Hosts, underlineSeparator))
 		mp.setPeers(mpv.Peers)
 		mp.setLearners(mpv.Learners)

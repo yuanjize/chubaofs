@@ -496,13 +496,14 @@ func (m *ClusterService) addMetaNode(ctx context.Context, args struct {
 func (m *ClusterService) addMetaReplica(ctx context.Context, args struct {
 	PartitionID uint64
 	Addr        string
+	mpStoreType proto.StoreType
 }) (*proto.GeneralResp, error) {
 	mp, err := m.cluster.getMetaPartitionByID(args.PartitionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = m.cluster.addMetaReplica(mp, args.Addr); err != nil {
+	if err = m.cluster.addMetaReplica(mp, args.Addr, args.mpStoreType); err != nil {
 		return nil, err
 	}
 	mp.IsRecover = true
