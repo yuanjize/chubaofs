@@ -494,6 +494,7 @@ func (m *Server) addMetaReplica(w http.ResponseWriter, r *http.Request) {
 		mp          *MetaPartition
 		partitionID uint64
 		mpStoreType proto.StoreType
+		vol         *Vol
 		err         error
 	)
 
@@ -505,6 +506,14 @@ func (m *Server) addMetaReplica(w http.ResponseWriter, r *http.Request) {
 	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(proto.ErrMetaPartitionNotExists))
 		return
+	}
+	if mpStoreType == proto.MetaTypeUnKnown {
+		// get the default type which is the same with vol
+		if vol, err = m.cluster.getVol(mp.VolName); err != nil {
+			sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
+			return
+		}
+		mpStoreType = vol.mpStoreType
 	}
 	if err = m.cluster.addMetaReplica(mp, addr, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
@@ -553,6 +562,7 @@ func (m *Server) addMetaReplicaLearner(w http.ResponseWriter, r *http.Request) {
 		auto        bool
 		threshold   uint8
 		mpStoreType proto.StoreType
+		vol         *Vol
 		err         error
 	)
 
@@ -564,6 +574,14 @@ func (m *Server) addMetaReplicaLearner(w http.ResponseWriter, r *http.Request) {
 	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(proto.ErrMetaPartitionNotExists))
 		return
+	}
+	if mpStoreType == proto.MetaTypeUnKnown {
+		// get the default type which is the same with vol
+		if vol, err = m.cluster.getVol(mp.VolName); err != nil {
+			sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
+			return
+		}
+		mpStoreType = vol.mpStoreType
 	}
 	if err = m.cluster.addMetaReplicaLearner(mp, addr, auto, threshold, mpStoreType); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
@@ -2475,7 +2493,7 @@ func extractMpStoreType(r *http.Request) (mpStoreType proto.StoreType, err error
 func extractMpStoreTypeToAddMetaReplica(r *http.Request) (mpStoreType proto.StoreType, err error) {
 	var s string
 	if s = r.FormValue(volMpStoreTypeKey); s == "" {
-		err = unmatchedKey(volMpStoreTypeKey)
+		mpStoreType = proto.MetaTypeUnKnown
 		return
 	}
 
