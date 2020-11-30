@@ -133,6 +133,10 @@ func CreateDataPartition(volId string, partitionId uint32, disk *Disk, size int,
 // LoadDataPartition load and returns partition instance from specified directory.
 // This method will read the partition meta file stored under the specified directory
 // and create partition instance.
+/*
+  1.从partitionDir/META文件里面读出来元数据
+  2.根据元数据调用newDataPartition从DiskPath/datapartition_partitionid_size读取数据
+*/
 func LoadDataPartition(partitionDir string, disk *Disk) (dp DataPartition, err error) {
 	var (
 		metaFileData []byte
@@ -150,7 +154,7 @@ func LoadDataPartition(partitionDir string, disk *Disk) (dp DataPartition, err e
 	dp, err = newDataPartition(meta.VolumeId, meta.PartitionId, disk, meta.PartitionSize)
 	return
 }
-
+// 创建/恢复 partition
 func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int) (dp DataPartition, err error) {
 	partition := &dataPartition{
 		volumeId:        volumeId,
@@ -179,7 +183,7 @@ func newDataPartition(volumeId string, partitionId uint32, disk *Disk, size int)
 func (dp *dataPartition) ID() uint32 {
 	return dp.partitionId
 }
-
+// 它对应的数据文件的path
 func (dp *dataPartition) Path() string {
 	return dp.path
 }
@@ -238,7 +242,7 @@ func (dp *dataPartition) ChangeStatus(status int) {
 		dp.partitionStatus = status
 	}
 }
-
+// 10分钟更新一次状态
 func (dp *dataPartition) statusUpdateScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	for {
@@ -251,7 +255,7 @@ func (dp *dataPartition) statusUpdateScheduler() {
 		}
 	}
 }
-
+// 定时更新partitionStatus
 func (dp *dataPartition) statusUpdate() {
 
 	status := proto.ReadWrite

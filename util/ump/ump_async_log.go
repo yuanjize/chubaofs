@@ -20,7 +20,7 @@ type SystemAlive struct {
 	HostName string `json:"hostname"`
 	Time     string `json:"time"`
 }
-
+// 异步写日志的一个东西
 type BusinessAlarm struct {
 	Time         string `json:"time"`
 	Key          string `json:"key"`
@@ -76,7 +76,7 @@ func (lw *LogWrite) initLogFp(sufixx string) (err error) {
 
 	return
 }
-
+// 最多保存三个日志文件，当钱文件大小超过最大文件的时候，把当前文件flush并重命名为.1/.2/.3（三个文件循环删除写）文件，然后重新写。
 func (lw *LogWrite) backGroundCheckFile() (err error) {
 	if lw.logSize <= MaxLogSize {
 		return

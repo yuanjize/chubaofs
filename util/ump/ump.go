@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 )
-
+// 异步日志消息
 type TpObject struct {
 	startTime time.Time
 	endTime   time.Time

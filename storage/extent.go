@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 )
-
+// O_EXCL&O_CREATE 如果文件存在，那么打开的时候会有err.
 const (
 	ExtentOpenOpt          = os.O_CREATE | os.O_RDWR | os.O_EXCL
 	ExtentOpenOptOverwrite = os.O_CREATE | os.O_RDWR
@@ -147,6 +147,7 @@ func (e *fsExtent) ID() uint64 {
 
 // InitToFS init extent data info filesystem. If entry file exist and overwrite is true,
 // this operation will clear all data of exist entry file and initialize extent header data.
+// 初始化文件并写入extent header
 func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 
 	opt := ExtentOpenOpt
@@ -195,6 +196,7 @@ func (e *fsExtent) InitToFS(ino uint64, overwrite bool) (err error) {
 }
 
 // RestoreFromFS restore entity data and status from entry file stored in filesystem.
+// 从文件中填充extent结构体
 func (e *fsExtent) RestoreFromFS() (err error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -224,7 +226,7 @@ func (e *fsExtent) RestoreFromFS() (err error) {
 	return
 }
 
-// MarkDelete mark this extent as deleted.
+// MarkDelete mark this extent as deleted. 标记删除
 func (e *fsExtent) MarkDelete() (err error) {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
@@ -243,7 +245,7 @@ func (e *fsExtent) IsMarkDelete() bool {
 	return e.header[util.MarkDeleteIndex] == util.MarkDelete
 }
 
-// Size returns length of extent data exclude header.
+// Size returns length of extent data exclude header. 数据部分的大小，不算上header
 func (e *fsExtent) Size() (size int64) {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
@@ -259,6 +261,7 @@ func (e *fsExtent) ModTime() time.Time {
 }
 
 // Write data to extent.
+// size：data中要写入数据的大小 offset：相对于数据部分的偏移量，不包括header
 func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error) {
 	if err = e.checkOffsetAndSize(offset, size); err != nil {
 		return
@@ -272,16 +275,16 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 	if writeSize, err = e.file.WriteAt(data[:size], int64(offset+util.BlockHeaderSize)); err != nil {
 		return
 	}
-	blockNo := offset / util.BlockSize
-	offsetInBlock := offset % util.BlockSize
-	e.dataSize = int64(math.Max(float64(e.dataSize), float64(offset+size)))
+	blockNo := offset / util.BlockSize  // 第几块
+	offsetInBlock := offset % util.BlockSize //块内偏移量
+	e.dataSize = int64(math.Max(float64(e.dataSize), float64(offset+size))) //更新大小
 	e.modifyTime = time.Now()
-	if offsetInBlock == 0 {
+	if offsetInBlock == 0 {  // 正好对齐
 		return e.updateBlockCrc(int(blockNo), crc)
 	}
 	blockBuffer := make([]byte, util.BlockSize)
 	remainCheckByteCnt := offsetInBlock + int64(writeSize)
-	for {
+	for {  //重新计算校验值
 		if remainCheckByteCnt <= 0 {
 			break
 		}
@@ -306,7 +309,7 @@ func (e *fsExtent) Write(data []byte, offset, size int64, crc uint32) (err error
 	return
 }
 
-// Read data from extent.
+// Read data from extent. 读数据
 func (e *fsExtent) Read(data []byte, offset, size int64) (crc uint32, err error) {
 	if err = e.checkOffsetAndSize(offset, size); err != nil {
 		return
@@ -328,6 +331,7 @@ func (e *fsExtent) Read(data []byte, offset, size int64) (crc uint32, err error)
 	return
 }
 
+//更新对应块的校验值 header里面包含多个校验值，每个块都是对应的一个校验值.目前来看blockHeader是包含在extend的header里面的
 func (e *fsExtent) updateBlockCrc(blockNo int, crc uint32) (err error) {
 	startIdx := util.BlockHeaderCrcIndex + blockNo*util.PerBlockCrcSize
 	endIdx := startIdx + util.PerBlockCrcSize
@@ -338,14 +342,14 @@ func (e *fsExtent) updateBlockCrc(blockNo int, crc uint32) (err error) {
 	e.modifyTime = time.Now()
 	return
 }
-
+// 读取block对应的校验值
 func (e *fsExtent) getBlockCrc(blockNo int) (crc uint32) {
 	startIdx := util.BlockHeaderCrcIndex + blockNo*util.PerBlockCrcSize
 	endIdx := startIdx + util.PerBlockCrcSize
 	crc = binary.BigEndian.Uint32(e.header[startIdx:endIdx])
 	return
 }
-
+// 检查一下offset和size是否合法，写入的数据是否会超出规定的extent大小，每次写入的数据不能超过一块
 func (e *fsExtent) checkOffsetAndSize(offset, size int64) error {
 	if offset+size > util.BlockSize*util.BlockCount {
 		return NewParamMismatchErr(fmt.Sprintf("offset=%v size=%v", offset, size))
@@ -360,7 +364,7 @@ func (e *fsExtent) checkOffsetAndSize(offset, size int64) error {
 	return nil
 }
 
-// Flush synchronize data to disk immediately.
+// Flush synchronize data to disk immediately.= sync
 func (e *fsExtent) Flush() (err error) {
 	err = e.file.Sync()
 	return

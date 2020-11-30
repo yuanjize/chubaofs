@@ -156,6 +156,7 @@ func (m *MetaNode) validConfig() (err error) {
 	return
 }
 
+// 启动meta manager
 func (m *MetaNode) startMetaManager() (err error) {
 	if _, err = os.Stat(m.metaDir); err != nil {
 		if err = os.MkdirAll(m.metaDir, 0755); err != nil {
@@ -180,6 +181,7 @@ func (m *MetaNode) stopMetaManager() {
 	}
 }
 
+//首先拿到本季ip,然后通过postNodeID函数去其中一个master拿到自己的nodeid.
 func (m *MetaNode) register() (err error) {
 	for {
 		m.localAddr, err = util.GetLocalIP()
@@ -197,6 +199,7 @@ func (m *MetaNode) register() (err error) {
 	}
 }
 
+// 去其中一个master拿到自己的nodeid
 func (m *MetaNode) postNodeID() (err error) {
 	reqPath := fmt.Sprintf("%s?addr=%s:%s", metaNodeURL, m.localAddr, m.listen)
 	msg, err := postToMaster(reqPath, nil)
@@ -213,6 +216,7 @@ func (m *MetaNode) postNodeID() (err error) {
 	return
 }
 
+// 向master(其中一个)发请求
 func postToMaster(reqPath string, body []byte) (msg []byte, err error) {
 	var (
 		req  *http.Request
@@ -263,7 +267,7 @@ func postToMaster(reqPath string, body []byte) (msg []byte, err error) {
 	}
 	return
 }
-
+// 初始化异步日志logger,modulename是clusterName
 func (m *MetaNode) startUMP() (err error) {
 	defaultTimeout := http.DefaultClient.Timeout
 	defer func() {

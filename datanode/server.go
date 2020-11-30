@@ -102,7 +102,13 @@ func (s *DataNode) Sync() {
 		s.wg.Wait()
 	}
 }
-
+/*
+	1.parse配置
+	2.注册http api
+	3.启动startSpaceManager
+	4.启动tcp服务
+	5.把自己注册到master
+*/
 func (s *DataNode) onStart(cfg *config.Config) (err error) {
 	s.stopC = make(chan bool, 0)
 	if err = s.parseConfig(cfg); err != nil {
@@ -160,7 +166,7 @@ func (s *DataNode) parseConfig(cfg *config.Config) (err error) {
 	log.LogDebugf("action[parseConfig] load rackName[%v].", s.rackName)
 	return
 }
-
+// 初始化一下sm，然后根据ConfigKeyDisks配置，把disk加载出来(同时会加载disk下面的partition)
 func (s *DataNode) startSpaceManager(cfg *config.Config) (err error) {
 	s.space = NewSpaceManager(s.rackName)
 	if err != nil || len(strings.TrimSpace(s.port)) == 0 {
@@ -193,7 +199,8 @@ func (s *DataNode) startSpaceManager(cfg *config.Config) (err error) {
 	wg.Wait()
 	return nil
 }
-
+// 1.从master手里拿到集群的info(GetIpFromMaster)接口
+// 2.调用naster的AddDataNode函数，注册自己
 func (s *DataNode) registerToMaster() {
 	var (
 		err  error
@@ -241,7 +248,7 @@ func (s *DataNode) registerToMaster() {
 	}
 
 }
-
+// 注册一些http api
 func (s *DataNode) registerProfHandler() {
 	http.HandleFunc("/disks", s.apiGetDisk)
 	http.HandleFunc("/partitions", s.apiGetPartitions)
@@ -249,7 +256,7 @@ func (s *DataNode) registerProfHandler() {
 	http.HandleFunc("/extent", s.apiGetExtent)
 	http.HandleFunc("/stats", s.apiGetStat)
 }
-
+// 启动tcp服务
 func (s *DataNode) startTcpService() (err error) {
 	log.LogInfo("Start: startTcpService")
 	addr := fmt.Sprintf(":%v", s.port)

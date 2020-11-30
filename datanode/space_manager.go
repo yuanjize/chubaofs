@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 )
-
+// 目前来看是sm包含disk，disk和partition有直接关系
 type SpaceManager interface {
 	LoadDisk(path string, restSize uint64, maxErrs int) (err error)
 	GetDisk(path string) (d *Disk, err error)
@@ -27,7 +27,7 @@ type spaceManager struct {
 	partitions  map[uint32]DataPartition
 	diskMu      sync.RWMutex
 	partitionMu sync.RWMutex
-	stats       *Stats
+	stats       *Stats  // metric用
 	stopC       chan bool
 }
 
@@ -52,7 +52,7 @@ func (space *spaceManager) Stop() {
 	}()
 	close(space.stopC)
 }
-
+// 使用f，便利所有的分区
 func (space *spaceManager) RangePartitions(f func(partition DataPartition) bool) {
 	if f == nil {
 		return
@@ -70,7 +70,7 @@ func (space *spaceManager) RangePartitions(f func(partition DataPartition) bool)
 		}
 	}
 }
-
+// 获取所有的Disk(map转换slice)
 func (space *spaceManager) GetDisks() (disks []*Disk) {
 	space.diskMu.RLock()
 	defer space.diskMu.RUnlock()
@@ -80,11 +80,11 @@ func (space *spaceManager) GetDisks() (disks []*Disk) {
 	}
 	return
 }
-
+// 获取stats
 func (space *spaceManager) Stats() *Stats {
 	return space.stats
 }
-
+// 恢复disk数据结构，并restore disk中的partition
 func (space *spaceManager) LoadDisk(path string, restSize uint64, maxErrs int) (err error) {
 	var (
 		disk *Disk
@@ -98,7 +98,7 @@ func (space *spaceManager) LoadDisk(path string, restSize uint64, maxErrs int) (
 	}
 	return
 }
-
+// 根据path获取Disk
 func (space *spaceManager) GetDisk(path string) (d *Disk, err error) {
 	space.diskMu.RLock()
 	defer space.diskMu.RUnlock()
@@ -110,14 +110,14 @@ func (space *spaceManager) GetDisk(path string) (d *Disk, err error) {
 	err = fmt.Errorf("disk[%v] not exsit", path)
 	return
 }
-
+// 放在map里
 func (space *spaceManager) putDisk(d *Disk) {
 	space.diskMu.Lock()
 	space.disks[d.Path] = d
 	space.diskMu.Unlock()
 
 }
-
+// 更新metrics
 func (space *spaceManager) updateMetrics() {
 	space.diskMu.RLock()
 	var (
@@ -143,7 +143,7 @@ func (space *spaceManager) updateMetrics() {
 	space.stats.updateMetrics(total, used, available, createdPartitionWeights,
 		remainWeightsForCreatePartition, maxWeightsForCreatePartition, partitionCnt)
 }
-
+// 找到包含分区数最少的disk
 func (space *spaceManager) getMinPartitionCntDisk() (d *Disk) {
 	space.diskMu.Lock()
 	defer space.diskMu.Unlock()
@@ -163,7 +163,7 @@ func (space *spaceManager) getMinPartitionCntDisk() (d *Disk) {
 
 	return
 }
-
+// 每5分钟对每个分区调用一次fileRepair，实际调用所有分区的partition.LaunchRepair()
 func (space *spaceManager) fileRepairScheduler() {
 	go func() {
 		timer := time.NewTimer(5 * time.Minute)
@@ -179,7 +179,7 @@ func (space *spaceManager) fileRepairScheduler() {
 		}
 	}()
 }
-
+// 每2分钟调用一次flushDelete
 func (space *spaceManager) flushDeleteScheduler() {
 	go func() {
 		ticker := time.NewTicker(2 * time.Minute)
@@ -194,7 +194,7 @@ func (space *spaceManager) flushDeleteScheduler() {
 		}
 	}()
 }
-
+// 每5分钟对每个分区调用一次updateMetrics，调用每个分区的partition.FlushDelete()
 func (space *spaceManager) statUpdateScheduler() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -209,7 +209,7 @@ func (space *spaceManager) statUpdateScheduler() {
 		}
 	}()
 }
-
+// 所有分区都调用LaunchRepair
 func (space *spaceManager) fileRepair() {
 	partitions := make([]DataPartition, 0)
 	space.RangePartitions(func(dp DataPartition) bool {
@@ -220,7 +220,7 @@ func (space *spaceManager) fileRepair() {
 		partition.LaunchRepair()
 	}
 }
-
+// 所有分区都调用FlushDelete
 func (space *spaceManager) flushDelete() {
 	partitions := make([]DataPartition, 0)
 	space.RangePartitions(func(dp DataPartition) bool {
@@ -231,7 +231,7 @@ func (space *spaceManager) flushDelete() {
 		partition.FlushDelete()
 	}
 }
-
+// 从map里面获取DataPartition
 func (space *spaceManager) GetPartition(partitionId uint32) (dp DataPartition) {
 	space.partitionMu.RLock()
 	defer space.partitionMu.RUnlock()
@@ -239,14 +239,14 @@ func (space *spaceManager) GetPartition(partitionId uint32) (dp DataPartition) {
 
 	return
 }
-
+// DataPartition放到map里面s
 func (space *spaceManager) PutPartition(dp DataPartition) {
 	space.partitionMu.Lock()
 	defer space.partitionMu.Unlock()
 	space.partitions[dp.ID()] = dp
 	return
 }
-
+// 找到包含的分区数目最小的disk,然后创建分区
 func (space *spaceManager) CreatePartition(volId string, partitionId uint32, storeSize int, storeType string) (dp DataPartition, err error) {
 	if space.GetPartition(partitionId) != nil {
 		return
@@ -261,7 +261,7 @@ func (space *spaceManager) CreatePartition(volId string, partitionId uint32, sto
 	space.PutPartition(dp)
 	return
 }
-
+// 从space和disk中移除分区，然后分区自我销毁
 func (space *spaceManager) DeletePartition(dpId uint32) {
 	dp := space.GetPartition(dpId)
 	if dp == nil {

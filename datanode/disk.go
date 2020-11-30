@@ -51,21 +51,28 @@ type DiskUsage struct {
 type Disk struct {
 	sync.RWMutex
 	Path         string
-	ReadErrs     uint64
-	WriteErrs    uint64
+	ReadErrs     uint64 // 读取stat错误数
+	WriteErrs    uint64 // 写入错误数
 	Total        uint64
 	Used         uint64
 	Available    uint64
 	Unallocated  uint64
 	Allocated    uint64
-	MaxErrs      int
-	Status       int
-	RestSize     uint64
+	MaxErrs      int  // 最大错误数,超过这个错误数disk就是unAvailable的了
+	Status       int  //disk状态，unAvailable/只读/读写
+	RestSize     uint64 // 这个是不用的空间，就是留白的？？
 	partitionMap map[uint32]DataPartition
 	compactCh    chan *CompactTask
 	space        SpaceManager
 }
-
+/*
+  1.创建Disk对象
+  2.对其多个goroutine进行compact任务
+  3.计算Usage
+  4.开始定时调度任务
+	 4.1定时计算usage
+	 4.2定时更新status
+*/
 func NewDisk(path string, restSize uint64, maxErrs int) (d *Disk) {
 	d = new(Disk)
 	d.Path = path
@@ -83,11 +90,11 @@ func NewDisk(path string, restSize uint64, maxErrs int) (d *Disk) {
 	d.startScheduleTasks()
 	return
 }
-
+// 当前disk有几个partition
 func (d *Disk) PartitionCount() int {
 	return len(d.partitionMap)
 }
-
+// 磁盘使用率
 func (d *Disk) computeUsage() (err error) {
 	fs := syscall.Statfs_t{}
 	err = syscall.Statfs(d.Path, &fs)
@@ -141,11 +148,11 @@ func (d *Disk) addTask(t *CompactTask) (err error) {
 		return errors.Annotatef(ErrDiskCompactChanFull, "diskPath:[%v] partitionId[%v]", d.Path, t.partitionId)
 	}
 }
-
+// 产生一次读错误
 func (d *Disk) addReadErr() {
 	atomic.AddUint64(&d.ReadErrs, 1)
 }
-
+// 进行compact任务
 func (d *Disk) compact() {
 	for {
 		select {
@@ -167,7 +174,7 @@ func (d *Disk) compact() {
 func (d *Disk) addWriteErr() {
 	atomic.AddUint64(&d.WriteErrs, 1)
 }
-
+// 定时计算disk的useage和status
 func (d *Disk) startScheduleTasks() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -180,7 +187,7 @@ func (d *Disk) startScheduleTasks() {
 		}
 	}()
 }
-
+// 更新disk的status
 func (d *Disk) updateSpaceInfo() (err error) {
 	var statsInfo syscall.Statfs_t
 	if err = syscall.Statfs(d.Path, &statsInfo); err != nil {
@@ -223,7 +230,7 @@ func (d *Disk) DataPartitionList() (partitionIds []uint32) {
 	}
 	return
 }
-
+// 从文件名中parse出来partitionId，partitionSize。格式是: name:partitionID:partitionSize
 func unmarshalPartitionName(name string) (partitionId uint32, partitionSize int, err error) {
 	arr := strings.Split(name, "_")
 	if len(arr) != 3 {
@@ -242,12 +249,15 @@ func unmarshalPartitionName(name string) (partitionId uint32, partitionSize int,
 	partitionId = uint32(pId)
 	return
 }
-
+// 判断文件夹名是不是符合Partition文件名规则
 func (d *Disk) isPartitionDir(filename string) (is bool) {
 	is = RegexpDataPartitionDir.MatchString(filename)
 	return
 }
-
+/*
+   1.从disk.path下面找到所有存放partition元数据的目录
+   2.恢复partition
+*/ 
 func (d *Disk) RestorePartition(space SpaceManager) {
 	var (
 		partitionId   uint32
