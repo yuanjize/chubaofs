@@ -378,7 +378,7 @@ func (e *fsExtent) HeaderChecksum() (crc uint32) {
 	crc = crc32.ChecksumIEEE(e.header)
 	return
 }
-
+// 定时把extent文件补全（没数据的地方用0）
 func (e *fsExtent) pendingCollapseFile() {
 	timer := time.NewTimer(5 * time.Second)
 	for {

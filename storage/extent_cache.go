@@ -117,7 +117,7 @@ func (cache *lruExtentCache) Size() int {
 	cache.lock.RUnlock()
 	return cache.extentList.Len()
 }
-
+// 干掉lru中多余的节点
 func (cache *lruExtentCache) fireLRU() {
 	if cache.capacity <= 0 {
 		return

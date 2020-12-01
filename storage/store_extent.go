@@ -39,13 +39,15 @@ type ExtentFilter func(info *FileInfo) bool
 
 // Filters
 var (
+	// 很久没有修改了，但是里面还有数据，感觉已经稳定了的文件。
 	GetStableExtentFilter = func() ExtentFilter {
 		now := time.Now()
 		return func(info *FileInfo) bool {
 			return now.Unix()-info.ModTime.Unix() > 30*60 && !info.Deleted && info.Size > 0
 		}
 	}
-	GetEmptyExtentFilter = func() ExtentFilter {
+	// 很少被修改，感觉可以删除了的文件
+	GetEmptyExtentFilter = func() ExtentFilter { // 上次修改已经过了三十分钟 && extent没有被删除 && 文件大小是0
 		now := time.Now()
 		return func(info *FileInfo) bool {
 			return now.Unix()-info.ModTime.Unix() > 30*60 && !info.Deleted && info.Size == 0
@@ -55,7 +57,7 @@ var (
 
 type ExtentStore struct {
 	dataDir       string
-	baseExtentId  uint64
+	baseExtentId  uint64  // 最大的extendid
 	extentInfoMap map[uint64]*FileInfo
 	extentInfoMux sync.RWMutex
 	cache         ExtentCache
@@ -94,13 +96,13 @@ func NewExtentStore(dataDir string, storeSize int) (s *ExtentStore, err error) {
 		err = fmt.Errorf("init base field ID: %v", err)
 		return
 	}
-	s.storeSize = storeSize
+	s.storeSize = storeSize  // partition大小
 	s.closeC = make(chan bool, 1)
 	s.closed = false
 	go s.cleanupScheduler()
 	return
 }
-
+// 删除分区所有数据？
 func (s *ExtentStore) DeleteStore() (err error) {
 	s.cache.Clear()
 	err = os.RemoveAll(s.dataDir)
@@ -127,11 +129,14 @@ func (s *ExtentStore) SnapShot() (files []*proto.File, err error) {
 	}
 	return
 }
-
+// baseExtentId自增1
 func (s *ExtentStore) NextExtentId() (extentId uint64) {
 	return atomic.AddUint64(&s.baseExtentId, 1)
 }
-
+/*
+  创建新的extent
+  overwrite 是否允许覆盖使用其它已经被使用的extent
+*/
 func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err error) {
 	var extent Extent
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
@@ -143,7 +148,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 		if extent, err = s.getExtent(extentId); err != nil {
 			return
 		}
-		extent.InitToFS(extentId, true)
+		extent.InitToFS(extentId, true) // 重制
 	} else {
 		extent = NewExtentInCore(name, extentId)
 		if err = extent.InitToFS(inode, false); err != nil {
@@ -161,7 +166,7 @@ func (s *ExtentStore) Create(extentId uint64, inode uint64, overwrite bool) (err
 	s.UpdateBaseExtentId(extentId)
 	return
 }
-
+// 更新 BaseExtentId
 func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 	if id >= atomic.LoadUint64(&s.baseExtentId) {
 		atomic.StoreUint64(&s.baseExtentId, id)
@@ -175,6 +180,11 @@ func (s *ExtentStore) UpdateBaseExtentId(id uint64) (err error) {
 	return
 }
 
+/*
+  根据extentid获取extent
+  1.先从extent cache获取
+  2.1获取不到就从磁盘获取
+*/
 func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
 	var ok bool
 	if e, ok = s.cache.Get(extentId); !ok {
@@ -185,7 +195,7 @@ func (s *ExtentStore) getExtent(extentId uint64) (e Extent, err error) {
 	}
 	return
 }
-
+// extent是否存在
 func (s *ExtentStore) IsExistExtent(extentId uint64) (exist bool) {
 	s.extentInfoMux.RLock()
 	defer s.extentInfoMux.RUnlock()
@@ -193,6 +203,7 @@ func (s *ExtentStore) IsExistExtent(extentId uint64) (exist bool) {
 	return
 }
 
+// 从磁盘加载Extent结构体
 func (s *ExtentStore) loadExtentFromDisk(extentId uint64) (e Extent, err error) {
 	name := path.Join(s.dataDir, strconv.Itoa(int(extentId)))
 	e = NewExtentInCore(name, extentId)
@@ -203,7 +214,7 @@ func (s *ExtentStore) loadExtentFromDisk(extentId uint64) (e Extent, err error) 
 	s.cache.Put(e)
 	return
 }
-
+// 从meta文件中读取出 baseFileId,然后解析当前目录下面的所有extent文件，找到最大的extentId作为baseFileId
 func (s *ExtentStore) initBaseFileId() (err error) {
 	var (
 		baseFileId uint64
@@ -245,7 +256,7 @@ func (s *ExtentStore) initBaseFileId() (err error) {
 	atomic.StoreUint64(&s.baseExtentId, baseFileId)
 	return nil
 }
-
+// 写入到指定的extentId
 func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, crc uint32) (err error) {
 	var (
 		extentInfo *FileInfo
@@ -274,7 +285,11 @@ func (s *ExtentStore) Write(extentId uint64, offset, size int64, data []byte, cr
 	extentInfo.FromExtent(extent)
 	return
 }
-
+/*
+   写入不能超过文件大小
+   偏移不能超过文件大小
+   每次写入的数据不能超过一块
+*/
 func (s *ExtentStore) checkOffsetAndSize(offset, size int64) error {
 	if offset+size > util.BlockSize*util.BlockCount {
 		return NewParamMismatchErr(fmt.Sprintf("offset=%v size=%v", offset, size))
@@ -288,7 +303,7 @@ func (s *ExtentStore) checkOffsetAndSize(offset, size int64) error {
 	}
 	return nil
 }
-
+// 从extent读取数据
 func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (crc uint32, err error) {
 	var extent Extent
 	if extent, err = s.getExtent(extentId); err != nil {
@@ -305,6 +320,7 @@ func (s *ExtentStore) Read(extentId uint64, offset, size int64, nbuf []byte) (cr
 	return
 }
 
+// 干掉空文件. mark extent为delete状态，干掉内存中该extent相关的信息，最后把extentid写入delete file
 func (s *ExtentStore) MarkDelete(extentId uint64) (err error) {
 	var (
 		extent     Extent
@@ -341,7 +357,7 @@ func (s *ExtentStore) MarkDelete(extentId uint64) (err error) {
 
 	return
 }
-
+// 定时回收大概率不会再被使用的空extent
 func (s *ExtentStore) cleanupScheduler() {
 	ticker := time.NewTicker(5 * time.Minute)
 	for {
@@ -354,20 +370,23 @@ func (s *ExtentStore) cleanupScheduler() {
 		}
 	}
 }
-
+// 清理基本没啥修改的空文件，标记为delete.
 func (s *ExtentStore) cleanup() {
-
+    // 获取无用extent集合
 	extentInfoSlice, err := s.GetAllWatermark(GetEmptyExtentFilter())
 	if err != nil {
 		return
 	}
+	// 空文件标记为删除
 	for _, extentInfo := range extentInfoSlice {
 		if extentInfo.Size == 0 {
 			s.MarkDelete(uint64(extentInfo.FileId))
 		}
 	}
 }
-
+/*
+从EXTENT_DELETE文件找到所有被标记为delete的extentid，然后删除对应文件
+*/
 func (s *ExtentStore) FlushDelete() (err error) {
 	var (
 		delIdxOff uint64
@@ -424,7 +443,7 @@ func (s *ExtentStore) FlushDelete() (err error) {
 
 	return
 }
-
+// flush extent数据到磁盘
 func (s *ExtentStore) Sync(extentId uint64) (err error) {
 	var extent Extent
 	if extent, err = s.getExtent(extentId); err != nil {
@@ -455,7 +474,7 @@ func (s *ExtentStore) Close() {
 
 	s.closed = true
 }
-
+// 其实就是reload就会更新extentId对应的fileInfo
 func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *FileInfo, err error) {
 	s.extentInfoMux.RLock()
 	defer s.extentInfoMux.RUnlock()
@@ -475,7 +494,7 @@ func (s *ExtentStore) GetWatermark(extentId uint64, reload bool) (extentInfo *Fi
 	}
 	return
 }
-
+// filter返回true的extendFileInfo放到集合里面
 func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo, err error) {
 	extents = make([]*FileInfo, 0)
 	extentInfoSlice := make([]*FileInfo, 0, len(s.extentInfoMap))
@@ -493,7 +512,7 @@ func (s *ExtentStore) GetAllWatermark(filter ExtentFilter) (extents []*FileInfo,
 	}
 	return
 }
-
+// extent文件名字就是extentID，文件名字是大于1的纯数字
 func (s *ExtentStore) parseExtentId(filename string) (extentId uint64, isExtent bool) {
 	if isExtent = RegexpExtentFile.MatchString(filename); !isExtent {
 		return
@@ -508,7 +527,7 @@ func (s *ExtentStore) parseExtentId(filename string) (extentId uint64, isExtent 
 	isExtent = extentId > TinyChunkCount
 	return
 }
-
+// 当前所有的extent占用的磁盘大小
 func (s *ExtentStore) UsedSize() (size int64) {
 	if fInfoArray, err := ioutil.ReadDir(s.dataDir); err == nil {
 		for _, fInfo := range fInfoArray {
@@ -523,7 +542,7 @@ func (s *ExtentStore) UsedSize() (size int64) {
 	}
 	return
 }
-
+// 从del文件中读出来所有的extendID
 func (s *ExtentStore) GetDelObjects() (extents []uint64) {
 	extents = make([]uint64, 0)
 	var (
