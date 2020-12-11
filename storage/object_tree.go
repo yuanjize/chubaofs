@@ -16,7 +16,7 @@ const (
 	IndexBatchRead    = 1024
 	TombstoneFileSize = math.MaxUint32
 )
-
+// 实现了btree.Item接口，可以作为B树的一个节点
 type Object struct {
 	Oid    uint64
 	Offset uint32
@@ -46,9 +46,9 @@ func (o *Object) Unmarshal(in []byte) {
 
 type treeStat struct {
 	fileCount   uint32
-	deleteCount uint32
-	fileBytes   uint64
-	deleteBytes uint64
+	deleteCount uint32  //删除的文件数
+	fileBytes   uint64  
+	deleteBytes uint64  //删除的所有文件之和
 }
 
 type ObjectTree struct {
@@ -57,7 +57,7 @@ type ObjectTree struct {
 	tree    *btree.BTree
 	treeStat
 }
-
+// 一个小文件B树索引
 func (tree *ObjectTree) FileBytes() uint64 {
 	return atomic.LoadUint64(&tree.fileBytes)
 }
@@ -72,6 +72,7 @@ func NewObjectTree(f *os.File) *ObjectTree {
 
 // Needle map in this function is not protected, so callers should
 // guarantee there is no write and delete operations on this needle map
+// 从加载object header文件集合到内存的b树中
 func (tree *ObjectTree) Load() (maxOid uint64, err error) {
 	f := tree.idxFile
 	maxOid, err = WalkIndexFile(f, func(oid uint64, offset, size, crc uint32) error {
@@ -99,12 +100,12 @@ func (tree *ObjectTree) Load() (maxOid uint64, err error) {
 
 	return
 }
-
+// 价差object是否正常
 func (o *Object) Check(offset, size, crc uint32) bool {
 	return o.Oid != 0 && o.Offset == offset && o.Crc == crc &&
 		(o.Size == size || size == TombstoneFileSize)
 }
-
+// 从f中遍历出所有object header，然后传入fn进行处理
 func WalkIndexFile(f *os.File, fn func(oid uint64, offset, size, crc uint32) error) (maxOid uint64, err error) {
 	var (
 		readOff int64
@@ -139,7 +140,7 @@ func WalkIndexFile(f *os.File, fn func(oid uint64, offset, size, crc uint32) err
 
 	return maxOid, err
 }
-
+// ReplaceOrInsert新的object
 func (tree *ObjectTree) set(oid uint64, offset, size, crc uint32) (oldOff, oldSize uint32, err error) {
 	o := &Object{
 		Oid:    oid,
@@ -161,7 +162,7 @@ func (tree *ObjectTree) set(oid uint64, offset, size, crc uint32) (oldOff, oldSi
 
 	return
 }
-
+// 根据oid查找
 func (tree *ObjectTree) get(oid uint64) (n *Object, exist bool) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -176,7 +177,7 @@ func (tree *ObjectTree) get(oid uint64) (n *Object, exist bool) {
 
 	return nil, false
 }
-
+// 删除一个object，并在b树文件中标记它为删除
 func (tree *ObjectTree) delete(oid uint64) error {
 	tree.idxLock.Lock()
 	found := tree.tree.Delete(&Object{Oid: oid})
@@ -191,7 +192,7 @@ func (tree *ObjectTree) delete(oid uint64) error {
 
 	return tree.appendToIdxFile(o)
 }
-
+// 检查某个object的一致性
 func (tree *ObjectTree) checkConsistency(oid uint64, offset, size uint32) bool {
 	o, ok := tree.get(oid)
 	if !ok || o.Offset != offset || o.Size != size {
@@ -200,17 +201,17 @@ func (tree *ObjectTree) checkConsistency(oid uint64, offset, size uint32) bool {
 
 	return true
 }
-
+// 未删除文件数
 func (tree *ObjectTree) increaseSize(size uint32) {
 	tree.fileCount++
 	tree.fileBytes += uint64(size)
 }
-
+// 已删除文件数
 func (tree *ObjectTree) decreaseSize(size uint32) {
 	tree.deleteCount++
 	tree.deleteBytes += uint64(size)
 }
-
+// 把o写入b树文件
 func (tree *ObjectTree) appendToIdxFile(o *Object) error {
 	bytes := make([]byte, ObjectHeaderSize)
 	o.Marshal(bytes)
@@ -218,11 +219,11 @@ func (tree *ObjectTree) appendToIdxFile(o *Object) error {
 	_, err := tree.idxFile.Write(bytes)
 	return err
 }
-
+// 返回B树
 func (tree *ObjectTree) getTree() *btree.BTree {
 	return tree.tree
 }
-
+// o==that
 func (o *Object) IsIdentical(that *Object) bool {
 	return o.Oid == that.Oid && o.Offset == that.Offset && o.Size == that.Size && o.Crc == that.Crc
 }

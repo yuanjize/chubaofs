@@ -28,13 +28,13 @@ const (
 type TinyStore struct {
 	dataDir        string
 	chunks         map[int]*Chunk
-	availChunkCh   chan int
+	availChunkCh   chan int  // 个人觉得这个就是个chunk锁，写的时候从这里取出来ID然后别的人就没法写了。写完了之后再把ID放回去
 	unavailChunkCh chan int
 	storeSize      int
 	chunkSize      int
 	fullChunks     *util.Set
 }
-
+// 加载了一个chunk
 func NewTinyStore(dataDir string, storeSize int) (s *TinyStore, err error) {
 	s = new(TinyStore)
 	s.dataDir = dataDir
@@ -57,7 +57,7 @@ func NewTinyStore(dataDir string, storeSize int) (s *TinyStore, err error) {
 
 	return
 }
-
+// 清空当前store(不会删除底层chunk)
 func (s *TinyStore) DeleteStore() {
 	for index, c := range s.chunks {
 		c.file.Close()
@@ -70,7 +70,7 @@ func (s *TinyStore) UseSize() (size int64) {
 	// TODO: implement this
 	return 0
 }
-
+// 初始化chunk，目前只有一个chunk
 func (s *TinyStore) initChunkFile() (err error) {
 	for i := 1; i <= TinyChunkCount; i++ {
 		var c *Chunk
@@ -82,7 +82,7 @@ func (s *TinyStore) initChunkFile() (err error) {
 
 	return
 }
-
+// 检查chunk是否存在
 func (s *TinyStore) chunkExist(chunkId uint32) (exist bool) {
 	name := s.dataDir + "/" + strconv.Itoa(int(chunkId))
 	if _, err := os.Stat(name); err == nil {
@@ -91,7 +91,7 @@ func (s *TinyStore) chunkExist(chunkId uint32) (exist bool) {
 
 	return
 }
-
+// 把objectId标记为删除
 func (s *TinyStore) WriteDeleteDentry(objectId uint64, chunkId int, crc uint32) (err error) {
 	var (
 		fi os.FileInfo
@@ -116,7 +116,7 @@ func (s *TinyStore) WriteDeleteDentry(objectId uint64, chunkId int, crc uint32) 
 
 	return
 }
-
+// 写操作就是数据写到数据文件末尾，然后创建新的object.如果该objectid之前已经存在，那么干掉老的然后插入新的
 func (s *TinyStore) Write(fileId uint32, objectId uint64, size int64, data []byte, crc uint32) (err error) {
 	var (
 		fi os.FileInfo
@@ -132,7 +132,7 @@ func (s *TinyStore) Write(fileId uint32, objectId uint64, size int64, data []byt
 	}
 	defer c.compactLock.Unlock()
 
-	if objectId < c.loadLastOid() {
+	if objectId < c.loadLastOid() { // object应该不能代表一个文件
 		msg := fmt.Sprintf("Object id smaller than last oid. DataDir[%v] FileId[%v]"+
 			" ObjectId[%v] Size[%v]", s.dataDir, chunkId, objectId, c.loadLastOid())
 		err = errors.New(msg)
@@ -155,7 +155,7 @@ func (s *TinyStore) Write(fileId uint32, objectId uint64, size int64, data []byt
 	}
 	return
 }
-
+// 读一个object，size必须和文件中的object.size一样
 func (s *TinyStore) Read(fileId uint32, offset, size int64, nbuf []byte) (crc uint32, err error) {
 	chunkId := int(fileId)
 	objectId := uint64(offset)
@@ -193,7 +193,7 @@ func (s *TinyStore) Read(fileId uint32, offset, size int64, nbuf []byte) (crc ui
 
 	return
 }
-
+// 刷新chunk文件的索引文件和数据文件
 func (s *TinyStore) Sync(fileId uint32) (err error) {
 	chunkId := (int)(fileId)
 	c, ok := s.chunks[chunkId]
@@ -208,7 +208,7 @@ func (s *TinyStore) Sync(fileId uint32) (err error) {
 
 	return c.file.Sync()
 }
-
+// 所有chunk的fileInfo
 func (s *TinyStore) GetAllWatermark() (chunks []*FileInfo, err error) {
 	chunks = make([]*FileInfo, 0)
 	for chunkId, c := range s.chunks {
@@ -218,7 +218,7 @@ func (s *TinyStore) GetAllWatermark() (chunks []*FileInfo, err error) {
 
 	return
 }
-
+// 获得某个chunk的chunkinfo
 func (s *TinyStore) GetWatermark(fileId uint64) (chunkInfo *FileInfo, err error) {
 	chunkId := (int)(fileId)
 	c, ok := s.chunks[chunkId]
@@ -229,7 +229,7 @@ func (s *TinyStore) GetWatermark(fileId uint64) (chunkInfo *FileInfo, err error)
 
 	return
 }
-
+// 可用的chunk
 func (s *TinyStore) GetAvailChunk() (chunkId int, err error) {
 	select {
 	case chunkId = <-s.availChunkCh:
@@ -239,7 +239,7 @@ func (s *TinyStore) GetAvailChunk() (chunkId int, err error) {
 
 	return
 }
-
+// 可用的chunk
 func (s *TinyStore) GetChunkForWrite() (chunkId int, err error) {
 	chLen := len(s.availChunkCh)
 	for i := 0; i < chLen; i++ {
@@ -253,24 +253,26 @@ func (s *TinyStore) GetChunkForWrite() (chunkId int, err error) {
 
 	return
 }
-
+// 所有chunk的索引文件和数据文件都刷新到磁盘
 func (s *TinyStore) SyncAll() {
 	for _, chunkFp := range s.chunks {
 		chunkFp.tree.idxFile.Sync()
 		chunkFp.file.Sync()
 	}
 }
+// 关闭所有chunk文件
 func (s *TinyStore) CloseAll() {
 	for _, chunkFp := range s.chunks {
 		chunkFp.tree.idxFile.Close()
 		chunkFp.file.Close()
 	}
 }
-
+// 该chunk变为可用状态
 func (s *TinyStore) PutAvailChunk(chunkId int) {
 	s.availChunkCh <- chunkId
 }
 
+// 获取不可用chunk
 func (s *TinyStore) GetUnAvailChunk() (chunkId int, err error) {
 	select {
 	case chunkId = <-s.unavailChunkCh:
@@ -281,6 +283,7 @@ func (s *TinyStore) GetUnAvailChunk() (chunkId int, err error) {
 	return
 }
 
+// 该chunk状态置为不可用
 func (s *TinyStore) PutUnAvailChunk(chunkId int) {
 	s.unavailChunkCh <- chunkId
 }
@@ -288,7 +291,7 @@ func (s *TinyStore) PutUnAvailChunk(chunkId int) {
 func (s *TinyStore) GetStoreChunkCount() (files int, err error) {
 	return TinyChunkCount, nil
 }
-
+// 删除某个object
 func (s *TinyStore) MarkDelete(fileId uint32, offset, size int64) error {
 	chunkId := int(fileId)
 	objectId := uint64(offset)
@@ -299,11 +302,12 @@ func (s *TinyStore) MarkDelete(fileId uint32, offset, size int64) error {
 
 	return c.tree.delete(objectId)
 }
-
+// UnAvailChan长度
 func (s *TinyStore) GetUnAvailChanLen() (chanLen int) {
 	return len(s.unavailChunkCh)
 }
 
+// AvailChan长度
 func (s *TinyStore) GetAvailChanLen() (chanLen int) {
 	return len(s.availChunkCh)
 }

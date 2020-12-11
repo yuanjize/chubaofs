@@ -10,7 +10,7 @@ import (
 
 	"github.com/tiglabs/baudstorage/util"
 )
-
+// 一个chunk对应一个物理文件，里面包含很多小文件
 type Chunk struct {
 	file        *os.File
 	tree        *ObjectTree
@@ -19,7 +19,7 @@ type Chunk struct {
 	commitLock  sync.RWMutex
 	compactLock util.TryMutex
 }
-
+// 加载chunk索引文件
 func NewChunk(dataDir string, chunkId int) (c *Chunk, err error) {
 	c = new(Chunk)
 	name := dataDir + "/" + strconv.Itoa(chunkId)
@@ -31,7 +31,7 @@ func NewChunk(dataDir string, chunkId int) (c *Chunk, err error) {
 	c.storeLastOid(maxOid)
 	return c, nil
 }
-
+// 把要删除的oid从b树删除
 func (c *Chunk) applyDelObjects(objects []uint64) (err error) {
 	for _, needle := range objects {
 		c.tree.delete(needle)
@@ -40,7 +40,7 @@ func (c *Chunk) applyDelObjects(objects []uint64) (err error) {
 	c.storeSyncLastOid(c.loadLastOid())
 	return
 }
-
+// 加载chunkid.idx b树索引文件，打开chunkid文件
 func (c *Chunk) loadTree(name string) (maxOid uint64, err error) {
 	if c.file, err = os.OpenFile(name, ChunkOpenOpt, 0666); err != nil {
 		return
@@ -63,7 +63,7 @@ func (c *Chunk) loadTree(name string) (maxOid uint64, err error) {
 	return
 }
 
-// returns count of valid objects calculated for CRC
+// returns count of valid objects calculated for CRC // 返回校验值，和校验的object的数目
 func (c *Chunk) getCheckSum() (fullCRC uint32, syncLastOid uint64, count int) {
 	syncLastOid = c.loadSyncLastOid()
 	if syncLastOid == 0 {
@@ -117,7 +117,7 @@ func (c *Chunk) storeSyncLastOid(val uint64) {
 	atomic.StoreUint64(&c.syncLastOid, val)
 	return
 }
-
+// 对数据文件和索引文件分别进行合并,其实就是把被删除的文件干掉
 func (c *Chunk) doCompact() (err error) {
 	var (
 		newIdxFile *os.File
@@ -146,7 +146,7 @@ func (c *Chunk) doCompact() (err error) {
 
 	return nil
 }
-
+// 复制idx文件和数据文件，如果索引是delete，那么只复制该object的索引，不复制数据。
 func (c *Chunk) copyValidData(dstNm *ObjectTree, dstDatFile *os.File) (err error) {
 	srcNm := c.tree
 	srcDatFile := c.file
@@ -203,7 +203,7 @@ func (c *Chunk) copyValidData(dstNm *ObjectTree, dstDatFile *os.File) (err error
 
 	return err
 }
-
+// 就是文件重命名
 func (c *Chunk) doCommit() (err error) {
 	name := c.file.Name()
 	c.tree.idxFile.Close()
@@ -230,7 +230,7 @@ func (c *Chunk) doCommit() (err error) {
 	}
 	return err
 }
-
+// 把老文件末尾的删除部分拷贝到新文件？？
 func catchupDeleteIndex(oldIdxName, newIdxName string) error {
 	var (
 		oldIdxFile, newIdxFile *os.File
@@ -251,7 +251,7 @@ func catchupDeleteIndex(oldIdxName, newIdxName string) error {
 		return err
 	}
 
-	data := make([]byte, ObjectHeaderSize)
+	data := make([]byte, ObjectHeaderSize) // 读出来新文件的最后一项
 	_, err = newIdxFile.ReadAt(data, newinfo.Size()-ObjectHeaderSize)
 	if err != nil {
 		return err
@@ -265,7 +265,7 @@ func catchupDeleteIndex(oldIdxName, newIdxName string) error {
 		return err
 	}
 
-	catchup := make([]byte, 0)
+	catchup := make([]byte, 0)  // 从后往前便利老文件，找到第一个非delet或者和新文件对其的地方
 	for offset := oldInfo.Size() - ObjectHeaderSize; offset >= 0; offset -= ObjectHeaderSize {
 		_, err = oldIdxFile.ReadAt(data, offset)
 		if err != nil {
